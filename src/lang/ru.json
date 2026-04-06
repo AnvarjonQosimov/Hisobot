@@ -1,0 +1,14 @@
+{
+    "Home": "Главная",
+    "Kalkulator": "Калькулятор",
+    "Start": "Начать",
+    "Calculation History": "История расчетов",
+    "Are you sure you want to clear all history?": "Вы уверены, что хотите очистить всю историю?",
+    "Are you sure you want to delete this entry?": "Вы уверены, что хотите удалить эту запись?",
+    "Clear": "Очистить",
+    "Delete": "Удалить",
+    "Cancel": "Отмена",
+    "Clear All": "Очистить всё",
+    "History": "История",
+    "NoCalculationsYet": "Пока нет расчетов"
+}
