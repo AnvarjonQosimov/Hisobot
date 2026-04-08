@@ -22,12 +22,6 @@ function Hisobot() {
   const [currencyAlreadyReceived, setCurrencyAlreadyReceived] = useState("sum");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
-  const [miniCalcOpen, setMiniCalcOpen] = useState(false);
-  const [calcDisplay, setCalcDisplay] = useState("0");
-  const [calcPrevious, setCalcPrevious] = useState(null);
-  const [calcOperation, setCalcOperation] = useState(null);
-  const [calcWaiting, setCalcWaiting] = useState(false);
-
 
   // Persistence States
   const [workers, setWorkers] = useState([]);
@@ -40,8 +34,6 @@ function Hisobot() {
 
   // Mini Calculator State
   const [expandedHistory, setExpandedHistory] = useState([]); // Track which worker's history is shown
-  const [undoState, setUndoState] = useState(null); // System state for one-step Undo
-  const [showUndoConfirm, setShowUndoConfirm] = useState(false); // For dismissing Undo option
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,11 +47,6 @@ function Hisobot() {
 
   // Responsive State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  // Draggable State
-  const [isDragging, setIsDragging] = useState(false);
-  const [calcPosition, setCalcPosition] = useState({ x: 100, y: 100 });
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Load from localStorage (Account Scoped)
   useEffect(() => {
@@ -136,56 +123,14 @@ function Hisobot() {
     setDateAlreadyReceived("");
     setCurrencyToReceive("sum");
     setCurrencyAlreadyReceived("sum");
-    setMiniCalcOpen(false);
-    setCalcDisplay("0");
-    setCalcPrevious(null);
-    setCalcOperation(null);
-    setCalcPosition({ x: 100, y: 100 });
   };
 
   const handleBalansModalClose = () => {
     setBalansQoshish(false);
     setBalanceAmount("");
     setBalanceCurrency("sum");
-    setMiniCalcOpen(false);
-    setCalcDisplay("0");
-    setCalcPrevious(null);
-    setCalcOperation(null);
-    setCalcPosition({ x: 100, y: 100 });
   };
 
-  // Dragging logic
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - calcPosition.x,
-      y: e.clientY - calcPosition.y,
-    });
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isDragging) return;
-      setCalcPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging, dragStart]);
 
   const saveForUndo = () => {
     setUndoState({
