@@ -2,14 +2,10 @@ import React, { useState, useEffect } from "react";
 import "../styles/Hisobot.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import Select from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
 
 function Hisobot() {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   // State Definitions
   const [username, setUsername] = useState("");
@@ -25,7 +21,12 @@ function Hisobot() {
   const [currencyAlreadyReceived, setCurrencyAlreadyReceived] = useState("sum");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
-  const [age, setAge] = useState("uz");
+  const [miniCalcOpen, setMiniCalcOpen] = useState(false);
+  const [calcDisplay, setCalcDisplay] = useState("0");
+  const [calcPrevious, setCalcPrevious] = useState(null);
+  const [calcOperation, setCalcOperation] = useState(null);
+  const [calcWaiting, setCalcWaiting] = useState(false);
+
 
   // Persistence States
   const [workers, setWorkers] = useState([]);
@@ -37,11 +38,6 @@ function Hisobot() {
   const [editingWorkerId, setEditingWorkerId] = useState(null);
 
   // Mini Calculator State
-  const [miniCalcOpen, setMiniCalcOpen] = useState(false);
-  const [calcDisplay, setCalcDisplay] = useState("0");
-  const [calcPrevious, setCalcPrevious] = useState(null);
-  const [calcOperation, setCalcOperation] = useState(null);
-  const [calcWaiting, setCalcWaiting] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState([]); // Track which worker's history is shown
   const [undoState, setUndoState] = useState(null); // System state for one-step Undo
   const [showUndoConfirm, setShowUndoConfirm] = useState(false); // For dismissing Undo option
@@ -461,67 +457,15 @@ function Hisobot() {
     return path;
   };
 
-  // Mini Calculator Logic
-  const handleCalcNumber = (num) => {
-    if (calcWaiting) {
-      setCalcDisplay(String(num));
-      setCalcWaiting(false);
-    } else {
-      setCalcDisplay(calcDisplay === "0" ? String(num) : calcDisplay + num);
-    }
+  const getCircularData = () => {
+    const totalCount = workers.length;
+    if (totalCount === 0) return { paid: 0, unpaid: 0, percent: 0 };
+    const paidCount = workers.filter((w) => w.isPaid).length;
+    const percent = Math.round((paidCount / totalCount) * 100);
+    return { paid: paidCount, unpaid: totalCount - paidCount, percent };
   };
 
-  const handleCalcOperation = (op) => {
-    const input = parseFloat(calcDisplay);
-    if (calcPrevious === null) {
-      setCalcPrevious(input);
-    } else if (calcOperation) {
-      const result = performCalculation(calcPrevious, input, calcOperation);
-      setCalcDisplay(String(result));
-      setCalcPrevious(result);
-    }
-    setCalcOperation(op);
-    setCalcWaiting(true);
-  };
 
-  const performCalculation = (prev, curr, op) => {
-    switch (op) {
-      case "+":
-        return prev + curr;
-      case "-":
-        return prev - curr;
-      case "*":
-        return prev * curr;
-      case "/":
-        return prev / curr;
-      default:
-        return curr;
-    }
-  };
-
-  const handleCalcEquals = () => {
-    const input = parseFloat(calcDisplay);
-    if (calcPrevious !== null && calcOperation) {
-      const result = performCalculation(calcPrevious, input, calcOperation);
-      setCalcDisplay(String(result));
-      setCalcPrevious(null);
-      setCalcOperation(null);
-      setCalcWaiting(true);
-    }
-  };
-
-  const handleCalcClear = () => {
-    setCalcDisplay("0");
-    setCalcPrevious(null);
-    setCalcOperation(null);
-    setCalcWaiting(false);
-  };
-
-  const handleUseCalcValue = (field) => {
-    if (field === "toReceive") setAmountToReceive(calcDisplay);
-    if (field === "alreadyReceived") setAmountAlreadyReceived(calcDisplay);
-    // setMiniCalcOpen(false);
-  };
 
   const isFormValid =
     workerName &&
@@ -529,12 +473,6 @@ function Hisobot() {
     dateToGive &&
     amountAlreadyReceived &&
     dateAlreadyReceived;
-
-  const handleChange = (event) => {
-    const lang = String(event.target.value);
-    setAge(lang);
-    i18n.changeLanguage(lang);
-  };
 
   return (
     <div className="Hisobot">
@@ -938,6 +876,49 @@ function Hisobot() {
                   </defs>
                   <path className="chart-path" d={getChartData()} />
                 </svg>
+              </div>
+            </div>
+
+            <div className="circular-stats">
+              <h2>Kruglaya Statistika</h2>
+              <div className="pie-container">
+                <svg className="pie-chart" viewBox="0 0 100 100">
+                  <circle
+                    className="pie-bg"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke="rgba(161, 161, 241, 0.1)"
+                    strokeWidth="10"
+                  />
+                  <circle
+                    className="pie-segment"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke="rgb(86, 86, 255)"
+                    strokeWidth="10"
+                    strokeDasharray={`${getCircularData().percent * 2.51} 251.2`}
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    transform="rotate(-90 50 50)"
+                  />
+                  <text x="50" y="55" className="pie-text">
+                    {getCircularData().percent}%
+                  </text>
+                </svg>
+                <div className="pie-legend">
+                  <div className="legend-item">
+                    <span className="dot paid"></span>
+                    <span>To'langan: {getCircularData().paid}</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="dot unpaid"></span>
+                    <span>Qolgan: {getCircularData().unpaid}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

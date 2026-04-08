@@ -2,14 +2,10 @@ import React, { useState, useEffect } from "react";
 import "../styles/OfficeXarajat.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import Select from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   // State Definitions
   const [username, setUsername] = useState("");
@@ -25,7 +21,6 @@ function OfficeXarajat() {
   const [currencyAlreadyPaid, setCurrencyAlreadyPaid] = useState("sum");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
-  const [age, setAge] = useState("uz");
 
   // Persistence States
   const [expenses, setExpenses] = useState([]);
@@ -45,18 +40,10 @@ function OfficeXarajat() {
   const [expandedHistory, setExpandedHistory] = useState([]); 
   const [undoState, setUndoState] = useState(null); 
   const [showUndoConfirm, setShowUndoConfirm] = useState(false); 
-
-  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState("all"); 
-
-  // Custom Delete Modal State
   const [deleteExpenseId, setDeleteExpenseId] = useState(null);
-
-  // Linear Stats State
   const [chartPeriod, setChartPeriod] = useState("week"); 
-
-  // Draggable State
   const [isDragging, setIsDragging] = useState(false);
   const [calcPosition, setCalcPosition] = useState({ x: 100, y: 100 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -425,6 +412,14 @@ function OfficeXarajat() {
     return path;
   };
 
+  const getCircularData = () => {
+    const totalCount = expenses.length;
+    if (totalCount === 0) return { paid: 0, unpaid: 0, percent: 0 };
+    const paidCount = expenses.filter((e) => e.isPaid).length;
+    const percent = Math.round((paidCount / totalCount) * 100);
+    return { paid: paidCount, unpaid: totalCount - paidCount, percent };
+  };
+
   const handleCalcNumber = (num) => {
     if (calcWaiting) {
       setCalcDisplay(String(num));
@@ -645,6 +640,49 @@ function OfficeXarajat() {
                   </defs>
                   <path className="chart-path" d={getChartData()} />
                 </svg>
+              </div>
+            </div>
+
+            <div className="circular-stats">
+              <h2>Kruglaya Statistika</h2>
+              <div className="pie-container">
+                <svg className="pie-chart" viewBox="0 0 100 100">
+                  <circle
+                    className="pie-bg"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke="rgba(161, 161, 241, 0.1)"
+                    strokeWidth="10"
+                  />
+                  <circle
+                    className="pie-segment"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke="#5656ff"
+                    strokeWidth="10"
+                    strokeDasharray={`${getCircularData().percent * 2.51} 251.2`}
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    transform="rotate(-90 50 50)"
+                  />
+                  <text x="50" y="55" className="pie-text">
+                    {getCircularData().percent}%
+                  </text>
+                </svg>
+                <div className="pie-legend">
+                  <div className="legend-item">
+                    <span className="dot paid"></span>
+                    <span>To'langan: {getCircularData().paid}</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="dot unpaid"></span>
+                    <span>Qolgan: {getCircularData().unpaid}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

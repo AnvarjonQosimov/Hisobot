@@ -871,6 +871,75 @@
   cursor: not-allowed;
 }
 
+/* Circular Stats */
+.circular-stats {
+  margin-top: 40px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 25px;
+  border-radius: 20px;
+  border: 1px solid rgba(161, 161, 241, 0.15);
+}
+
+.circular-stats h2 {
+  font-size: 20px;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.pie-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.pie-chart {
+  width: 150px;
+  height: 150px;
+}
+
+.pie-segment {
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.pie-text {
+  fill: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  dominant-baseline: middle;
+  text-anchor: middle;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: rgb(146, 151, 223);
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.dot.paid {
+  background: rgb(86, 86, 255);
+}
+
+.dot.unpaid {
+  background: rgba(161, 161, 241, 0.1);
+  border: 1px solid rgba(161, 161, 241, 0.3);
+}
+
 /* Animation */
 @keyframes modalFade {
   from {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import "../styles/Calculator.css"
 import { useTranslation } from "react-i18next";
 
@@ -27,25 +27,25 @@ function Calculator() {
     itemIndex: null
   });
 
-  const handleNumberClick = (num) => {
+  const handleNumberClick = useCallback((num) => {
     if (waitingForNewValue) {
       setDisplay(String(num));
       setWaitingForNewValue(false);
     } else {
       setDisplay(display === '0' ? String(num) : display + num);
     }
-  };
+  }, [display, waitingForNewValue]);
 
-  const handleDecimal = () => {
+  const handleDecimal = useCallback(() => {
     if (waitingForNewValue) {
       setDisplay('0.');
       setWaitingForNewValue(false);
     } else if (!display.includes('.')) {
       setDisplay(display + '.');
     }
-  };
+  }, [display, waitingForNewValue]);
 
-  const handleOperation = (op) => {
+  const handleOperation = useCallback((op) => {
     const inputValue = parseFloat(display);
 
     if (previous === null) {
@@ -58,7 +58,7 @@ function Calculator() {
 
     setOperation(op);
     setWaitingForNewValue(true);
-  };
+  }, [display, previous, operation]);
 
   const calculate = (prev, current, op) => {
     switch (op) {
@@ -77,7 +77,7 @@ function Calculator() {
     }
   };
 
-  const handleEquals = () => {
+  const handleEquals = useCallback(() => {
     const inputValue = parseFloat(display);
 
     if (previous !== null && operation) {
@@ -89,22 +89,22 @@ function Calculator() {
       setOperation(null);
       setWaitingForNewValue(true);
     }
-  };
+  }, [display, previous, operation, history]);
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setDisplay('0');
     setPrevious(null);
     setOperation(null);
     setWaitingForNewValue(false);
-  };
+  }, []);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     if (display.length === 1) {
       setDisplay('0');
     } else {
       setDisplay(display.slice(0, -1));
     }
-  };
+  }, [display]);
 
   const clearHistory = () => {
     setConfirmDialog({
@@ -195,7 +195,7 @@ function Calculator() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [display, previous, operation, waitingForNewValue]);
+  }, [handleNumberClick, handleOperation, handleDecimal, handleEquals, handleDelete, handleClear]);
 
   return (
     <div className='Calculator'>
