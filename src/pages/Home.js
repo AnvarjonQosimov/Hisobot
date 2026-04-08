@@ -25,7 +25,7 @@ function Home() {
         <div className='icon icon-rocket'>🚀</div>
       </div>
       <div className='content'>
-        <h1>HisobotUz</h1>
+        <h1>OfficeReport</h1>
         <Link to="/login"><button>{t("Start")}</button></Link>
       </div>
     </div>

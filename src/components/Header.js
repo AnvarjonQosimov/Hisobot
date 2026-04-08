@@ -26,7 +26,7 @@ function Header() {
           </i>
         </div>
         <div className="textLogo">
-          <h1>HisobotUz</h1>
+          <h1>OfficeReport</h1>
         </div>
       </div>
 

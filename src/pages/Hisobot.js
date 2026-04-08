@@ -35,6 +35,10 @@ function Hisobot() {
   // Mini Calculator State
   const [expandedHistory, setExpandedHistory] = useState([]); // Track which worker's history is shown
 
+  // Undo Functionality State
+  const [undoState, setUndoState] = useState(null);
+  const [showUndoConfirm, setShowUndoConfirm] = useState(false);
+
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState("all"); // all, recent, high
@@ -435,7 +439,7 @@ function Hisobot() {
         </button>
         <div className="hisobotLeftText">
           <div className="leftTop">
-            <h1 onClick={() => setIsSidebarOpen(false)}>HisobotUz</h1>
+            <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
             <p>{username}</p>
             <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
               <h3>Profil</h3>

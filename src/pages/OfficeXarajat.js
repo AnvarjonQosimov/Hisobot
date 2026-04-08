@@ -493,7 +493,7 @@ function OfficeXarajat() {
         </button>
         <div className="hisobotLeftText">
           <div className="leftTop">
-            <h1 onClick={() => setIsSidebarOpen(false)}>HisobotUz</h1>
+            <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
             <p>{username}</p>
             <Link to="/profil" onClick={() => setIsSidebarOpen(false)}><h3>Profil</h3></Link>
             <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}><h3>{t("Kalkulator")}</h3></Link>
