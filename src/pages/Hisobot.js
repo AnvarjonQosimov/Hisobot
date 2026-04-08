@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "../styles/Hisobot.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
+import { HiMenu, HiX } from "react-icons/hi";
 
 function Hisobot() {
   const navigate = useNavigate();
@@ -51,6 +52,9 @@ function Hisobot() {
 
   // Linear Stats State
   const [chartPeriod, setChartPeriod] = useState("week"); // day, week, month, year
+
+  // Responsive State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Draggable State
   const [isDragging, setIsDragging] = useState(false);
@@ -476,18 +480,25 @@ function Hisobot() {
 
   return (
     <div className="Hisobot">
-      <div className="HisobotLeft">
+      <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
+        <HiMenu />
+      </button>
+
+      <div className={`HisobotLeft ${isSidebarOpen ? "open" : ""}`}>
+        <button className="mobile-close-btn" onClick={() => setIsSidebarOpen(false)}>
+          <HiX />
+        </button>
         <div className="hisobotLeftText">
           <div className="leftTop">
-            <h1>HisobotUz</h1>
+            <h1 onClick={() => setIsSidebarOpen(false)}>HisobotUz</h1>
             <p>{username}</p>
-            <Link to="/profil">
+            <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
               <h3>Profil</h3>
             </Link>
-            <Link to="/calculator2">
+            <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("Kalkulator")}</h3>
             </Link>
-            <Link to="/officexarajat">
+            <Link to="/officexarajat" onClick={() => setIsSidebarOpen(false)}>
               <h3>O'fis xarajatlari</h3>
             </Link>
           </div>
@@ -499,6 +510,11 @@ function Hisobot() {
         </div>
         <div className="leftLine"></div>
       </div>
+
+      {isSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
+      )}
+
 
       <div className="HisobotRight">
         <div className="rightTop">

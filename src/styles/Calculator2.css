@@ -539,4 +539,10 @@
         height: 28px;
         font-size: 20px;
     }
+
+    .prevBtn {
+        top: 15px;
+        left: 20px;
+        font-size: 20px;
+    }
 }

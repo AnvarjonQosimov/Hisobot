@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "../styles/OfficeXarajat.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
+import { HiMenu, HiX } from "react-icons/hi";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
@@ -44,6 +45,9 @@ function OfficeXarajat() {
   const [activeFilter, setActiveFilter] = useState("all"); 
   const [deleteExpenseId, setDeleteExpenseId] = useState(null);
   const [chartPeriod, setChartPeriod] = useState("week"); 
+
+  // Responsive State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [calcPosition, setCalcPosition] = useState({ x: 100, y: 100 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -479,14 +483,21 @@ function OfficeXarajat() {
 
   return (
     <div className="OfficeXarajat">
-      <div className="OfficeXarajatLeft">
+      <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
+        <HiMenu />
+      </button>
+
+      <div className={`OfficeXarajatLeft ${isSidebarOpen ? "open" : ""}`}>
+        <button className="mobile-close-btn" onClick={() => setIsSidebarOpen(false)}>
+          <HiX />
+        </button>
         <div className="hisobotLeftText">
           <div className="leftTop">
-            <h1>HisobotUz</h1>
+            <h1 onClick={() => setIsSidebarOpen(false)}>HisobotUz</h1>
             <p>{username}</p>
-            <Link to="/profil"><h3>Profil</h3></Link>
-            <Link to="/calculator2"><h3>{t("Kalkulator")}</h3></Link>
-            <Link to="/hisobot"><h3>Ishchilar hisoboti</h3></Link>
+            <Link to="/profil" onClick={() => setIsSidebarOpen(false)}><h3>Profil</h3></Link>
+            <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}><h3>{t("Kalkulator")}</h3></Link>
+            <Link to="/hisobot" onClick={() => setIsSidebarOpen(false)}><h3>Ishchilar hisoboti</h3></Link>
           </div>
           <div className="leftBottom">
             <button className="logout-btn" onClick={handleLogout}><h3>Chiqish</h3></button>
@@ -494,6 +505,11 @@ function OfficeXarajat() {
         </div>
         <div className="leftLine"></div>
       </div>
+
+      {isSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
+      )}
+
 
       <div className="OfficeXarajatRight">
         <div className="rightTop">

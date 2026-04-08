@@ -13,11 +13,13 @@
     display: flex;
     align-items: center;
     justify-content: start;
-    width: 15%;
+    width: 280px;
     height: 100%;
     position: fixed;
     padding: 0 0 0 30px;
     background-color: rgb(0, 4, 45);
+    z-index: 1000;
+    transition: transform 0.3s ease;
 }
 
 .hisobotLeftText{
@@ -106,12 +108,52 @@
 
 .leftLine{
     height: 100%;
-    width: 1%;
+    width: 4px;
     background-color: rgb(7, 12, 64);
     display: flex;
     align-items: center;
     justify-content: end;   
     box-shadow: 10px 0 20px 10px rgba(15, 21, 90, 0.2);
+}
+
+/* Mobile Menu Buttons */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 900;
+    background: rgba(161, 161, 241, 0.1);
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    color: rgb(204, 194, 255);
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 24px;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+}
+
+.mobile-close-btn {
+    display: none;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: rgb(204, 194, 255);
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 999;
 }
 
 /* Modal Styles */
@@ -217,11 +259,12 @@
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
-    width: calc(100% - 15% - 340px); /* Fill space between sidebars */
-    height: 100vh;
-    margin-left: 15% !important; /* Matches OfficeXarajatLeft width */
+    width: calc(100% - 280px);
+    min-height: 100vh;
+    margin-left: 280px !important;
     color: rgb(204, 194, 255);
     overflow-x: hidden;
+    transition: all 0.3s ease;
 }
 
 .rightTop{
@@ -1057,3 +1100,134 @@
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 1200px) {
+    .OfficeXarajatRight {
+        width: calc(100% - 280px);
+    }
+}
+
+@media (max-width: 992px) {
+    .worker-values {
+        gap: 20px;
+    }
+    
+    .rightTop {
+        gap: 10px;
+    }
+    
+    .searchWorker {
+        width: 120px;
+    }
+    
+    .filterIshchilar {
+        width: 200px;
+    }
+}
+
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: flex;
+    }
+
+    .mobile-close-btn {
+        display: block;
+    }
+
+    .OfficeXarajatLeft {
+        transform: translateX(-100%);
+        width: 280px;
+        box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .OfficeXarajatLeft.open {
+        transform: translateX(0);
+    }
+
+    .OfficeXarajatRight {
+        width: 100% !important;
+        margin-left: 0 !important;
+        padding-top: 80px;
+    }
+
+    .rightTop {
+        margin: 0;
+        height: auto;
+        padding: 20px;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .qoshishLine {
+        display: none;
+    }
+
+    .statistic {
+        flex-direction: column;
+        padding: 20px;
+        gap: 15px;
+    }
+
+    .statistic1, .statistic2, .statistic3, .statistic4 {
+        width: 100% !important;
+        min-height: auto;
+    }
+
+    .worker-item-main {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .worker-values {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .worker-actions {
+        width: 100%;
+        justify-content: flex-end;
+        border-top: 1px solid rgba(161, 161, 241, 0.1);
+        padding-top: 10px;
+    }
+
+    .pie-container {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .rightTop h3, .searchWorker {
+        width: 100% !important;
+        margin: 0 !important;
+    }
+
+    .filterIshchilar {
+        width: 100%;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .worker-values {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .confirm-modal {
+        width: 95%;
+        padding: 20px;
+    }
+
+    .confirm-buttons {
+        flex-direction: column;
+    }
+
+    .confirm-btn {
+        width: 100%;
+    }
+}
+
