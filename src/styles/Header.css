@@ -9,7 +9,7 @@
     border: 1px solid rgba(191, 170, 233, 0.5);
     box-shadow: 0 0 10px 15px rgba(255, 255, 255, 0.2);
     border-radius: 50px;
-    position: absolute;
+    position: fixed;
     top: 40px;
     left: 50%;
     transform: translateX(-50%);

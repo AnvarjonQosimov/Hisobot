@@ -84,7 +84,7 @@
     width: 100%;
 }
 
-.logout-btn h3 {
+.leftBottom h3 {
     background-color: rgba(255, 60, 60, 0.5);
     width: 85%;
     padding: 10px 20px;
@@ -101,9 +101,13 @@
     color: rgb(204, 194, 255);
 }
 
-.logout-btn:hover h3 {
+.leftBottom:hover h3 {
     box-shadow: 0 0 10px 15px rgba(255, 107, 107, 0.2);
     border-left: 5px solid rgb(232, 74, 74);
+}
+
+.leftBottom a{
+    text-decoration: none;
 }
 
 .leftLine{
@@ -259,7 +263,7 @@
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
-    width: calc(100% - 280px);
+    width: 63.5%;
     min-height: 100vh;
     margin-left: 280px !important;
     color: rgb(204, 194, 255);
@@ -478,7 +482,7 @@
     align-items: flex-start;
     justify-content: flex-start;
     width: 100%;
-    height: calc(100vh - 70px);
+    height: 100% !important;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 20px;
@@ -693,7 +697,7 @@
     display: flex;
     align-items: center;
     justify-content: start;
-    width: 340px;
+    width: 285px;
     height: 100vh;
     overflow: hidden;
     position: fixed;
@@ -701,6 +705,8 @@
     top: 0;
     background-color: rgb(0, 4, 45);
     text-align: center;
+    z-index: 50;
+    transform: none;
 }
 
 .lrLine{
@@ -995,32 +1001,52 @@
   }
 }
 
-/* RESPONSIVE DESIGN */
-@media (max-width: 1200px) {
-    .HisobotRight {
-        width: calc(100% - 280px);
-    }
+/* ── Left panel toggle button (hidden on wide screens) ── */
+.mobile-menu-btn {
+    display: none;
 }
 
-@media (max-width: 992px) {
-    .worker-values {
-        gap: 20px;
-    }
-    
-    .rightTop {
-        gap: 10px;
-    }
-    
-    .searchWorker {
-        width: 120px;
-    }
-    
-    .filterIshchilar {
-        width: 200px;
-    }
+.mobile-close-btn {
+    display: none;
 }
 
-@media (max-width: 768px) {
+/* ── Right panel toggle button ── */
+.right-panel-toggle-btn {
+    display: none;
+    position: fixed;
+    top: 50%;
+    right: 0;
+    z-index: 900;
+    background: rgba(161, 161, 241, 0.15);
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+    color: rgb(204, 194, 255);
+    padding: 14px 8px;
+    font-size: 18px;
+    backdrop-filter: blur(5px);
+    writing-mode: vertical-rl;
+    letter-spacing: 2px;
+    line-height: 1;
+}
+
+.right-panel-close-btn {
+    display: none;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: none;
+    border: none;
+    color: rgb(204, 194, 255);
+    font-size: 22px;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* ─────────────── RESPONSIVE ≤ 1485px ─────────────── */
+@media (max-width: 1485px) {
+
+    /* Show toggle buttons */
     .mobile-menu-btn {
         display: flex;
     }
@@ -1029,46 +1055,62 @@
         display: block;
     }
 
+    .right-panel-toggle-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .right-panel-close-btn {
+        display: block;
+    }
+
+    /* ── Left sidebar — hidden by default, slides in when .open ── */
     .HisobotLeft {
         transform: translateX(-100%);
-        width: 280px;
+        z-index: 1002;
         box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+        top: 0;
+        left: 0;
     }
 
     .HisobotLeft.open {
         transform: translateX(0);
     }
 
+    /* ── Right stats panel — hidden by default, slides in when .open ── */
+    .rightRight {
+        transform: translateX(100%);
+        z-index: 1002;
+        box-shadow: -20px 0 50px rgba(0, 0, 0, 0.5);
+        transition: transform 0.3s ease;
+    }
+
+    .rightRight.open {
+        transform: translateX(0);
+    }
+
+    /* ── Main content fills full width ── */
     .HisobotRight {
         width: 100% !important;
         margin-left: 0 !important;
-        padding-top: 80px;
     }
 
+    /* ── Top bar adjustments ── */
     .rightTop {
         margin: 0;
         height: auto;
-        padding: 20px;
+        padding: 20px 15px;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 15px;
+        gap: 10px;
     }
 
     .qoshishLine {
         display: none;
     }
 
-    .statistic {
-        flex-direction: column;
-        padding: 20px;
-        gap: 15px;
-    }
-
-    .statistic1, .statistic2, .statistic3, .statistic4, .statistic5, .statistic6 {
-        width: 100% !important;
-        min-height: auto;
-    }
-
+    /* ── Worker list adjustments ── */
     .worker-item-main {
         flex-direction: column;
         gap: 15px;
@@ -1079,6 +1121,7 @@
         width: 100%;
         justify-content: flex-start;
         flex-wrap: wrap;
+        gap: 20px;
     }
 
     .worker-actions {
@@ -1095,20 +1138,30 @@
 }
 
 @media (max-width: 480px) {
-    .rightTop h3, .searchWorker {
-        width: 100% !important;
+    .rightTop {
+        gap: 8px;
+        padding: 15px 10px;
+    }
+
+    .addH3 {
+        width: 90px;
+        font-size: 13px;
+    }
+
+    .searchWorker {
+        width: 130px !important;
         margin: 0 !important;
     }
 
     .filterIshchilar {
         width: 100%;
         justify-content: center;
-        gap: 10px;
+        gap: 8px;
     }
 
     .worker-values {
         flex-direction: column;
-        gap: 15px;
+        gap: 12px;
     }
 
     .confirm-modal {
@@ -1123,4 +1176,110 @@
     .confirm-btn {
         width: 100%;
     }
+
+    .modal-container {
+        max-width: 98%;
+        margin: 0 5px;
+    }
+
+    .modal-body {
+        padding: 15px;
+    }
+}
+
+/* ─────────────── RESPONSIVE ≤ 554px ─────────────── */
+.mobile-filter-btn {
+    display: none;
+    padding: 10px 20px;
+    background: rgba(161, 161, 241, 0.1);
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    color: rgb(204, 194, 255);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.mobile-filter-btn:hover {
+    background: rgba(161, 161, 241, 0.2);
+}
+
+@media (max-width: 554px) {
+    .desktop-only-filter {
+        display: none !important;
+    }
+
+    .mobile-filter-btn {
+        display: block;
+    }
+}
+
+.filter-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.modal-search {
+    width: 100% !important;
+    padding: 12px 15px;
+    background: rgba(0, 4, 45, 0.6);
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    color: white;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.modal-search:focus {
+    border-color: rgb(146, 151, 223);
+    box-shadow: 0 0 10px rgba(146, 151, 223, 0.4);
+}
+
+.filter-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.filter-options label {
+    font-size: 13px;
+    color: rgba(204, 194, 255, 0.7);
+    margin-bottom: -5px;
+}
+
+.filter-btn {
+    padding: 14px;
+    background: rgba(161, 161, 241, 0.1);
+    border: 1px solid rgba(161, 161, 241, 0.2);
+    color: rgb(204, 194, 255);
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+    background: rgba(161, 161, 241, 0.2);
+}
+
+.filter-btn.active {
+    background: rgba(86, 86, 255, 0.2);
+    border-color: rgb(86, 86, 255);
+    color: white;
+}
+
+@media(max-width: 434px){
+    .addH3{
+        width: 100px !important;
+    }
+}
+
+.translation{
+    z-index: 9999;
+    position: fixed;
 }

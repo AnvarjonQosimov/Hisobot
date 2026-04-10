@@ -41,13 +41,21 @@ function OfficeXarajat() {
   const [expandedHistory, setExpandedHistory] = useState([]); 
   const [undoState, setUndoState] = useState(null); 
   const [showUndoConfirm, setShowUndoConfirm] = useState(false); 
+  const [showPerformUndoConfirm, setShowPerformUndoConfirm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState("all"); 
   const [deleteExpenseId, setDeleteExpenseId] = useState(null);
+  
+  // History Edit & Delete State
+  const [deleteHistoryData, setDeleteHistoryData] = useState(null);
+  const [editingHistoryData, setEditingHistoryData] = useState(null);
+  
   const [chartPeriod, setChartPeriod] = useState("week"); 
 
   // Responsive State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [calcPosition, setCalcPosition] = useState({ x: 100, y: 100 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -175,12 +183,17 @@ function OfficeXarajat() {
     });
   };
 
-  const handleUndo = () => {
+  const handleUndoClick = () => {
+    setShowPerformUndoConfirm(true);
+  };
+
+  const confirmPerformUndo = () => {
     if (!undoState) return;
     setExpenses(undoState.expenses);
     setTotalBalance(undoState.totalBalance);
     setInitialBalance(undoState.initialBalance);
     setUndoState(null);
+    setShowPerformUndoConfirm(false);
   };
 
   const handleDismissUndoClick = () => {
@@ -258,6 +271,41 @@ function OfficeXarajat() {
       saveForUndo();
       setExpenses(expenses.filter((e) => e.id !== deleteExpenseId));
       setDeleteExpenseId(null);
+    }
+  };
+
+  const confirmDeleteHistory = () => {
+    if (deleteHistoryData) {
+      saveForUndo();
+      setExpenses(expenses.map(e => {
+        if (e.id === deleteHistoryData.expenseId) {
+          const newHistory = [...(e.history || [])];
+          newHistory.splice(deleteHistoryData.index, 1);
+          return { ...e, history: newHistory };
+        }
+        return e;
+      }));
+      setDeleteHistoryData(null);
+    }
+  };
+
+  const handleEditHistorySave = () => {
+    if (editingHistoryData) {
+      saveForUndo();
+      setExpenses(expenses.map(e => {
+        if (e.id === editingHistoryData.expenseId) {
+          const newHistory = [...(e.history || [])];
+          newHistory[editingHistoryData.index] = {
+            amount: editingHistoryData.amount,
+            currency: editingHistoryData.currency,
+            date: editingHistoryData.date,
+            type: editingHistoryData.type
+          };
+          return { ...e, history: newHistory };
+        }
+        return e;
+      }));
+      setEditingHistoryData(null);
     }
   };
 
@@ -487,6 +535,11 @@ function OfficeXarajat() {
         <HiMenu />
       </button>
 
+      {/* Right panel open button */}
+      <button className="right-panel-toggle-btn" onClick={() => setIsRightPanelOpen(true)}>
+        ‹
+      </button>
+
       <div className={`OfficeXarajatLeft ${isSidebarOpen ? "open" : ""}`}>
         <button className="mobile-close-btn" onClick={() => setIsSidebarOpen(false)}>
           <HiX />
@@ -500,14 +553,16 @@ function OfficeXarajat() {
             <Link to="/hisobot" onClick={() => setIsSidebarOpen(false)}><h3>Ishchilar hisoboti</h3></Link>
           </div>
           <div className="leftBottom">
-            <button className="logout-btn" onClick={handleLogout}><h3>Chiqish</h3></button>
+            <Link to={"/login"}>
+              <h3>Chiqish</h3>
+            </Link>
           </div>
         </div>
         <div className="leftLine"></div>
       </div>
 
-      {isSidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
+      {(isSidebarOpen || isRightPanelOpen) && (
+        <div className="sidebar-overlay" onClick={() => { setIsSidebarOpen(false); setIsRightPanelOpen(false); }}></div>
       )}
 
 
@@ -517,24 +572,29 @@ function OfficeXarajat() {
           <h3 className="addH3" onClick={handleBalansClick}>+ Balans</h3>
           <div className="ql"><div className="qoshishLine"></div></div>
           <input
-            className="searchWorker"
+            className="searchWorker desktop-only-filter"
             type="search"
             placeholder="Xarajatni izlash"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <div className="filterIshchilar">
+          <div className="filterIshchilar desktop-only-filter">
             <h3 className={activeFilter === "recent" ? "active-filter" : ""} 
                 onClick={() => setActiveFilter(activeFilter === "recent" ? "all" : "recent")}>Yangilar</h3>
             <h3 className={activeFilter === "high" ? "active-filter" : ""}
                 onClick={() => setActiveFilter(activeFilter === "high" ? "all" : "high")}>Katta sarf</h3>
-            {undoState && (
-              <div className="undo-group">
-                <button className="undo-btn icon-only" onClick={handleUndo}>↩️</button>
-                <button className="undo-close-btn" onClick={handleDismissUndoClick}>✕</button>
-              </div>
-            )}
           </div>
+
+          <button className="mobile-filter-btn" onClick={() => setIsFilterModalOpen(true)}>
+            Filtrlash
+          </button>
+
+          {undoState && (
+            <div className="undo-group">
+              <button className="undo-btn icon-only" onClick={handleUndoClick}>↩️</button>
+              <button className="undo-close-btn" onClick={handleDismissUndoClick}>✕</button>
+            </div>
+          )}
         </div>
 
         <div className="rightBottom">
@@ -597,6 +657,10 @@ function OfficeXarajat() {
                               <span>{h.date}</span>
                               <span>{h.amount} {h.currency === "sum" ? "so'm" : "$"}</span>
                               <span className="h-type">{h.type === "archived" ? "Arxivlandi" : "To'landi"}</span>
+                              <div className="history-actions" style={{ display: "flex", gap: "5px", marginLeft: "auto" }}>
+                                <button className="edit-btn" onClick={() => setEditingHistoryData({ expenseId: expense.id, index: idx, ...h })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="Tahrirlash">✏️</button>
+                                <button className="delete-btn" onClick={() => setDeleteHistoryData({ expenseId: expense.id, index: idx })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="O'chirish">🗑️</button>
+                              </div>
                             </div>
                           ))}
                       </div>
@@ -608,7 +672,8 @@ function OfficeXarajat() {
           })()}
         </div>
 
-        <div className="OfficeXarajatRightMain">
+        <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
+          <button className="right-panel-close-btn" onClick={() => setIsRightPanelOpen(false)}>›</button>
           <div className="lrLine"></div>
           <div className="statistic">
             <h2>Statistika</h2>
@@ -660,7 +725,7 @@ function OfficeXarajat() {
             </div>
 
             <div className="circular-stats">
-              <h2>Kruglaya Statistika</h2>
+              <h2>Aylana Statistika</h2>
               <div className="pie-container">
                 <svg className="pie-chart" viewBox="0 0 100 100">
                   <circle
@@ -709,7 +774,7 @@ function OfficeXarajat() {
       {logoutDialog && (
         <div className="confirm-overlay">
           <div className="confirm-modal">
-            <p className="confirm-message">Haqiqatan ham chiqishni xohlaysizmi?</p>
+            <p className="confirm-message">Haqiqatdan ham chiqishni xohlaysizmi?</p>
             <div className="confirm-buttons">
               <button className="confirm-btn confirm-cancel" onClick={handleLogoutCancel}>Bekor qilish</button>
               <button className="confirm-btn confirm-logout" onClick={confirmLogout}>Chiqish</button>
@@ -861,6 +926,18 @@ function OfficeXarajat() {
         </div>
       )}
 
+      {showPerformUndoConfirm && (
+        <div className="confirm-overlay" onClick={() => setShowPerformUndoConfirm(false)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <p className="confirm-message">Haqiqatan ham oxirgi harakatni bekor qilmoqchimisiz?</p>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setShowPerformUndoConfirm(false)}>Yo'q</button>
+              <button className="confirm-btn confirm-logout" onClick={confirmPerformUndo}>Ha, bekor qilish</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showUndoConfirm && (
         <div className="confirm-overlay">
           <div className="confirm-modal">
@@ -872,6 +949,117 @@ function OfficeXarajat() {
           </div>
         </div>
       )}
+
+      {deleteHistoryData && (
+        <div className="confirm-overlay" onClick={() => setDeleteHistoryData(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-message">
+              Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?
+              <br />
+              <small style={{ color: "rgba(204,194,255,0.6)" }}>
+                Ushbu amalni bekor qilish imkoniyati bo'ladi.
+              </small>
+            </div>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setDeleteHistoryData(null)}>Bekor qilish</button>
+              <button className="confirm-btn confirm-logout" onClick={confirmDeleteHistory}>O'chirish</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingHistoryData && (
+        <div className="modal-overlay" onClick={() => setEditingHistoryData(null)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Tarixni tahrirlash</h2>
+                <p>O'zgartirishlarni kiriting</p>
+              </div>
+              <button className="close-btn" onClick={() => setEditingHistoryData(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-section">
+                <div className="row">
+                  <div className="input-group">
+                    <label>Summa</label>
+                    <input
+                      type="number"
+                      value={editingHistoryData.amount}
+                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, amount: e.target.value })}
+                    />
+                  </div>
+                  <div className="input-group small">
+                    <label>Valyuta</label>
+                    <select
+                      value={editingHistoryData.currency}
+                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, currency: e.target.value })}
+                    >
+                      <option value="sum">So'm</option>
+                      <option value="dollar">$</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>Sana</label>
+                  <input
+                    type="date"
+                    value={editingHistoryData.date}
+                    onChange={(e) => setEditingHistoryData({ ...editingHistoryData, date: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn cancel" onClick={() => setEditingHistoryData(null)}>Bekor qilish</button>
+              <button className="btn add" onClick={handleEditHistorySave}>Saqlash</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Modal for Mobile */}
+      {isFilterModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsFilterModalOpen(false)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Filtrlash</h2>
+                <p>Xarajatlarni izlash va saralash</p>
+              </div>
+              <button className="close-btn" onClick={() => setIsFilterModalOpen(false)}>✕</button>
+            </div>
+            <div className="modal-body filter-modal-body">
+              <div className="input-group">
+                <label>Qidiruv</label>
+                <input
+                  className="modal-search"
+                  type="search"
+                  placeholder="Xarajatni izlash..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="filter-options">
+                <label>Saralash turi</label>
+                <button 
+                  className={`filter-btn ${activeFilter === "recent" ? "active" : ""}`}
+                  onClick={() => { setActiveFilter(activeFilter === "recent" ? "all" : "recent"); setIsFilterModalOpen(false); }}
+                >
+                  Yangi qo'shilganlar
+                </button>
+                <button 
+                  className={`filter-btn ${activeFilter === "high" ? "active" : ""}`}
+                  onClick={() => { setActiveFilter(activeFilter === "high" ? "all" : "high"); setIsFilterModalOpen(false); }}
+                >
+                  Katta sarflar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

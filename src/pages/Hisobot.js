@@ -38,6 +38,7 @@ function Hisobot() {
   // Undo Functionality State
   const [undoState, setUndoState] = useState(null);
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
+  const [showPerformUndoConfirm, setShowPerformUndoConfirm] = useState(false);
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,11 +47,17 @@ function Hisobot() {
   // Custom Delete Modal State
   const [deleteWorkerId, setDeleteWorkerId] = useState(null);
 
+  // History Edit & Delete State
+  const [deleteHistoryData, setDeleteHistoryData] = useState(null);
+  const [editingHistoryData, setEditingHistoryData] = useState(null);
+
   // Linear Stats State
   const [chartPeriod, setChartPeriod] = useState("week"); // day, week, month, year
 
   // Responsive State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   // Load from localStorage (Account Scoped)
   useEffect(() => {
@@ -144,12 +151,17 @@ function Hisobot() {
     });
   };
 
-  const handleUndo = () => {
+  const handleUndoClick = () => {
+    setShowPerformUndoConfirm(true);
+  };
+
+  const confirmPerformUndo = () => {
     if (!undoState) return;
     setWorkers(undoState.workers);
     setTotalBalance(undoState.totalBalance);
     setInitialBalance(undoState.initialBalance);
     setUndoState(null);
+    setShowPerformUndoConfirm(false);
   };
 
   const handleDismissUndoClick = () => {
@@ -175,15 +187,15 @@ function Hisobot() {
         workers.map((w) =>
           w.id === editingWorkerId
             ? {
-                ...w,
-                workerName,
-                amountToReceive,
-                currencyToReceive,
-                dateToGive,
-                amountAlreadyReceived,
-                currencyAlreadyReceived,
-                dateAlreadyReceived,
-              }
+              ...w,
+              workerName,
+              amountToReceive,
+              currencyToReceive,
+              dateToGive,
+              amountAlreadyReceived,
+              currencyAlreadyReceived,
+              dateAlreadyReceived,
+            }
             : w,
         ),
       );
@@ -228,6 +240,41 @@ function Hisobot() {
       saveForUndo(); // Save state before deletion
       setWorkers(workers.filter((w) => w.id !== deleteWorkerId));
       setDeleteWorkerId(null);
+    }
+  };
+
+  const confirmDeleteHistory = () => {
+    if (deleteHistoryData) {
+      saveForUndo();
+      setWorkers(workers.map(w => {
+        if (w.id === deleteHistoryData.workerId) {
+          const newHistory = [...(w.history || [])];
+          newHistory.splice(deleteHistoryData.index, 1);
+          return { ...w, history: newHistory };
+        }
+        return w;
+      }));
+      setDeleteHistoryData(null);
+    }
+  };
+
+  const handleEditHistorySave = () => {
+    if (editingHistoryData) {
+      saveForUndo();
+      setWorkers(workers.map(w => {
+        if (w.id === editingHistoryData.workerId) {
+          const newHistory = [...(w.history || [])];
+          newHistory[editingHistoryData.index] = {
+            amount: editingHistoryData.amount,
+            currency: editingHistoryData.currency,
+            date: editingHistoryData.date,
+            type: editingHistoryData.type
+          };
+          return { ...w, history: newHistory };
+        }
+        return w;
+      }));
+      setEditingHistoryData(null);
     }
   };
 
@@ -429,8 +476,14 @@ function Hisobot() {
 
   return (
     <div className="Hisobot">
+      {/* Left sidebar open button */}
       <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
         <HiMenu />
+      </button>
+
+      {/* Right panel open button */}
+      <button className="right-panel-toggle-btn" onClick={() => setIsRightPanelOpen(true)}>
+        ‹
       </button>
 
       <div className={`HisobotLeft ${isSidebarOpen ? "open" : ""}`}>
@@ -450,18 +503,25 @@ function Hisobot() {
             <Link to="/officexarajat" onClick={() => setIsSidebarOpen(false)}>
               <h3>O'fis xarajatlari</h3>
             </Link>
+            <div className="translation">
+              <select>
+                <option value="">UZ</option>
+                <option value="todo">RU</option>
+                <option value="in-progress">EN</option>
+              </select>
+            </div>
           </div>
           <div className="leftBottom">
-            <button className="logout-btn" onClick={handleLogout}>
+            <Link to={"/login"}>
               <h3>Chiqish</h3>
-            </button>
+            </Link>
           </div>
         </div>
         <div className="leftLine"></div>
       </div>
 
-      {isSidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
+      {(isSidebarOpen || isRightPanelOpen) && (
+        <div className="sidebar-overlay" onClick={() => { setIsSidebarOpen(false); setIsRightPanelOpen(false); }}></div>
       )}
 
 
@@ -477,13 +537,13 @@ function Hisobot() {
             <div className="qoshishLine"></div>
           </div>
           <input
-            className="searchWorker"
+            className="searchWorker desktop-only-filter"
             type="search"
             placeholder="Ishchini izlash"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <div className="filterIshchilar">
+          <div className="filterIshchilar desktop-only-filter">
             <h3
               className={activeFilter === "recent" ? "active-filter" : ""}
               onClick={() =>
@@ -500,25 +560,30 @@ function Hisobot() {
             >
               Yuqori maosh
             </h3>
-            {undoState && (
-              <div className="undo-group">
-                <button
-                  className="undo-btn icon-only"
-                  onClick={handleUndo}
-                  title="Eng so'nggi amalni bekor qilish"
-                >
-                  ↩️
-                </button>
-                <button
-                  className="undo-close-btn"
-                  onClick={handleDismissUndoClick}
-                  title="O'chirish"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
           </div>
+
+          <button className="mobile-filter-btn" onClick={() => setIsFilterModalOpen(true)}>
+            Filtrlash
+          </button>
+
+          {undoState && (
+            <div className="undo-group">
+              <button
+                className="undo-btn icon-only"
+                onClick={handleUndoClick}
+                title="Eng so'nggi amalni bekor qilish"
+              >
+                ↩️
+              </button>
+              <button
+                className="undo-close-btn"
+                onClick={handleDismissUndoClick}
+                title="O'chirish"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="rightBottom">
@@ -650,6 +715,10 @@ function Hisobot() {
                                   ? "Arxivlandi"
                                   : "To'landi"}
                               </span>
+                              <div className="history-actions" style={{ display: "flex", gap: "5px", marginLeft: "auto" }}>
+                                <button className="edit-btn" onClick={() => setEditingHistoryData({ workerId: worker.id, index: idx, ...h })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="Tahrirlash">✏️</button>
+                                <button className="delete-btn" onClick={() => setDeleteHistoryData({ workerId: worker.id, index: idx })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="O'chirish">🗑️</button>
+                              </div>
                             </div>
                           ))
                         )}
@@ -662,7 +731,8 @@ function Hisobot() {
           })()}
         </div>
 
-        <div className="rightRight">
+        <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
+          <button className="right-panel-close-btn" onClick={() => setIsRightPanelOpen(false)}>›</button>
           <div className="lrLine"></div>
           <div className="statistic">
             <h2>Statistika</h2>
@@ -845,7 +915,7 @@ function Hisobot() {
             </div>
 
             <div className="circular-stats">
-              <h2>Kruglaya Statistika</h2>
+              <h2>Aylana Statistika</h2>
               <div className="pie-container">
                 <svg className="pie-chart" viewBox="0 0 100 100">
                   <circle
@@ -1126,6 +1196,33 @@ function Hisobot() {
         </div>
       )}
 
+      {showPerformUndoConfirm && (
+        <div
+          className="confirm-overlay"
+          onClick={() => setShowPerformUndoConfirm(false)}
+        >
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-message">
+              Haqiqatan ham oxirgi harakatni bekor qilmoqchimisiz?
+            </div>
+            <div className="confirm-buttons">
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={() => setShowPerformUndoConfirm(false)}
+              >
+                Yo'q
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmPerformUndo}
+              >
+                Ha, bekor qilish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showUndoConfirm && (
         <div
           className="confirm-overlay"
@@ -1152,6 +1249,117 @@ function Hisobot() {
           </div>
         </div>
       )}
+
+      {deleteHistoryData && (
+        <div className="confirm-overlay" onClick={() => setDeleteHistoryData(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-message">
+              Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?
+              <br />
+              <small style={{ color: "rgba(204,194,255,0.6)" }}>
+                Ushbu amalni bekor qilish imkoniyati bo'ladi.
+              </small>
+            </div>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setDeleteHistoryData(null)}>Bekor qilish</button>
+              <button className="confirm-btn confirm-logout" onClick={confirmDeleteHistory}>O'chirish</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingHistoryData && (
+        <div className="modal-overlay" onClick={() => setEditingHistoryData(null)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Tarixni tahrirlash</h2>
+                <p>O'zgartirishlarni kiriting</p>
+              </div>
+              <button className="close-btn" onClick={() => setEditingHistoryData(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-section">
+                <div className="row">
+                  <div className="input-group">
+                    <label>Summa</label>
+                    <input
+                      type="number"
+                      value={editingHistoryData.amount}
+                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, amount: e.target.value })}
+                    />
+                  </div>
+                  <div className="input-group small">
+                    <label>Valyuta</label>
+                    <select
+                      value={editingHistoryData.currency}
+                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, currency: e.target.value })}
+                    >
+                      <option value="sum">So'm</option>
+                      <option value="dollar">$</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>Sana</label>
+                  <input
+                    type="date"
+                    value={editingHistoryData.date}
+                    onChange={(e) => setEditingHistoryData({ ...editingHistoryData, date: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn cancel" onClick={() => setEditingHistoryData(null)}>Bekor qilish</button>
+              <button className="btn add" onClick={handleEditHistorySave}>Saqlash</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Modal for Mobile */}
+      {isFilterModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsFilterModalOpen(false)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Filtrlash</h2>
+                <p>Ishchilarni izlash va saralash</p>
+              </div>
+              <button className="close-btn" onClick={() => setIsFilterModalOpen(false)}>✕</button>
+            </div>
+            <div className="modal-body filter-modal-body">
+              <div className="input-group">
+                <label>Qidiruv</label>
+                <input
+                  className="modal-search"
+                  type="search"
+                  placeholder="Ishchini izlash..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="filter-options">
+                <label>Saralash turi</label>
+                <button
+                  className={`filter-btn ${activeFilter === "recent" ? "active" : ""}`}
+                  onClick={() => { setActiveFilter(activeFilter === "recent" ? "all" : "recent"); setIsFilterModalOpen(false); }}
+                >
+                  Yangi qo'shilganlar
+                </button>
+                <button
+                  className={`filter-btn ${activeFilter === "high" ? "active" : ""}`}
+                  onClick={() => { setActiveFilter(activeFilter === "high" ? "all" : "high"); setIsFilterModalOpen(false); }}
+                >
+                  Katta oylikli ishchilar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

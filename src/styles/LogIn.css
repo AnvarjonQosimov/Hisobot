@@ -134,29 +134,3 @@
     position: relative;
     transition: transform 0.1s ease-out;
 }
-
-@media (max-width: 600px) {
-    .LoginType {
-        padding: 40px 25px;
-        max-width: 100%;
-    }
-
-    .LoginType h1 {
-        font-size: 28px;
-    }
-
-    .LoginType input {
-        padding: 12px 14px;
-        font-size: 14px;
-    }
-
-    .eye-button {
-        font-size: 18px;
-        right: 10px;
-    }
-
-    .LoginType button {
-        padding: 12px;
-        font-size: 14px;
-    }
-}
