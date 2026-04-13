@@ -89,14 +89,156 @@
     justify-content: center;
     text-decoration: none;
     cursor: pointer;
-    color: white;
+    color: rgb(191, 179, 238);
 }
 
 .translator{
     height: 100%;
-    width: 200px;
+    width: 150px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
+}
+
+.burger-wrapper {
+  display: none;
+  position: relative;
+  height: 100%;
+  width: 50px;
+  margin-left: 50px;
+}
+
+.burger {
+  width: 32px;
+  height: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.burger span {
+  height: 3px;
+  width: 100%;
+  background: #111;
+  border-radius: 2px;
+  transition: 0.3s;
+}
+
+.burger.active span:nth-child(1) {
+  transform: translateY(10px) rotate(45deg);
+}
+.burger.active span:nth-child(2) {
+  opacity: 0;
+}
+.burger.active span:nth-child(3) {
+  transform: translateY(-10px) rotate(-45deg);
+}
+
+.burger span:nth-child(1) {
+  margin-bottom: 7px;
+}
+
+.burger span:nth-child(2) {
+  margin-bottom: 7px;
+}
+
+.burger-dropdown {
+  position: absolute;
+  top: 50px;
+  right: -130px;
+  width: 220px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: 0.25s;
+}
+
+.burger-dropdown.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.menu-link {
+  text-decoration: none;
+  color: #111;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-link::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+  transition: 0.3s;
+}
+
+.menu-link.active::before {
+  background: #111;
+}
+
+@media (max-width: 1150px) {
+  .burger-wrapper{
+    display: block;
+  }
+
+  .menu{
+    display: none;
+  }
+}
+
+@media(max-width: 770px){
+  .Header{
+    width: 70%;
+  }
+
+  .burger-wrapper{
+    margin-left: 60px;
+  }
+}
+
+@media(max-width: 480px){
+  .Header{
+    width: 80%;
+  }
+}
+
+@media(max-width: 415px){
+  .Header{
+    width: 60%;
+  }
+
+  .burger-wrapper{
+    margin-right: 50px;
+  }
+
+  .logo h1{
+    display: none;
+  }
+}
+
+@media(max-width: 400px){
+  .imgLogo {
+    margin-right: -20px;
+  }
+
+  .burger-wrapper{
+    margin-right: 10px;
+  }
 }

@@ -166,3 +166,39 @@
         transform: translateY(-30px) translateX(25px);
     }
 }
+
+@media(max-width: 700px){
+    .icon{
+        font-size: 65px;
+    }
+}
+
+@media(max-width: 600px){
+    .icon{
+        font-size: 60px;
+    }
+}
+
+@media(max-width: 500px){
+    .icon{
+        font-size: 55px;
+    }
+}
+
+@media(max-width: 400px){
+    .icon{
+        font-size: 50px;
+    }
+}
+
+@media(max-width: 435px){
+    .Home h1{
+        font-size: 50px;
+    }
+}
+
+@media(max-width: 360px){
+    .Home h1{
+        font-size: 40px;
+    }
+}

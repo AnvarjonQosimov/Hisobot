@@ -6,7 +6,7 @@ import { HiMenu, HiX } from "react-icons/hi";
 
 function Hisobot() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // State Definitions
   const [username, setUsername] = useState("");
@@ -465,14 +465,16 @@ function Hisobot() {
     return { paid: paidCount, unpaid: totalCount - paidCount, percent };
   };
 
-
-
   const isFormValid =
     workerName &&
     amountToReceive &&
     dateToGive &&
     amountAlreadyReceived &&
     dateAlreadyReceived;
+
+  const changeLanguage = (lng) => () => i18n.changeLanguage(lng);
+  const [age, setAge] = React.useState("");
+  const handleChange = (event) => setAge(event.target.value);
 
   return (
     <div className="Hisobot">
@@ -504,10 +506,16 @@ function Hisobot() {
               <h3>O'fis xarajatlari</h3>
             </Link>
             <div className="translation">
-              <select>
-                <option value="">UZ</option>
-                <option value="todo">RU</option>
-                <option value="in-progress">EN</option>
+              <select 
+              className="translationSelect"
+              labelId="demo-select-small-label"
+            id="demo-select-small"
+            value={age}
+            label="Age"
+            onChange={handleChange}>
+                <option className="languageOption" onClick={changeLanguage("uz")} value={10}>UZ</option>
+                <option className="languageOption" onClick={changeLanguage("en")} value={20}>RU</option>
+                <option className="languageOption" onClick={changeLanguage("ru")} value={30}>EN</option>
               </select>
             </div>
           </div>

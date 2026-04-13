@@ -45,8 +45,11 @@ function LogIn() {
 
       if (distance < 80) { // Если курсор ближе 80px
         // Генерируем новое случайное положение
-        const newX = Math.random() * 250 - 125; // -125px до +125px
-        const newY = Math.random() * 250 - 125; // -125px до +125px
+        const maxX = window.innerWidth < 500 ? 80 : 125;
+const maxY = window.innerWidth < 500 ? 80 : 125;
+
+const newX = Math.random() * maxX * 2 - maxX;
+const newY = Math.random() * maxY * 2 - maxY;
         setButtonPosition({ x: newX, y: newY });
       }
     }

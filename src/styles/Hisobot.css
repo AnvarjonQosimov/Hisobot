@@ -1276,10 +1276,36 @@
 @media(max-width: 434px){
     .addH3{
         width: 100px !important;
+        padding: 7px 5px !important;
     }
 }
 
 .translation{
     z-index: 9999;
     position: fixed;
+}
+
+.translation{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 400px;
+    width: 25%;
+}
+
+.translationSelect{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 15px;
+    border: 1px solid rgba(161, 161, 241, 0.5);
+    background-color: rgba(161, 161, 241, 0.5);
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+}
+
+.languageOption{
+    cursor: pointer;
+    color: black;
 }
