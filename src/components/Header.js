@@ -74,7 +74,7 @@ function Header() {
             onClick={() => setBurgerOpen(false)}
             className="menu-link"
           >
-            {t("home")}
+            {t("Home")}
           </NavLink>
 
           <NavLink
@@ -91,7 +91,6 @@ function Header() {
         <FormControl sx={{ m: 1, minWidth: 80 }} size="small">
           <InputLabel id="demo-select-small-label">{t("lang")}</InputLabel>
           <Select
-            labelId="demo-select-small-label"
             id="demo-select-small"
             value={age}
             label="Age"

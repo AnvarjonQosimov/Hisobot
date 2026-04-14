@@ -6,7 +6,7 @@ import { HiMenu, HiX } from "react-icons/hi";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // State Definitions
   const [username, setUsername] = useState("");
@@ -38,19 +38,19 @@ function OfficeXarajat() {
   const [calcPrevious, setCalcPrevious] = useState(null);
   const [calcOperation, setCalcOperation] = useState(null);
   const [calcWaiting, setCalcWaiting] = useState(false);
-  const [expandedHistory, setExpandedHistory] = useState([]); 
-  const [undoState, setUndoState] = useState(null); 
-  const [showUndoConfirm, setShowUndoConfirm] = useState(false); 
+  const [expandedHistory, setExpandedHistory] = useState([]);
+  const [undoState, setUndoState] = useState(null);
+  const [showUndoConfirm, setShowUndoConfirm] = useState(false);
   const [showPerformUndoConfirm, setShowPerformUndoConfirm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all"); 
+  const [activeFilter, setActiveFilter] = useState("all");
   const [deleteExpenseId, setDeleteExpenseId] = useState(null);
-  
+
   // History Edit & Delete State
   const [deleteHistoryData, setDeleteHistoryData] = useState(null);
   const [editingHistoryData, setEditingHistoryData] = useState(null);
-  
-  const [chartPeriod, setChartPeriod] = useState("week"); 
+
+  const [chartPeriod, setChartPeriod] = useState("week");
 
   // Responsive State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -69,30 +69,46 @@ function OfficeXarajat() {
     }
     setUsername(storedUsername);
 
-    const storedExpenses = localStorage.getItem(`office_expenses_${storedUsername}`);
+    const storedExpenses = localStorage.getItem(
+      `office_expenses_${storedUsername}`,
+    );
     if (storedExpenses) setExpenses(JSON.parse(storedExpenses));
 
-    const storedBalance = localStorage.getItem(`office_balance_${storedUsername}`);
+    const storedBalance = localStorage.getItem(
+      `office_balance_${storedUsername}`,
+    );
     if (storedBalance) setTotalBalance(JSON.parse(storedBalance));
 
-    const storedInitialBalance = localStorage.getItem(`office_initial_balance_${storedUsername}`);
-    if (storedInitialBalance) setInitialBalance(JSON.parse(storedInitialBalance));
+    const storedInitialBalance = localStorage.getItem(
+      `office_initial_balance_${storedUsername}`,
+    );
+    if (storedInitialBalance)
+      setInitialBalance(JSON.parse(storedInitialBalance));
   }, [navigate]);
 
   // Save to localStorage (Account Scoped)
   useEffect(() => {
     if (!username) return;
-    localStorage.setItem(`office_expenses_${username}`, JSON.stringify(expenses));
+    localStorage.setItem(
+      `office_expenses_${username}`,
+      JSON.stringify(expenses),
+    );
   }, [expenses, username]);
 
   useEffect(() => {
     if (!username) return;
-    localStorage.setItem(`office_balance_${username}`, JSON.stringify(totalBalance));
+    localStorage.setItem(
+      `office_balance_${username}`,
+      JSON.stringify(totalBalance),
+    );
   }, [totalBalance, username]);
 
   useEffect(() => {
     if (!username) return;
-    localStorage.setItem(`office_initial_balance_${username}`, JSON.stringify(initialBalance));
+    localStorage.setItem(
+      `office_initial_balance_${username}`,
+      JSON.stringify(initialBalance),
+    );
   }, [initialBalance, username]);
 
   const handleLogout = () => {
@@ -277,14 +293,16 @@ function OfficeXarajat() {
   const confirmDeleteHistory = () => {
     if (deleteHistoryData) {
       saveForUndo();
-      setExpenses(expenses.map(e => {
-        if (e.id === deleteHistoryData.expenseId) {
-          const newHistory = [...(e.history || [])];
-          newHistory.splice(deleteHistoryData.index, 1);
-          return { ...e, history: newHistory };
-        }
-        return e;
-      }));
+      setExpenses(
+        expenses.map((e) => {
+          if (e.id === deleteHistoryData.expenseId) {
+            const newHistory = [...(e.history || [])];
+            newHistory.splice(deleteHistoryData.index, 1);
+            return { ...e, history: newHistory };
+          }
+          return e;
+        }),
+      );
       setDeleteHistoryData(null);
     }
   };
@@ -292,19 +310,21 @@ function OfficeXarajat() {
   const handleEditHistorySave = () => {
     if (editingHistoryData) {
       saveForUndo();
-      setExpenses(expenses.map(e => {
-        if (e.id === editingHistoryData.expenseId) {
-          const newHistory = [...(e.history || [])];
-          newHistory[editingHistoryData.index] = {
-            amount: editingHistoryData.amount,
-            currency: editingHistoryData.currency,
-            date: editingHistoryData.date,
-            type: editingHistoryData.type
-          };
-          return { ...e, history: newHistory };
-        }
-        return e;
-      }));
+      setExpenses(
+        expenses.map((e) => {
+          if (e.id === editingHistoryData.expenseId) {
+            const newHistory = [...(e.history || [])];
+            newHistory[editingHistoryData.index] = {
+              amount: editingHistoryData.amount,
+              currency: editingHistoryData.currency,
+              date: editingHistoryData.date,
+              type: editingHistoryData.type,
+            };
+            return { ...e, history: newHistory };
+          }
+          return e;
+        }),
+      );
       setEditingHistoryData(null);
     }
   };
@@ -369,14 +389,20 @@ function OfficeXarajat() {
 
     const totalSpent = expenses.reduce((acc, curr) => {
       if (curr.currencyToPay !== balanceCurrency) return acc;
-      
+
       const currentCost = parseFloat(curr.amountToPay) || 0;
       const historyCost = (curr.history || []).reduce(
-        (hAcc, hCurr) => hCurr.currency === balanceCurrency ? hAcc + (parseFloat(hCurr.amount) || 0) : hAcc,
-        0
+        (hAcc, hCurr) =>
+          hCurr.currency === balanceCurrency
+            ? hAcc + (parseFloat(hCurr.amount) || 0)
+            : hAcc,
+        0,
       );
-      const lastPaid = curr.currencyAlreadyPaid === balanceCurrency ? parseFloat(curr.amountAlreadyPaid) || 0 : 0;
-      
+      const lastPaid =
+        curr.currencyAlreadyPaid === balanceCurrency
+          ? parseFloat(curr.amountAlreadyPaid) || 0
+          : 0;
+
       return acc + currentCost + historyCost + lastPaid;
     }, 0);
 
@@ -397,7 +423,7 @@ function OfficeXarajat() {
     const now = new Date();
     let data = [];
     let allPayments = [];
-    
+
     expenses.forEach((e) => {
       if (parseFloat(e.amountAlreadyPaid) > 0) {
         allPayments.push({
@@ -419,7 +445,11 @@ function OfficeXarajat() {
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 2 * 60 * 60 * 1000);
         const sum = allPayments
-          .filter((p) => p.date.getHours() === d.getHours() && p.date.getDate() === d.getDate())
+          .filter(
+            (p) =>
+              p.date.getHours() === d.getHours() &&
+              p.date.getDate() === d.getDate(),
+          )
           .reduce((acc, curr) => acc + curr.amount, 0);
         data.push(sum);
       }
@@ -443,7 +473,11 @@ function OfficeXarajat() {
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const sum = allPayments
-          .filter((p) => p.date.getMonth() === d.getMonth() && p.date.getFullYear() === d.getFullYear())
+          .filter(
+            (p) =>
+              p.date.getMonth() === d.getMonth() &&
+              p.date.getFullYear() === d.getFullYear(),
+          )
           .reduce((acc, curr) => acc + curr.amount, 0);
         data.push(sum);
       }
@@ -496,11 +530,16 @@ function OfficeXarajat() {
 
   const performCalculation = (prev, curr, op) => {
     switch (op) {
-      case "+": return prev + curr;
-      case "-": return prev - curr;
-      case "*": return prev * curr;
-      case "/": return prev / curr;
-      default: return curr;
+      case "+":
+        return prev + curr;
+      case "-":
+        return prev - curr;
+      case "*":
+        return prev * curr;
+      case "/":
+        return prev / curr;
+      default:
+        return curr;
     }
   };
 
@@ -527,34 +566,81 @@ function OfficeXarajat() {
     if (field === "alreadyPaid") setAmountAlreadyPaid(calcDisplay);
   };
 
-  const isFormValid = expenseName && amountToPay && dateToPay && amountAlreadyPaid && dateAlreadyPaid;
+  const isFormValid =
+    expenseName &&
+    amountToPay &&
+    dateToPay &&
+    amountAlreadyPaid &&
+    dateAlreadyPaid;
+
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+  };
+  const [age, setAge] = React.useState(i18n.language || "uz");
+  // const handleChange = (event) => setAge(event.target.value);
 
   return (
     <div className="OfficeXarajat">
-      <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setIsSidebarOpen(true)}
+      >
         <HiMenu />
       </button>
 
       {/* Right panel open button */}
-      <button className="right-panel-toggle-btn" onClick={() => setIsRightPanelOpen(true)}>
+      <button
+        className="right-panel-toggle-btn"
+        onClick={() => setIsRightPanelOpen(true)}
+      >
         ‹
       </button>
 
       <div className={`OfficeXarajatLeft ${isSidebarOpen ? "open" : ""}`}>
-        <button className="mobile-close-btn" onClick={() => setIsSidebarOpen(false)}>
+        <button
+          className="mobile-close-btn"
+          onClick={() => setIsSidebarOpen(false)}
+        >
           <HiX />
         </button>
         <div className="hisobotLeftText">
           <div className="leftTop">
             <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
             <p>{username}</p>
-            <Link to="/profil" onClick={() => setIsSidebarOpen(false)}><h3>Profil</h3></Link>
-            <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}><h3>{t("Kalkulator")}</h3></Link>
-            <Link to="/hisobot" onClick={() => setIsSidebarOpen(false)}><h3>Ishchilar hisoboti</h3></Link>
+            <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
+              <h3>{t("profil")}</h3>
+            </Link>
+            <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}>
+              <h3>{t("Kalkulator")}</h3>
+            </Link>
+            <Link to="/hisobot" onClick={() => setIsSidebarOpen(false)}>
+              <h3>{t("Ishchilar hisoboti")}</h3>
+            </Link>
+            <div className="translation">
+              <select
+                className="translationSelect"
+                value={age}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setAge(value);
+                  changeLanguage(value);
+                }}
+              >
+                <option className="languageOption" value={"uz"}>
+                  UZ
+                </option>
+                <option className="languageOption" value={"ru"}>
+                  RU
+                </option>
+                <option className="languageOption" value={"en"}>
+                  EN
+                </option>
+              </select>
+            </div>
           </div>
           <div className="leftBottom">
             <Link to={"/login"}>
-              <h3>Chiqish</h3>
+              <h3>{t("chiqish")}</h3>
             </Link>
           </div>
         </div>
@@ -562,15 +648,26 @@ function OfficeXarajat() {
       </div>
 
       {(isSidebarOpen || isRightPanelOpen) && (
-        <div className="sidebar-overlay" onClick={() => { setIsSidebarOpen(false); setIsRightPanelOpen(false); }}></div>
+        <div
+          className="sidebar-overlay"
+          onClick={() => {
+            setIsSidebarOpen(false);
+            setIsRightPanelOpen(false);
+          }}
+        ></div>
       )}
-
 
       <div className="OfficeXarajatRight">
         <div className="rightTop">
-          <h3 className="addH3" onClick={handleAddExpenseClick}>+ Qo'shish</h3>
-          <h3 className="addH3" onClick={handleBalansClick}>+ Balans</h3>
-          <div className="ql"><div className="qoshishLine"></div></div>
+          <h3 className="addH3" onClick={handleAddExpenseClick}>
+            + {t("qo'shish")}
+          </h3>
+          <h3 className="addH3" onClick={handleBalansClick}>
+            + {t("balans")}
+          </h3>
+          <div className="ql">
+            <div className="qoshishLine"></div>
+          </div>
           <input
             className="searchWorker desktop-only-filter"
             type="search"
@@ -579,29 +676,55 @@ function OfficeXarajat() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <div className="filterIshchilar desktop-only-filter">
-            <h3 className={activeFilter === "recent" ? "active-filter" : ""} 
-                onClick={() => setActiveFilter(activeFilter === "recent" ? "all" : "recent")}>Yangilar</h3>
-            <h3 className={activeFilter === "high" ? "active-filter" : ""}
-                onClick={() => setActiveFilter(activeFilter === "high" ? "all" : "high")}>Katta sarf</h3>
+            <h3
+              className={activeFilter === "recent" ? "active-filter" : ""}
+              onClick={() =>
+                setActiveFilter(activeFilter === "recent" ? "all" : "recent")
+              }
+            >
+              {t("Yangi qo'shilganlar")}
+            </h3>
+            <h3
+              className={activeFilter === "high" ? "active-filter" : ""}
+              onClick={() =>
+                setActiveFilter(activeFilter === "high" ? "all" : "high")
+              }
+            >
+              {t("Katta sarflar")}
+            </h3>
           </div>
 
-          <button className="mobile-filter-btn" onClick={() => setIsFilterModalOpen(true)}>
-            Filtrlash
+          <button
+            className="mobile-filter-btn"
+            onClick={() => setIsFilterModalOpen(true)}
+          >
+            {t("filtrlash")}
           </button>
 
           {undoState && (
             <div className="undo-group">
-              <button className="undo-btn icon-only" onClick={handleUndoClick}>↩️</button>
-              <button className="undo-close-btn" onClick={handleDismissUndoClick}>✕</button>
+              <button className="undo-btn icon-only" onClick={handleUndoClick}>
+                ↩️
+              </button>
+              <button
+                className="undo-close-btn"
+                onClick={handleDismissUndoClick}
+              >
+                ✕
+              </button>
             </div>
           )}
         </div>
 
         <div className="rightBottom">
           {(() => {
-            let filtered = expenses.filter((e) => e.expenseName.toLowerCase().includes(searchTerm.toLowerCase()));
+            let filtered = expenses.filter((e) =>
+              e.expenseName.toLowerCase().includes(searchTerm.toLowerCase()),
+            );
             if (activeFilter === "recent") {
-              filtered = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+              filtered = [...filtered]
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .slice(0, 5);
             } else if (activeFilter === "high") {
               filtered = filtered.filter((e) => {
                 const val = parseFloat(e.amountToPay) || 0;
@@ -612,7 +735,11 @@ function OfficeXarajat() {
             if (filtered.length === 0) {
               return (
                 <div className="no-workers">
-                  <p>{searchTerm ? "Qidiruv bo'yicha hech narsa topilmadi." : "Hozircha xarajatlar yo'q. \"+ Qo'shish\" tugmasini bosing."}</p>
+                  <p>
+                    {searchTerm
+                      ? "Qidiruv bo'yicha hech narsa topilmadi."
+                      : "Hozircha xarajatlar yo'q. \"+ Qo'shish\" tugmasini bosing."}
+                  </p>
                 </div>
               );
             }
@@ -620,49 +747,145 @@ function OfficeXarajat() {
             return (
               <div className="worker-list">
                 {filtered.map((expense) => (
-                  <div key={expense.id} className={`worker-item ${expense.isPaid ? "paid-row" : ""}`}>
+                  <div
+                    key={expense.id}
+                    className={`worker-item ${expense.isPaid ? "paid-row" : ""}`}
+                  >
                     <div className="worker-item-main">
                       <div className="worker-info">
-                        <input type="checkbox" className="paid-checkbox" checked={expense.isPaid} onChange={() => handleTogglePaid(expense.id)} />
+                        <input
+                          type="checkbox"
+                          className="paid-checkbox"
+                          checked={expense.isPaid}
+                          onChange={() => handleTogglePaid(expense.id)}
+                        />
                         <div className="name-date">
                           <h3>{expense.expenseName}</h3>
-                          <span>{new Date(expense.createdAt).toLocaleDateString()}</span>
+                          <span>
+                            {new Date(expense.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
                       <div className="worker-values">
                         <div className="val-group">
-                          <p>To'lanishi kerak:</p>
-                          <strong className="to-receive">{expense.amountToPay} {expense.currencyToPay === "sum" ? "so'm" : "$"}</strong>
-                          <span className="small-date">Sana: {expense.dateToPay}</span>
+                          <p>{t("To'lanishi kerak")}:</p>
+                          <strong className="to-receive">
+                            {expense.amountToPay}{" "}
+                            {expense.currencyToPay === "sum" ? "so'm" : "$"}
+                          </strong>
+                          <span className="small-date">
+                            {t("sana")}: {expense.dateToPay}
+                          </span>
                         </div>
                         <div className="val-group">
-                          <p>To'langan summa:</p>
-                          <strong className="received">{expense.amountAlreadyPaid} {expense.currencyAlreadyPaid === "sum" ? "so'm" : "$"}</strong>
-                          <span className="small-date">Sana: {expense.dateAlreadyPaid}</span>
+                          <p>{t("To'langan summa")}:</p>
+                          <strong className="received">
+                            {expense.amountAlreadyPaid}{" "}
+                            {expense.currencyAlreadyPaid === "sum"
+                              ? "so'm"
+                              : "$"}
+                          </strong>
+                          <span className="small-date">
+                            {t("sana")}: {expense.dateAlreadyPaid}
+                          </span>
                         </div>
                       </div>
                       <div className="worker-actions">
-                        <button className="month-btn" onClick={() => handleNextCycle(expense.id)} title="Yangi sikl">🔄</button>
-                        <button className="history-toggle-btn" onClick={() => toggleHistory(expense.id)}>📜</button>
-                        <button className="edit-btn" onClick={() => handleEditExpenseClick(expense)}>✏️</button>
-                        <button className="delete-btn" onClick={() => handleDeleteExpenseClick(expense.id)}>🗑️</button>
+                        <button
+                          className="month-btn"
+                          onClick={() => handleNextCycle(expense.id)}
+                          title="Yangi sikl"
+                        >
+                          🔄
+                        </button>
+                        <button
+                          className="history-toggle-btn"
+                          onClick={() => toggleHistory(expense.id)}
+                        >
+                          📜
+                        </button>
+                        <button
+                          className="edit-btn"
+                          onClick={() => handleEditExpenseClick(expense)}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDeleteExpenseClick(expense.id)}
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </div>
                     {expandedHistory.includes(expense.id) && (
                       <div className="history-section">
-                        <h4>Xarajatlar tarixi:</h4>
-                        {(expense.history || []).length === 0 ? <p className="no-history">Tarix mavjud emas</p> :
+                        <h4>{t("Xarajatlar tarixi")}:</h4>
+                        {(expense.history || []).length === 0 ? (
+                          <p className="no-history">Tarix mavjud emas</p>
+                        ) : (
                           expense.history.map((h, idx) => (
                             <div key={idx} className="history-item">
                               <span>{h.date}</span>
-                              <span>{h.amount} {h.currency === "sum" ? "so'm" : "$"}</span>
-                              <span className="h-type">{h.type === "archived" ? "Arxivlandi" : "To'landi"}</span>
-                              <div className="history-actions" style={{ display: "flex", gap: "5px", marginLeft: "auto" }}>
-                                <button className="edit-btn" onClick={() => setEditingHistoryData({ expenseId: expense.id, index: idx, ...h })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="Tahrirlash">✏️</button>
-                                <button className="delete-btn" onClick={() => setDeleteHistoryData({ expenseId: expense.id, index: idx })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="O'chirish">🗑️</button>
+                              <span>
+                                {h.amount} {h.currency === "sum" ? "so'm" : "$"}
+                              </span>
+                              <span className="h-type">
+                                {h.type === "archived"
+                                  ? "Arxivlandi"
+                                  : t("To'langan")}
+                              </span>
+                              <div
+                                className="history-actions"
+                                style={{
+                                  display: "flex",
+                                  gap: "5px",
+                                  marginLeft: "auto",
+                                }}
+                              >
+                                <button
+                                  className="edit-btn"
+                                  onClick={() =>
+                                    setEditingHistoryData({
+                                      expenseId: expense.id,
+                                      index: idx,
+                                      ...h,
+                                    })
+                                  }
+                                  style={{
+                                    padding: "5px",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontSize: "16px",
+                                  }}
+                                  title="Tahrirlash"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  className="delete-btn"
+                                  onClick={() =>
+                                    setDeleteHistoryData({
+                                      expenseId: expense.id,
+                                      index: idx,
+                                    })
+                                  }
+                                  style={{
+                                    padding: "5px",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontSize: "16px",
+                                  }}
+                                  title="O'chirish"
+                                >
+                                  🗑️
+                                </button>
                               </div>
                             </div>
-                          ))}
+                          ))
+                        )}
                       </div>
                     )}
                   </div>
@@ -673,48 +896,91 @@ function OfficeXarajat() {
         </div>
 
         <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
-          <button className="right-panel-close-btn" onClick={() => setIsRightPanelOpen(false)}>›</button>
+          <button
+            className="right-panel-close-btn"
+            onClick={() => setIsRightPanelOpen(false)}
+          >
+            ›
+          </button>
           <div className="lrLine"></div>
           <div className="statistic">
-            <h2>Statistika</h2>
+            <h2>{t("statistika")}</h2>
             <div className="statistic1">
-              <h3>Boshlang'ich balans:</h3>
-              <p>{initialBalance.sum.toLocaleString()} so'm / {initialBalance.dollar.toLocaleString()} $</p>
+              <h3>{t("Boshlang'ich balans")}:</h3>
+              <p>
+                {initialBalance.sum.toLocaleString()} so'm /{" "}
+                {initialBalance.dollar.toLocaleString()} $
+              </p>
             </div>
             <div className="statistic2">
-              <h3>Jami xarajatlar:</h3>
+              <h3>{t("Jami xarajatlar")}:</h3>
               <p>{expenses.length}</p>
             </div>
             <div className="statistic3">
-              <h3>Eng katta xarajat:</h3>
+              <h3>{t("Eng katta xarajat")}:</h3>
               <p>
                 {(() => {
-                  const sumHigh = expenses.filter(e => e.currencyToPay === "sum").sort((a, b) => (parseFloat(b.amountToPay) || 0) - (parseFloat(a.amountToPay) || 0))[0];
-                  const dolHigh = expenses.filter(e => e.currencyToPay === "dollar").sort((a, b) => (parseFloat(b.amountToPay) || 0) - (parseFloat(a.amountToPay) || 0))[0];
-                  return `${sumHigh ? sumHigh.expenseName + ': ' + parseFloat(sumHigh.amountToPay).toLocaleString() + ' so\'m' : 'yo\'q'} / ${dolHigh ? dolHigh.expenseName + ': ' + parseFloat(dolHigh.amountToPay).toLocaleString() + ' $' : 'yo\'q'}`;
+                  const sumHigh = expenses
+                    .filter((e) => e.currencyToPay === "sum")
+                    .sort(
+                      (a, b) =>
+                        (parseFloat(b.amountToPay) || 0) -
+                        (parseFloat(a.amountToPay) || 0),
+                    )[0];
+                  const dolHigh = expenses
+                    .filter((e) => e.currencyToPay === "dollar")
+                    .sort(
+                      (a, b) =>
+                        (parseFloat(b.amountToPay) || 0) -
+                        (parseFloat(a.amountToPay) || 0),
+                    )[0];
+                  return `${sumHigh ? sumHigh.expenseName + ": " + parseFloat(sumHigh.amountToPay).toLocaleString() + " so'm" : "yo'q"} / ${dolHigh ? dolHigh.expenseName + ": " + parseFloat(dolHigh.amountToPay).toLocaleString() + " $" : "yo'q"}`;
                 })()}
               </p>
             </div>
             <div className="statistic4">
-              <h3>Qolgan balans:</h3>
-              <p className={totalBalance.sum < 0 || totalBalance.dollar < 0 ? "negative-balance" : ""}>
-                {totalBalance.sum.toLocaleString()} so'm / {totalBalance.dollar.toLocaleString()} $
+              <h3>{t("Qolgan balans")}:</h3>
+              <p
+                className={
+                  totalBalance.sum < 0 || totalBalance.dollar < 0
+                    ? "negative-balance"
+                    : ""
+                }
+              >
+                {totalBalance.sum.toLocaleString()} so'm /{" "}
+                {totalBalance.dollar.toLocaleString()} $
               </p>
             </div>
-            
+
             <div className="linear-stats">
-              <h2>Xarajatlar o'zgarishi</h2>
+              <h2>{t("Xarajatlar o'zgarishi")}</h2>
               <div className="chart-controls">
-                {['day', 'week', 'month', 'year'].map(p => (
-                  <button key={p} className={chartPeriod === p ? 'active' : ''} onClick={() => setChartPeriod(p)}>
-                    {p === 'day' ? 'Kun' : p === 'week' ? 'Hafta' : p === 'month' ? 'Oy' : 'Yil'}
+                {["day", "week", "month", "year"].map((p) => (
+                  <button
+                    key={p}
+                    className={chartPeriod === p ? "active" : ""}
+                    onClick={() => setChartPeriod(p)}
+                  >
+                    {p === "day"
+                      ? t("kun")
+                      : p === "week"
+                        ? t("hafta")
+                        : p === "month"
+                          ? t("oy")
+                          : t("yil")}
                   </button>
                 ))}
               </div>
               <div className="chart-container">
                 <svg className="chart-svg" viewBox="0 0 300 150">
                   <defs>
-                    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <linearGradient
+                      id="chartGradient"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="0%"
+                    >
                       <stop offset="0%" stopColor="#5656ff" />
                       <stop offset="100%" stopColor="#28ec70" />
                     </linearGradient>
@@ -725,7 +991,7 @@ function OfficeXarajat() {
             </div>
 
             <div className="circular-stats">
-              <h2>Aylana Statistika</h2>
+              <h2>{t("Aylana Statistika")}</h2>
               <div className="pie-container">
                 <svg className="pie-chart" viewBox="0 0 100 100">
                   <circle
@@ -757,11 +1023,15 @@ function OfficeXarajat() {
                 <div className="pie-legend">
                   <div className="legend-item">
                     <span className="dot paid"></span>
-                    <span>To'langan: {getCircularData().paid}</span>
+                    <span>
+                      {t("To'langan")}: {getCircularData().paid}
+                    </span>
                   </div>
                   <div className="legend-item">
                     <span className="dot unpaid"></span>
-                    <span>Qolgan: {getCircularData().unpaid}</span>
+                    <span>
+                      {t("Qolgan")}: {getCircularData().unpaid}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -774,10 +1044,22 @@ function OfficeXarajat() {
       {logoutDialog && (
         <div className="confirm-overlay">
           <div className="confirm-modal">
-            <p className="confirm-message">Haqiqatdan ham chiqishni xohlaysizmi?</p>
+            <p className="confirm-message">
+              {t("Haqiqatdan ham chiqishni xohlaysizmi?")}
+            </p>
             <div className="confirm-buttons">
-              <button className="confirm-btn confirm-cancel" onClick={handleLogoutCancel}>Bekor qilish</button>
-              <button className="confirm-btn confirm-logout" onClick={confirmLogout}>Chiqish</button>
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={handleLogoutCancel}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmLogout}
+              >
+                {t("chiqish")}
+              </button>
             </div>
           </div>
         </div>
@@ -787,66 +1069,116 @@ function OfficeXarajat() {
         <div className="modal-overlay">
           <div className="modal-container">
             <div className="modal-header">
-              <h2>{editMode ? "Xarajatni tahrirlash" : "Yangi xarajat qo'shish"}</h2>
-              <button className="close-btn" onClick={handleAddExpenseModalClose}>✕</button>
+              <h2>
+                {editMode ? "Xarajatni tahrirlash" : t("qo'shish")}
+              </h2>
+              <button
+                className="close-btn"
+                onClick={handleAddExpenseModalClose}
+              >
+                ✕
+              </button>
             </div>
             <div className="modal-body">
               <div className="form-section">
                 <div className="input-group">
-                  <label>Xarajat nomi / turi</label>
+                  <label>{t("Xarajat nomi / turi")}</label>
                   <div className="input-wrapper">
-                    <input type="text" placeholder="Masalan: Ijara, Elektr..." value={expenseName} onChange={handleExpenseNameChange} />
+                    <input
+                      type="text"
+                      placeholder="Masalan: Ijara, Elektr..."
+                      value={expenseName}
+                      onChange={handleExpenseNameChange}
+                    />
                   </div>
                 </div>
                 <div className="input-row">
                   <div className="input-group">
-                    <label>To'lanishi kerak</label>
+                    <label>{t("To'lanishi kerak")}</label>
                     <div className="input-wrapper">
-                      <input type="number" value={amountToPay} onChange={(e) => setAmountToPay(e.target.value)} />
-                      <button className="calc-btn-trigger" onClick={() => setMiniCalcOpen(!miniCalcOpen)}>🧮</button>
+                      <input
+                        type="number"
+                        value={amountToPay}
+                        onChange={(e) => setAmountToPay(e.target.value)}
+                      />
+                      <button
+                        className="calc-btn-trigger"
+                        onClick={() => setMiniCalcOpen(!miniCalcOpen)}
+                      >
+                        🧮
+                      </button>
                     </div>
                   </div>
                   <div className="input-group">
-                    <label>Valyuta</label>
-                    <select value={currencyToPay} onChange={(e) => setCurrencyToPay(e.target.value)} className="modal-select">
+                    <label>{t("valyuta")}</label>
+                    <select
+                      value={currencyToPay}
+                      onChange={(e) => setCurrencyToPay(e.target.value)}
+                      className="modal-select"
+                    >
                       <option value="sum">So'm</option>
                       <option value="dollar">Dollar ($)</option>
                     </select>
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>To'lov muddati (sana)</label>
+                  <label>{t("To'lov muddati (sana)")}</label>
                   <div className="input-wrapper">
-                    <input type="date" value={dateToPay} onChange={(e) => setDateToPay(e.target.value)} />
+                    <input
+                      type="date"
+                      value={dateToPay}
+                      onChange={(e) => setDateToPay(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="input-row">
                   <div className="input-group">
-                    <label>To'langan summa</label>
+                    <label>{t("To'langan summa")}</label>
                     <div className="input-wrapper">
-                      <input type="number" value={amountAlreadyPaid} onChange={(e) => setAmountAlreadyPaid(e.target.value)} />
+                      <input
+                        type="number"
+                        value={amountAlreadyPaid}
+                        onChange={(e) => setAmountAlreadyPaid(e.target.value)}
+                      />
                     </div>
                   </div>
                   <div className="input-group">
-                    <label>Valyuta</label>
-                    <select value={currencyAlreadyPaid} onChange={(e) => setCurrencyAlreadyPaid(e.target.value)} className="modal-select">
+                    <label>{t("valyuta")}</label>
+                    <select
+                      value={currencyAlreadyPaid}
+                      onChange={(e) => setCurrencyAlreadyPaid(e.target.value)}
+                      className="modal-select"
+                    >
                       <option value="sum">So'm</option>
                       <option value="dollar">Dollar ($)</option>
                     </select>
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>To'langan sana</label>
+                  <label>{t("To'langan sana")}</label>
                   <div className="input-wrapper">
-                    <input type="date" value={dateAlreadyPaid} onChange={(e) => setDateAlreadyPaid(e.target.value)} />
+                    <input
+                      type="date"
+                      value={dateAlreadyPaid}
+                      onChange={(e) => setDateAlreadyPaid(e.target.value)}
+                    />
                   </div>
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={handleAddExpenseModalClose}>Bekor qilish</button>
-              <button className="btn-submit" disabled={!isFormValid} onClick={handleAddExpense}>
-                {editMode ? "Saqlash" : "Qo'shish"}
+              <button
+                className="btn-cancel"
+                onClick={handleAddExpenseModalClose}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button
+                className="btn-submit"
+                disabled={!isFormValid}
+                onClick={handleAddExpense}
+              >
+                {editMode ? t("saqlash") : t("qo'shish")}
               </button>
             </div>
           </div>
@@ -857,21 +1189,36 @@ function OfficeXarajat() {
         <div className="modal-overlay">
           <div className="modal-container">
             <div className="modal-header">
-              <h2>Balansni yangilash</h2>
-              <button className="close-btn" onClick={handleBalansModalClose}>✕</button>
+              <h2>{t("Balansni yangilash")}</h2>
+              <button className="close-btn" onClick={handleBalansModalClose}>
+                ✕
+              </button>
             </div>
             <div className="modal-body">
               <div className="form-section">
                 <div className="input-group">
-                  <label>Yangi balans miqdori</label>
+                  <label>{t("Yangi balans miqdori")}</label>
                   <div className="input-wrapper">
-                    <input type="number" value={balanceAmount} onChange={(e) => setBalanceAmount(e.target.value)} />
-                    <button className="calc-btn-trigger" onClick={() => setMiniCalcOpen(!miniCalcOpen)}>🧮</button>
+                    <input
+                      type="number"
+                      value={balanceAmount}
+                      onChange={(e) => setBalanceAmount(e.target.value)}
+                    />
+                    <button
+                      className="calc-btn-trigger"
+                      onClick={() => setMiniCalcOpen(!miniCalcOpen)}
+                    >
+                      🧮
+                    </button>
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>Valyuta</label>
-                  <select value={balanceCurrency} onChange={(e) => setBalanceCurrency(e.target.value)} className="modal-select">
+                  <label>{t("valyuta")}</label>
+                  <select
+                    value={balanceCurrency}
+                    onChange={(e) => setBalanceCurrency(e.target.value)}
+                    className="modal-select"
+                  >
                     <option value="sum">So'm</option>
                     <option value="dollar">Dollar ($)</option>
                   </select>
@@ -879,37 +1226,94 @@ function OfficeXarajat() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={handleBalansModalClose}>Bekor qilish</button>
-              <button className="btn-submit" onClick={handleUpdateBalans}>Yangilash</button>
+              <button className="btn-cancel" onClick={handleBalansModalClose}>
+                {t("bekorqilish")}
+              </button>
+              <button className="btn-submit" onClick={handleUpdateBalans}>
+                {t("yangilash")}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {miniCalcOpen && (
-        <div className="mini-calc" style={{ left: calcPosition.x, top: calcPosition.y }}>
+        <div
+          className="mini-calc"
+          style={{ left: calcPosition.x, top: calcPosition.y }}
+        >
           <div className="calc-header" onMouseDown={handleMouseDown}>
-            <span>Kalkulator</span>
-            <button className="close-btn" onClick={() => setMiniCalcOpen(false)}>✕</button>
+            <span>{t("Kalkulator")}</span>
+            <button
+              className="close-btn"
+              onClick={() => setMiniCalcOpen(false)}
+            >
+              ✕
+            </button>
           </div>
           <div className="calc-screen">{calcDisplay}</div>
           <div className="calc-grid">
             <button onClick={handleCalcClear}>C</button>
-            <button className="op-btn" onClick={() => handleCalcOperation("/")}>÷</button>
-            <button className="op-btn" onClick={() => handleCalcOperation("*")}>×</button>
-            <button onClick={() => setCalcDisplay(calcDisplay.slice(0,-1) || "0")}>⌫</button>
-            {[7,8,9].map(n => <button key={n} onClick={() => handleCalcNumber(n)}>{n}</button>)}
-            <button className="op-btn" onClick={() => handleCalcOperation("-")}>-</button>
-            {[4,5,6].map(n => <button key={n} onClick={() => handleCalcNumber(n)}>{n}</button>)}
-            <button className="op-btn" onClick={() => handleCalcOperation("+")}>+</button>
-            {[1,2,3].map(n => <button key={n} onClick={() => handleCalcNumber(n)}>{n}</button>)}
-            <button className="eq-btn" style={{ gridRow: 'span 2' }} onClick={handleCalcEquals}>=</button>
-            <button style={{ gridColumn: 'span 2' }} onClick={() => handleCalcNumber(0)}>0</button>
-            <button onClick={() => !calcDisplay.includes(".") && setCalcDisplay(calcDisplay + ".")}>.</button>
+            <button className="op-btn" onClick={() => handleCalcOperation("/")}>
+              ÷
+            </button>
+            <button className="op-btn" onClick={() => handleCalcOperation("*")}>
+              ×
+            </button>
+            <button
+              onClick={() => setCalcDisplay(calcDisplay.slice(0, -1) || "0")}
+            >
+              ⌫
+            </button>
+            {[7, 8, 9].map((n) => (
+              <button key={n} onClick={() => handleCalcNumber(n)}>
+                {n}
+              </button>
+            ))}
+            <button className="op-btn" onClick={() => handleCalcOperation("-")}>
+              -
+            </button>
+            {[4, 5, 6].map((n) => (
+              <button key={n} onClick={() => handleCalcNumber(n)}>
+                {n}
+              </button>
+            ))}
+            <button className="op-btn" onClick={() => handleCalcOperation("+")}>
+              +
+            </button>
+            {[1, 2, 3].map((n) => (
+              <button key={n} onClick={() => handleCalcNumber(n)}>
+                {n}
+              </button>
+            ))}
+            <button
+              className="eq-btn"
+              style={{ gridRow: "span 2" }}
+              onClick={handleCalcEquals}
+            >
+              =
+            </button>
+            <button
+              style={{ gridColumn: "span 2" }}
+              onClick={() => handleCalcNumber(0)}
+            >
+              0
+            </button>
+            <button
+              onClick={() =>
+                !calcDisplay.includes(".") && setCalcDisplay(calcDisplay + ".")
+              }
+            >
+              .
+            </button>
           </div>
           <div className="calc-footer">
-            <button onClick={() => handleUseCalcValue("toPay")}>To'lovga</button>
-            <button onClick={() => handleUseCalcValue("alreadyPaid")}>Olgan sum-ga</button>
+            <button onClick={() => handleUseCalcValue("toPay")}>
+              {t("To'lovga")}
+            </button>
+            <button onClick={() => handleUseCalcValue("alreadyPaid")}>
+              {t("Olgan sum-ga")}
+            </button>
           </div>
         </div>
       )}
@@ -917,22 +1321,49 @@ function OfficeXarajat() {
       {deleteExpenseId && (
         <div className="confirm-overlay">
           <div className="confirm-modal">
-            <p className="confirm-message">Ushbu xarajatni o'chirib tashlamoqchimisiz?</p>
+            <p className="confirm-message">
+              {t("Ushbu xarajatni o'chirib tashlamoqchimisiz?")}
+            </p>
             <div className="confirm-buttons">
-              <button className="confirm-btn confirm-cancel" onClick={() => setDeleteExpenseId(null)}>Bekor qilish</button>
-              <button className="confirm-btn confirm-logout" onClick={confirmDeleteExpense}>O'chirish</button>
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={() => setDeleteExpenseId(null)}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmDeleteExpense}
+              >
+                {t("o'chirish")}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {showPerformUndoConfirm && (
-        <div className="confirm-overlay" onClick={() => setShowPerformUndoConfirm(false)}>
+        <div
+          className="confirm-overlay"
+          onClick={() => setShowPerformUndoConfirm(false)}
+        >
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <p className="confirm-message">Haqiqatan ham oxirgi harakatni bekor qilmoqchimisiz?</p>
+            <p className="confirm-message">
+              {t("Haqiqatan ham oxirgi harakatni bekor qilmoqchimisiz?")}
+            </p>
             <div className="confirm-buttons">
-              <button className="confirm-btn confirm-cancel" onClick={() => setShowPerformUndoConfirm(false)}>Yo'q</button>
-              <button className="confirm-btn confirm-logout" onClick={confirmPerformUndo}>Ha, bekor qilish</button>
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={() => setShowPerformUndoConfirm(false)}
+              >
+                {t("yo'q")}
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmPerformUndo}
+              >
+                {t("Ha, bekor qilish")}
+              </button>
             </div>
           </div>
         </div>
@@ -941,59 +1372,104 @@ function OfficeXarajat() {
       {showUndoConfirm && (
         <div className="confirm-overlay">
           <div className="confirm-modal">
-            <p className="confirm-message">Bekor qilish imkoniyatini o'chirasizmi? (Amalni ortga qaytarib bo'lmaydi)</p>
+            <p className="confirm-message">
+              {t(
+                "Bekor qilish imkoniyatini o'chirasizmi? (Amalni ortga qaytarib bo'lmaydi)",
+              )}
+            </p>
             <div className="confirm-buttons">
-              <button className="confirm-btn confirm-cancel" onClick={() => setShowUndoConfirm(false)}>Yo'q</button>
-              <button className="confirm-btn confirm-logout" onClick={confirmDismissUndo}>Ha, o'chirilsin</button>
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={() => setShowUndoConfirm(false)}
+              >
+                {t("yo'q")}
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmDismissUndo}
+              >
+                {t("Ha, o'chirilsin")}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {deleteHistoryData && (
-        <div className="confirm-overlay" onClick={() => setDeleteHistoryData(null)}>
+        <div
+          className="confirm-overlay"
+          onClick={() => setDeleteHistoryData(null)}
+        >
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-message">
-              Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?
+              {t("Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?")}
               <br />
               <small style={{ color: "rgba(204,194,255,0.6)" }}>
-                Ushbu amalni bekor qilish imkoniyati bo'ladi.
+                {t("Ushbu amalni bekor qilish imkoniyati bo'ladi.")}
               </small>
             </div>
             <div className="confirm-buttons">
-              <button className="confirm-btn confirm-cancel" onClick={() => setDeleteHistoryData(null)}>Bekor qilish</button>
-              <button className="confirm-btn confirm-logout" onClick={confirmDeleteHistory}>O'chirish</button>
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={() => setDeleteHistoryData(null)}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmDeleteHistory}
+              >
+                {t("o'chirish")}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {editingHistoryData && (
-        <div className="modal-overlay" onClick={() => setEditingHistoryData(null)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setEditingHistoryData(null)}
+        >
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2>Tarixni tahrirlash</h2>
-                <p>O'zgartirishlarni kiriting</p>
+                <h2>{t("Tarixni tahrirlash")}</h2>
+                <p>{t("O'zgartirishlarni kiriting")}</p>
               </div>
-              <button className="close-btn" onClick={() => setEditingHistoryData(null)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setEditingHistoryData(null)}
+              >
+                ✕
+              </button>
             </div>
             <div className="modal-body">
               <div className="form-section">
                 <div className="row">
                   <div className="input-group">
-                    <label>Summa</label>
+                    <label>{t("summa")}</label>
                     <input
                       type="number"
                       value={editingHistoryData.amount}
-                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, amount: e.target.value })}
+                      onChange={(e) =>
+                        setEditingHistoryData({
+                          ...editingHistoryData,
+                          amount: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="input-group small">
-                    <label>Valyuta</label>
+                    <label>{t("valyuta")}</label>
                     <select
                       value={editingHistoryData.currency}
-                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, currency: e.target.value })}
+                      onChange={(e) =>
+                        setEditingHistoryData({
+                          ...editingHistoryData,
+                          currency: e.target.value,
+                        })
+                      }
                     >
                       <option value="sum">So'm</option>
                       <option value="dollar">$</option>
@@ -1001,18 +1477,30 @@ function OfficeXarajat() {
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>Sana</label>
+                  <label>{t("sana")}</label>
                   <input
                     type="date"
                     value={editingHistoryData.date}
-                    onChange={(e) => setEditingHistoryData({ ...editingHistoryData, date: e.target.value })}
+                    onChange={(e) =>
+                      setEditingHistoryData({
+                        ...editingHistoryData,
+                        date: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn cancel" onClick={() => setEditingHistoryData(null)}>Bekor qilish</button>
-              <button className="btn add" onClick={handleEditHistorySave}>Saqlash</button>
+              <button
+                className="btn cancel"
+                onClick={() => setEditingHistoryData(null)}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button className="btn add" onClick={handleEditHistorySave}>
+                {t("saqlash")}
+              </button>
             </div>
           </div>
         </div>
@@ -1020,18 +1508,26 @@ function OfficeXarajat() {
 
       {/* Filter Modal for Mobile */}
       {isFilterModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsFilterModalOpen(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setIsFilterModalOpen(false)}
+        >
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2>Filtrlash</h2>
-                <p>Xarajatlarni izlash va saralash</p>
+                <h2>{t("filtrlash")}</h2>
+                <p>{t("Xarajatlarni izlash va saralash")}</p>
               </div>
-              <button className="close-btn" onClick={() => setIsFilterModalOpen(false)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setIsFilterModalOpen(false)}
+              >
+                ✕
+              </button>
             </div>
             <div className="modal-body filter-modal-body">
               <div className="input-group">
-                <label>Qidiruv</label>
+                <label>{t("qidiruv")}</label>
                 <input
                   className="modal-search"
                   type="search"
@@ -1041,25 +1537,32 @@ function OfficeXarajat() {
                 />
               </div>
               <div className="filter-options">
-                <label>Saralash turi</label>
-                <button 
+                <label>{t("Saralash turi")}</label>
+                <button
                   className={`filter-btn ${activeFilter === "recent" ? "active" : ""}`}
-                  onClick={() => { setActiveFilter(activeFilter === "recent" ? "all" : "recent"); setIsFilterModalOpen(false); }}
+                  onClick={() => {
+                    setActiveFilter(
+                      activeFilter === "recent" ? "all" : "recent",
+                    );
+                    setIsFilterModalOpen(false);
+                  }}
                 >
-                  Yangi qo'shilganlar
+                  {t("Yangi qo'shilganlar")}
                 </button>
-                <button 
+                <button
                   className={`filter-btn ${activeFilter === "high" ? "active" : ""}`}
-                  onClick={() => { setActiveFilter(activeFilter === "high" ? "all" : "high"); setIsFilterModalOpen(false); }}
+                  onClick={() => {
+                    setActiveFilter(activeFilter === "high" ? "all" : "high");
+                    setIsFilterModalOpen(false);
+                  }}
                 >
-                  Katta sarflar
+                  {t("Katta sarflar")}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

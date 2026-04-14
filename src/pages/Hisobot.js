@@ -142,7 +142,6 @@ function Hisobot() {
     setBalanceCurrency("sum");
   };
 
-
   const saveForUndo = () => {
     setUndoState({
       workers: JSON.parse(JSON.stringify(workers)),
@@ -187,15 +186,15 @@ function Hisobot() {
         workers.map((w) =>
           w.id === editingWorkerId
             ? {
-              ...w,
-              workerName,
-              amountToReceive,
-              currencyToReceive,
-              dateToGive,
-              amountAlreadyReceived,
-              currencyAlreadyReceived,
-              dateAlreadyReceived,
-            }
+                ...w,
+                workerName,
+                amountToReceive,
+                currencyToReceive,
+                dateToGive,
+                amountAlreadyReceived,
+                currencyAlreadyReceived,
+                dateAlreadyReceived,
+              }
             : w,
         ),
       );
@@ -246,14 +245,16 @@ function Hisobot() {
   const confirmDeleteHistory = () => {
     if (deleteHistoryData) {
       saveForUndo();
-      setWorkers(workers.map(w => {
-        if (w.id === deleteHistoryData.workerId) {
-          const newHistory = [...(w.history || [])];
-          newHistory.splice(deleteHistoryData.index, 1);
-          return { ...w, history: newHistory };
-        }
-        return w;
-      }));
+      setWorkers(
+        workers.map((w) => {
+          if (w.id === deleteHistoryData.workerId) {
+            const newHistory = [...(w.history || [])];
+            newHistory.splice(deleteHistoryData.index, 1);
+            return { ...w, history: newHistory };
+          }
+          return w;
+        }),
+      );
       setDeleteHistoryData(null);
     }
   };
@@ -261,19 +262,21 @@ function Hisobot() {
   const handleEditHistorySave = () => {
     if (editingHistoryData) {
       saveForUndo();
-      setWorkers(workers.map(w => {
-        if (w.id === editingHistoryData.workerId) {
-          const newHistory = [...(w.history || [])];
-          newHistory[editingHistoryData.index] = {
-            amount: editingHistoryData.amount,
-            currency: editingHistoryData.currency,
-            date: editingHistoryData.date,
-            type: editingHistoryData.type
-          };
-          return { ...w, history: newHistory };
-        }
-        return w;
-      }));
+      setWorkers(
+        workers.map((w) => {
+          if (w.id === editingHistoryData.workerId) {
+            const newHistory = [...(w.history || [])];
+            newHistory[editingHistoryData.index] = {
+              amount: editingHistoryData.amount,
+              currency: editingHistoryData.currency,
+              date: editingHistoryData.date,
+              type: editingHistoryData.type,
+            };
+            return { ...w, history: newHistory };
+          }
+          return w;
+        }),
+      );
       setEditingHistoryData(null);
     }
   };
@@ -472,24 +475,35 @@ function Hisobot() {
     amountAlreadyReceived &&
     dateAlreadyReceived;
 
-  const changeLanguage = (lng) => () => i18n.changeLanguage(lng);
-  const [age, setAge] = React.useState("");
-  const handleChange = (event) => setAge(event.target.value);
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+  };
+  const [age, setAge] = React.useState(i18n.language || "uz");
+  // const handleChange = (event) => setAge(event.target.value);
 
   return (
     <div className="Hisobot">
       {/* Left sidebar open button */}
-      <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setIsSidebarOpen(true)}
+      >
         <HiMenu />
       </button>
 
       {/* Right panel open button */}
-      <button className="right-panel-toggle-btn" onClick={() => setIsRightPanelOpen(true)}>
+      <button
+        className="right-panel-toggle-btn"
+        onClick={() => setIsRightPanelOpen(true)}
+      >
         ‹
       </button>
 
       <div className={`HisobotLeft ${isSidebarOpen ? "open" : ""}`}>
-        <button className="mobile-close-btn" onClick={() => setIsSidebarOpen(false)}>
+        <button
+          className="mobile-close-btn"
+          onClick={() => setIsSidebarOpen(false)}
+        >
           <HiX />
         </button>
         <div className="hisobotLeftText">
@@ -497,31 +511,39 @@ function Hisobot() {
             <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
             <p>{username}</p>
             <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
-              <h3>Profil</h3>
+              <h3>{t("profil")}</h3>
             </Link>
             <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("Kalkulator")}</h3>
             </Link>
             <Link to="/officexarajat" onClick={() => setIsSidebarOpen(false)}>
-              <h3>O'fis xarajatlari</h3>
+              <h3>{t("o'fisxarajatlari")}</h3>
             </Link>
             <div className="translation">
-              <select 
-              className="translationSelect"
-              labelId="demo-select-small-label"
-            id="demo-select-small"
-            value={age}
-            label="Age"
-            onChange={handleChange}>
-                <option className="languageOption" onClick={changeLanguage("uz")} value={10}>UZ</option>
-                <option className="languageOption" onClick={changeLanguage("en")} value={20}>RU</option>
-                <option className="languageOption" onClick={changeLanguage("ru")} value={30}>EN</option>
+              <select
+                className="translationSelect"
+                value={age}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setAge(value);
+                  changeLanguage(value);
+                }}
+              >
+                <option className="languageOption" value={"uz"}>
+                  UZ
+                </option>
+                <option className="languageOption" value={"ru"}>
+                  RU
+                </option>
+                <option className="languageOption" value={"en"}>
+                  EN
+                </option>
               </select>
             </div>
           </div>
           <div className="leftBottom">
             <Link to={"/login"}>
-              <h3>Chiqish</h3>
+              <h3>{t("chiqish")}</h3>
             </Link>
           </div>
         </div>
@@ -529,17 +551,22 @@ function Hisobot() {
       </div>
 
       {(isSidebarOpen || isRightPanelOpen) && (
-        <div className="sidebar-overlay" onClick={() => { setIsSidebarOpen(false); setIsRightPanelOpen(false); }}></div>
+        <div
+          className="sidebar-overlay"
+          onClick={() => {
+            setIsSidebarOpen(false);
+            setIsRightPanelOpen(false);
+          }}
+        ></div>
       )}
-
 
       <div className="HisobotRight">
         <div className="rightTop">
           <h3 className="addH3" onClick={handleAddWorkerClick}>
-            + Qo'shish
+            + {t("qo'shish")}
           </h3>
           <h3 className="addH3" onClick={handleBalansClick}>
-            + Balans
+            + {t("balans")}
           </h3>
           <div className="ql">
             <div className="qoshishLine"></div>
@@ -558,7 +585,7 @@ function Hisobot() {
                 setActiveFilter(activeFilter === "recent" ? "all" : "recent")
               }
             >
-              Yangilar
+              {t("yangi")}
             </h3>
             <h3
               className={activeFilter === "high" ? "active-filter" : ""}
@@ -566,12 +593,15 @@ function Hisobot() {
                 setActiveFilter(activeFilter === "high" ? "all" : "high")
               }
             >
-              Yuqori maosh
+              {t("yuqorimaosh")}
             </h3>
           </div>
 
-          <button className="mobile-filter-btn" onClick={() => setIsFilterModalOpen(true)}>
-            Filtrlash
+          <button
+            className="mobile-filter-btn"
+            onClick={() => setIsFilterModalOpen(true)}
+          >
+            {t("filtrlash")}
           </button>
 
           {undoState && (
@@ -650,17 +680,17 @@ function Hisobot() {
 
                       <div className="worker-values">
                         <div className="val-group">
-                          <p>Olishi kerak:</p>
+                          <p>{t("olishikerak")}:</p>
                           <strong className="to-receive">
                             {worker.amountToReceive}{" "}
                             {worker.currencyToReceive === "sum" ? "so'm" : "$"}
                           </strong>
                           <span className="small-date">
-                            Sana: {worker.dateToGive}
+                            {t("sana")}: {worker.dateToGive}
                           </span>
                         </div>
                         <div className="val-group">
-                          <p>Olgan summa:</p>
+                          <p>{t("olgansumma")}:</p>
                           <strong className="received">
                             {worker.amountAlreadyReceived}{" "}
                             {worker.currencyAlreadyReceived === "sum"
@@ -668,7 +698,7 @@ function Hisobot() {
                               : "$"}
                           </strong>
                           <span className="small-date">
-                            Olgan: {worker.dateAlreadyReceived}
+                            {t("olgan")}: {worker.dateAlreadyReceived}
                           </span>
                         </div>
                       </div>
@@ -708,7 +738,7 @@ function Hisobot() {
                     {/* History Section */}
                     {expandedHistory.includes(worker.id) && (
                       <div className="history-section">
-                        <h4>To'lovlar tarixi:</h4>
+                        <h4>{t("to'lovlartarixi")}:</h4>
                         {(worker.history || []).length === 0 ? (
                           <p className="no-history">Tarix mavjud emas</p>
                         ) : (
@@ -723,9 +753,53 @@ function Hisobot() {
                                   ? "Arxivlandi"
                                   : "To'landi"}
                               </span>
-                              <div className="history-actions" style={{ display: "flex", gap: "5px", marginLeft: "auto" }}>
-                                <button className="edit-btn" onClick={() => setEditingHistoryData({ workerId: worker.id, index: idx, ...h })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="Tahrirlash">✏️</button>
-                                <button className="delete-btn" onClick={() => setDeleteHistoryData({ workerId: worker.id, index: idx })} style={{ padding: "5px", background: "none", border: "none", cursor: "pointer", fontSize: "16px" }} title="O'chirish">🗑️</button>
+                              <div
+                                className="history-actions"
+                                style={{
+                                  display: "flex",
+                                  gap: "5px",
+                                  marginLeft: "auto",
+                                }}
+                              >
+                                <button
+                                  className="edit-btn"
+                                  onClick={() =>
+                                    setEditingHistoryData({
+                                      workerId: worker.id,
+                                      index: idx,
+                                      ...h,
+                                    })
+                                  }
+                                  style={{
+                                    padding: "5px",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontSize: "16px",
+                                  }}
+                                  title="Tahrirlash"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  className="delete-btn"
+                                  onClick={() =>
+                                    setDeleteHistoryData({
+                                      workerId: worker.id,
+                                      index: idx,
+                                    })
+                                  }
+                                  style={{
+                                    padding: "5px",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontSize: "16px",
+                                  }}
+                                  title="O'chirish"
+                                >
+                                  🗑️
+                                </button>
                               </div>
                             </div>
                           ))
@@ -740,23 +814,28 @@ function Hisobot() {
         </div>
 
         <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
-          <button className="right-panel-close-btn" onClick={() => setIsRightPanelOpen(false)}>›</button>
+          <button
+            className="right-panel-close-btn"
+            onClick={() => setIsRightPanelOpen(false)}
+          >
+            ›
+          </button>
           <div className="lrLine"></div>
           <div className="statistic">
-            <h2>Statistika</h2>
+            <h2>{t("statistika")}</h2>
             <div className="statistic1">
-              <h3>Boshlang'ich balans:</h3>
+              <h3>{t("boshlang'ichbalans")}:</h3>
               <p>
                 {initialBalance.sum.toLocaleString()} so'm /{" "}
                 {initialBalance.dollar.toLocaleString()} $
               </p>
             </div>
             <div className="statistic2">
-              <h3>Jami ishchilar:</h3>
+              <h3>{t("jamiishchilar")}:</h3>
               <p>{workers.length}</p>
             </div>
             <div className="statistic3">
-              <h3>Eng baland maosh:</h3>
+              <h3>{t("engbalandmaosh")}:</h3>
               <p>
                 {(() => {
                   const sumHigh = workers
@@ -786,7 +865,7 @@ function Hisobot() {
               </p>
             </div>
             <div className="statistic4">
-              <h3>Jami maoshlar uchun xarajat:</h3>
+              <h3>{t("jamimaoshlaruchunxarajat")}:</h3>
               <p>
                 {workers
                   .reduce((acc, curr) => {
@@ -833,7 +912,7 @@ function Hisobot() {
               </p>
             </div>
             <div className="statistic5">
-              <h3>To'lanishi kerak bo'lgan qoldiq:</h3>
+              <h3>{t("to'lanishikerakbo'lganqoldiq")}:</h3>
               <p>
                 {workers
                   .filter((w) => !w.isPaid)
@@ -860,7 +939,7 @@ function Hisobot() {
               </p>
             </div>
             <div className="statistic6">
-              <h3>Qolgan balans:</h3>
+              <h3>{t("qolganbalans")}:</h3>
               <p>
                 {totalBalance.sum.toLocaleString()} so'm /{" "}
                 {totalBalance.dollar.toLocaleString()} $
@@ -868,31 +947,31 @@ function Hisobot() {
             </div>
 
             <div className="linear-stats">
-              <h2>Chiziqli Statistika</h2>
+              <h2>{t("chiziqlistatistika")}</h2>
               <div className="chart-controls">
                 <button
                   className={chartPeriod === "day" ? "active" : ""}
                   onClick={() => setChartPeriod("day")}
                 >
-                  Kun
+                  {t("kun")}
                 </button>
                 <button
                   className={chartPeriod === "week" ? "active" : ""}
                   onClick={() => setChartPeriod("week")}
                 >
-                  Hafta
+                  {t("hafta")}
                 </button>
                 <button
                   className={chartPeriod === "month" ? "active" : ""}
                   onClick={() => setChartPeriod("month")}
                 >
-                  Oy
+                  {t("oy")}
                 </button>
                 <button
                   className={chartPeriod === "year" ? "active" : ""}
                   onClick={() => setChartPeriod("year")}
                 >
-                  Yil
+                  {t("yil")}
                 </button>
               </div>
               <div className="chart-container">
@@ -923,7 +1002,7 @@ function Hisobot() {
             </div>
 
             <div className="circular-stats">
-              <h2>Aylana Statistika</h2>
+              <h2>{t("aylanastatistika")}</h2>
               <div className="pie-container">
                 <svg className="pie-chart" viewBox="0 0 100 100">
                   <circle
@@ -955,11 +1034,15 @@ function Hisobot() {
                 <div className="pie-legend">
                   <div className="legend-item">
                     <span className="dot paid"></span>
-                    <span>To'langan: {getCircularData().paid}</span>
+                    <span>
+                      {t("to'langan")}: {getCircularData().paid}
+                    </span>
                   </div>
                   <div className="legend-item">
                     <span className="dot unpaid"></span>
-                    <span>Qolgan: {getCircularData().unpaid}</span>
+                    <span>
+                      {t("qolgan")}: {getCircularData().unpaid}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1017,7 +1100,7 @@ function Hisobot() {
               {/* LEFT */}
               <div className="form-section">
                 <div className="input-group">
-                  <label>Ishchining ismi</label>
+                  <label>{t("ishchiningismi")}</label>
                   <input
                     type="text"
                     value={workerName}
@@ -1028,7 +1111,7 @@ function Hisobot() {
 
                 <div className="row">
                   <div className="input-group">
-                    <label>Olishi kerak</label>
+                    <label>{t("olishikerak")}</label>
                     <input
                       type="number"
                       value={amountToReceive}
@@ -1038,7 +1121,7 @@ function Hisobot() {
                   </div>
 
                   <div className="input-group small">
-                    <label>Valyuta</label>
+                    <label>{t("valyuta")}</label>
                     <select
                       value={currencyToReceive}
                       onChange={(e) => setCurrencyToReceive(e.target.value)}
@@ -1050,7 +1133,7 @@ function Hisobot() {
                 </div>
 
                 <div className="input-group">
-                  <label>Berish sanasi</label>
+                  <label>{t("berishsanasi")}</label>
                   <input
                     type="date"
                     value={dateToGive}
@@ -1060,7 +1143,7 @@ function Hisobot() {
 
                 <div className="row">
                   <div className="input-group">
-                    <label>Olgan summa</label>
+                    <label>{t("olgansumma")}</label>
                     <input
                       type="number"
                       value={amountAlreadyReceived}
@@ -1070,7 +1153,7 @@ function Hisobot() {
                   </div>
 
                   <div className="input-group small">
-                    <label>Valyuta</label>
+                    <label>{t("valyuta")}</label>
                     <select
                       value={currencyAlreadyReceived}
                       onChange={(e) =>
@@ -1084,7 +1167,7 @@ function Hisobot() {
                 </div>
 
                 <div className="input-group">
-                  <label>Olgan sana</label>
+                  <label>{t("olgansana")}</label>
                   <input
                     type="date"
                     value={dateAlreadyReceived}
@@ -1100,7 +1183,7 @@ function Hisobot() {
                 className="btn cancel"
                 onClick={handleAddWorkerModalClose}
               >
-                Bekor qilish
+                {t("bekorqilish")}
               </button>
 
               <button
@@ -1121,8 +1204,8 @@ function Hisobot() {
             {/* HEADER */}
             <div className="modal-header">
               <div>
-                <h2>Balans Yangilash</h2>
-                <p>Yangi balans miqdorini kiriting</p>
+                <h2>{t("balansyangilash")}</h2>
+                <p>{t("yangibalansmiqdorinikiriting")}</p>
               </div>
               <button className="close-btn" onClick={handleBalansModalClose}>
                 ✕
@@ -1134,7 +1217,7 @@ function Hisobot() {
               <div className="form-section">
                 <div className="row">
                   <div className="input-group">
-                    <label>Balans miqdori</label>
+                    <label>{t("balansmiqdori")}</label>
                     <input
                       type="number"
                       value={balanceAmount}
@@ -1144,7 +1227,7 @@ function Hisobot() {
                     />
                   </div>
                   <div className="input-group small">
-                    <label>Valyuta</label>
+                    <label>{t("valyuta")}</label>
                     <select
                       value={balanceCurrency}
                       onChange={(e) => setBalanceCurrency(e.target.value)}
@@ -1160,14 +1243,14 @@ function Hisobot() {
             {/* FOOTER */}
             <div className="modal-footer">
               <button className="btn cancel" onClick={handleBalansModalClose}>
-                Bekor qilish
+                {t("bekorqilish")}
               </button>
               <button
                 className={`btn add ${!balanceAmount ? "disabled" : ""}`}
                 onClick={balanceAmount ? handleUpdateBalans : null}
                 disabled={!balanceAmount}
               >
-                Yangilash
+                {t("yangilash")}
               </button>
             </div>
           </div>
@@ -1180,10 +1263,10 @@ function Hisobot() {
         >
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-message">
-              Haqiqatan ham ushbu ishchini o'chirmoqchimisiz?
+              {t("Haqiqatan ham ushbu ishchini o'chirmoqchimisiz?")}
               <br />
               <small style={{ color: "rgba(204,194,255,0.6)" }}>
-                Ushbu amalni bekor qilish imkoniyati bo'ladi.
+                {t("Ushbu amalni bekor qilish imkoniyati bo'ladi.")}
               </small>
             </div>
             <div className="confirm-buttons">
@@ -1191,13 +1274,13 @@ function Hisobot() {
                 className="confirm-btn confirm-cancel"
                 onClick={() => setDeleteWorkerId(null)}
               >
-                Bekor qilish
+                {t("bekorqilish")}
               </button>
               <button
                 className="confirm-btn confirm-logout"
                 onClick={confirmDeleteWorker}
               >
-                O'chirish
+                {t("o'chirish")}
               </button>
             </div>
           </div>
@@ -1211,20 +1294,20 @@ function Hisobot() {
         >
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-message">
-              Haqiqatan ham oxirgi harakatni bekor qilmoqchimisiz?
+              {t("Haqiqatan ham oxirgi harakatni bekor qilmoqchimisiz?")}
             </div>
             <div className="confirm-buttons">
               <button
                 className="confirm-btn confirm-cancel"
                 onClick={() => setShowPerformUndoConfirm(false)}
               >
-                Yo'q
+                {t("yoq")}
               </button>
               <button
                 className="confirm-btn confirm-logout"
                 onClick={confirmPerformUndo}
               >
-                Ha, bekor qilish
+                {t("Ha, bekor qilish")}
               </button>
             </div>
           </div>
@@ -1238,18 +1321,51 @@ function Hisobot() {
         >
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-message">
-              Ushbu amalni qaytarish imkoniyatini o'chirib tashlamoqchimisiz?
+              {t(
+                "Ushbu amalni qaytarish imkoniyatini o'chirib tashlamoqchimisiz?",
+              )}
             </div>
             <div className="confirm-buttons">
               <button
                 className="confirm-btn confirm-cancel"
                 onClick={() => setShowUndoConfirm(false)}
               >
-                Bekor qilish
+                {t("bekorqilish")}
               </button>
               <button
                 className="confirm-btn confirm-logout"
                 onClick={confirmDismissUndo}
+              >
+                {t("o'chirish")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteHistoryData && (
+        <div
+          className="confirm-overlay"
+          onClick={() => setDeleteHistoryData(null)}
+        >
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-message">
+              {t("Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?")}
+              <br />
+              <small style={{ color: "rgba(204,194,255,0.6)" }}>
+                {t("Ushbu amalni bekor qilish imkoniyati bo'ladi.")}
+              </small>
+            </div>
+            <div className="confirm-buttons">
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={() => setDeleteHistoryData(null)}
+              >
+                Bekor qilish
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmDeleteHistory}
               >
                 O'chirish
               </button>
@@ -1258,50 +1374,50 @@ function Hisobot() {
         </div>
       )}
 
-      {deleteHistoryData && (
-        <div className="confirm-overlay" onClick={() => setDeleteHistoryData(null)}>
-          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-message">
-              Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?
-              <br />
-              <small style={{ color: "rgba(204,194,255,0.6)" }}>
-                Ushbu amalni bekor qilish imkoniyati bo'ladi.
-              </small>
-            </div>
-            <div className="confirm-buttons">
-              <button className="confirm-btn confirm-cancel" onClick={() => setDeleteHistoryData(null)}>Bekor qilish</button>
-              <button className="confirm-btn confirm-logout" onClick={confirmDeleteHistory}>O'chirish</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {editingHistoryData && (
-        <div className="modal-overlay" onClick={() => setEditingHistoryData(null)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setEditingHistoryData(null)}
+        >
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2>Tarixni tahrirlash</h2>
-                <p>O'zgartirishlarni kiriting</p>
+                <h2>{t("Tarixni tahrirlash")}</h2>
+                <p>{t("O'zgartirishlarni kiriting")}</p>
               </div>
-              <button className="close-btn" onClick={() => setEditingHistoryData(null)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setEditingHistoryData(null)}
+              >
+                ✕
+              </button>
             </div>
             <div className="modal-body">
               <div className="form-section">
                 <div className="row">
                   <div className="input-group">
-                    <label>Summa</label>
+                    <label>{t("summa")}</label>
                     <input
                       type="number"
                       value={editingHistoryData.amount}
-                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, amount: e.target.value })}
+                      onChange={(e) =>
+                        setEditingHistoryData({
+                          ...editingHistoryData,
+                          amount: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="input-group small">
-                    <label>Valyuta</label>
+                    <label>{t("valyuta")}</label>
                     <select
                       value={editingHistoryData.currency}
-                      onChange={(e) => setEditingHistoryData({ ...editingHistoryData, currency: e.target.value })}
+                      onChange={(e) =>
+                        setEditingHistoryData({
+                          ...editingHistoryData,
+                          currency: e.target.value,
+                        })
+                      }
                     >
                       <option value="sum">So'm</option>
                       <option value="dollar">$</option>
@@ -1309,18 +1425,30 @@ function Hisobot() {
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>Sana</label>
+                  <label>{t("sana")}</label>
                   <input
                     type="date"
                     value={editingHistoryData.date}
-                    onChange={(e) => setEditingHistoryData({ ...editingHistoryData, date: e.target.value })}
+                    onChange={(e) =>
+                      setEditingHistoryData({
+                        ...editingHistoryData,
+                        date: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn cancel" onClick={() => setEditingHistoryData(null)}>Bekor qilish</button>
-              <button className="btn add" onClick={handleEditHistorySave}>Saqlash</button>
+              <button
+                className="btn cancel"
+                onClick={() => setEditingHistoryData(null)}
+              >
+                Bekor qilish
+              </button>
+              <button className="btn add" onClick={handleEditHistorySave}>
+                Saqlash
+              </button>
             </div>
           </div>
         </div>
@@ -1328,18 +1456,26 @@ function Hisobot() {
 
       {/* Filter Modal for Mobile */}
       {isFilterModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsFilterModalOpen(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setIsFilterModalOpen(false)}
+        >
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2>Filtrlash</h2>
-                <p>Ishchilarni izlash va saralash</p>
+                <h2>{t("Filtrlash")}</h2>
+                <p>{t("Ishchilarni izlash va saralash")}</p>
               </div>
-              <button className="close-btn" onClick={() => setIsFilterModalOpen(false)}>✕</button>
+              <button
+                className="close-btn"
+                onClick={() => setIsFilterModalOpen(false)}
+              >
+                ✕
+              </button>
             </div>
             <div className="modal-body filter-modal-body">
               <div className="input-group">
-                <label>Qidiruv</label>
+                <label>{t("Qidiruv")}</label>
                 <input
                   className="modal-search"
                   type="search"
@@ -1349,25 +1485,32 @@ function Hisobot() {
                 />
               </div>
               <div className="filter-options">
-                <label>Saralash turi</label>
+                <label>{t("Saralash turi")}</label>
                 <button
                   className={`filter-btn ${activeFilter === "recent" ? "active" : ""}`}
-                  onClick={() => { setActiveFilter(activeFilter === "recent" ? "all" : "recent"); setIsFilterModalOpen(false); }}
+                  onClick={() => {
+                    setActiveFilter(
+                      activeFilter === "recent" ? "all" : "recent",
+                    );
+                    setIsFilterModalOpen(false);
+                  }}
                 >
-                  Yangi qo'shilganlar
+                  {t("Yangi qo'shilganlar")}
                 </button>
                 <button
                   className={`filter-btn ${activeFilter === "high" ? "active" : ""}`}
-                  onClick={() => { setActiveFilter(activeFilter === "high" ? "all" : "high"); setIsFilterModalOpen(false); }}
+                  onClick={() => {
+                    setActiveFilter(activeFilter === "high" ? "all" : "high");
+                    setIsFilterModalOpen(false);
+                  }}
                 >
-                  Katta oylikli ishchilar
+                  {t("Katta oylikli ishchilar")}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

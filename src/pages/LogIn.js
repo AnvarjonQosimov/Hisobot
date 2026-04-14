@@ -82,7 +82,7 @@ const newY = Math.random() * maxY * 2 - maxY;
             <h1>LogIn</h1>
             <input 
             maxLength={20}
-              required="true"
+              required={true}
               type="text" 
               placeholder='UserName'
               value={username}
@@ -100,7 +100,7 @@ const newY = Math.random() * maxY * 2 - maxY;
             <div className="passwordInput">
                 <input 
                 maxLength={17}
-                required="true"
+                required={true}
                   type={showPassword ? "text" : "password"}
                   placeholder='Password'
                   value={password}
