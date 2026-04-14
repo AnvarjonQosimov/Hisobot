@@ -105,10 +105,6 @@ function Hisobot() {
     );
   }, [initialBalance, username]);
 
-  const handleLogout = () => {
-    setLogoutDialog(true);
-  };
-
   const confirmLogout = () => {
     localStorage.removeItem("username");
     localStorage.removeItem("password");
