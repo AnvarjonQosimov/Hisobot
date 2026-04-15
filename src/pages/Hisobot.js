@@ -516,7 +516,7 @@ function Hisobot() {
               <h3>{t("o'fisxarajatlari")}</h3>
             </Link>
             <div className="QurilishXarajatlari">
-                <h3 className="qX">{t("qurilishxarajatlari")} <span>{">"}</span></h3>
+                <h3>{t("qurilishxarajatlari")} <span>{">"}</span></h3>
                 <h4>+ Fayl</h4>
             </div>
             <div className="translation">

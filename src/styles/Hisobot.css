@@ -77,37 +77,6 @@
     color: rgb(204, 194, 255);
 }
 
-.qX{
-    padding: 10px 15px 10px 15px !important;
-}
-
-.leftTop .qX span{
-    margin-left: 25px;
-    transform: rotate(90deg);
-}
-
-.QurilishXarajatlari{
-    min-height: 250px;
-    overflow: hidden;
-}
-
-.QurilishXarajatlari h4{
-    border: 2px solid rgba(40, 236, 112, 0.5);
-    padding: 10px 20px;
-    width: 70px;
-    border-radius: 20px;
-    cursor: pointer;
-    display: none;
-}
-
-.leftTop .qX span:active{
-    transform: rotate(270deg);
-
-    .QurilishXarajatlari h4 {
-        display: block !important;
-    }
-}
-
 .logout-btn {
     background: none;
     border: none;
