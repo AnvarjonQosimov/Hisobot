@@ -64,6 +64,7 @@
     border: 1px solid rgba(161, 161, 241, 0.5);
     box-shadow: 0 0 10px 10px rgba(161, 161, 241, 0.2);
     transition: 0.1s;
+    font-size: 14px;
 }
 
 .leftTop h3:hover{
@@ -74,6 +75,37 @@
 .leftTop a{
     text-decoration: none;
     color: rgb(204, 194, 255);
+}
+
+.qX{
+    padding: 10px 15px 10px 15px !important;
+}
+
+.leftTop .qX span{
+    margin-left: 25px;
+    transform: rotate(90deg);
+}
+
+.QurilishXarajatlari{
+    min-height: 250px;
+    overflow: hidden;
+}
+
+.QurilishXarajatlari h4{
+    border: 2px solid rgba(40, 236, 112, 0.5);
+    padding: 10px 20px;
+    width: 70px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: none;
+}
+
+.leftTop .qX span:active{
+    transform: rotate(270deg);
+
+    .QurilishXarajatlari h4 {
+        display: block !important;
+    }
 }
 
 .logout-btn {
@@ -1046,8 +1078,45 @@
     z-index: 10;
 }
 
+.translation{
+    z-index: 9999;
+    position: fixed;
+}
+
+.translation{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 655px;
+    width: 25%;
+}
+
+.translationSelect{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 15px;
+    border: 1px solid rgba(161, 161, 241, 0.5);
+    background-color: rgba(161, 161, 241, 0.5);
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+}
+
+.languageOption{
+    cursor: pointer;
+    color: black;
+}
+
 /* ─────────────── RESPONSIVE ≤ 1485px ─────────────── */
 @media (max-width: 1485px) {
+    .translation{
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    margin-top: 655px;
+    width: 75%;
+}
 
     /* Show toggle buttons */
     .mobile-menu-btn {
@@ -1281,34 +1350,4 @@
         width: 100px !important;
         padding: 7px 5px !important;
     }
-}
-
-.translation{
-    z-index: 9999;
-    position: fixed;
-}
-
-.translation{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: 400px;
-    width: 25%;
-}
-
-.translationSelect{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 7px 15px;
-    border: 1px solid rgba(161, 161, 241, 0.5);
-    background-color: rgba(161, 161, 241, 0.5);
-    border-radius: 5px;
-    cursor: pointer;
-    color: white;
-}
-
-.languageOption{
-    cursor: pointer;
-    color: black;
 }
