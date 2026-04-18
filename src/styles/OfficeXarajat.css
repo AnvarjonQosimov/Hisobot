@@ -293,7 +293,7 @@
     box-shadow: 0 0 10px 10px rgba(104, 239, 126, 0.2);
     transition: 0.1s;
     margin-right: 10px;
-    width: 400px;
+    width: 100px !important;
 }
 
 .addH3:hover{
@@ -1386,5 +1386,6 @@
 @media(max-width: 434px){
     .addH3{
         width: 120px !important;
+        padding: 7px 5px !important;
     }
 }   

@@ -58,6 +58,7 @@ function Hisobot() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [isConstructionExpanded, setIsConstructionExpanded] = useState(false);
 
   // Load from localStorage (Account Scoped)
   useEffect(() => {
@@ -182,15 +183,15 @@ function Hisobot() {
         workers.map((w) =>
           w.id === editingWorkerId
             ? {
-                ...w,
-                workerName,
-                amountToReceive,
-                currencyToReceive,
-                dateToGive,
-                amountAlreadyReceived,
-                currencyAlreadyReceived,
-                dateAlreadyReceived,
-              }
+              ...w,
+              workerName,
+              amountToReceive,
+              currencyToReceive,
+              dateToGive,
+              amountAlreadyReceived,
+              currencyAlreadyReceived,
+              dateAlreadyReceived,
+            }
             : w,
         ),
       );
@@ -515,9 +516,16 @@ function Hisobot() {
             <Link to="/officexarajat" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("o'fisxarajatlari")}</h3>
             </Link>
-            <div className="QurilishXarajatlari">
-                <h3>{t("qurilishxarajatlari")} <span>{">"}</span></h3>
-                <h4>+ Fayl</h4>
+            <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
+              <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
+                {t("qurilishxarajatlari")} <span>{">"}</span>
+              </h2>
+              <h4>+ Fayl</h4>
+            </div>
+          </div>
+          <div className="leftBottom">
+            <div className="logout-btn-container" onClick={() => setLogoutDialog(true)}>
+              <h3>{t("chiqish")}</h3>
             </div>
             <div className="translation">
               <select
@@ -540,11 +548,6 @@ function Hisobot() {
                 </option>
               </select>
             </div>
-          </div>
-          <div className="leftBottom">
-            <Link to={"/login"}>
-              <h3>{t("chiqish")}</h3>
-            </Link>
           </div>
         </div>
         <div className="leftLine"></div>
