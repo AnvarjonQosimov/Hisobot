@@ -280,7 +280,7 @@
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
-    width: 67%;
+    width: 63.5%;
     min-height: 100vh;
     margin-left: 280px !important;
     color: rgb(204, 194, 255);
@@ -1127,12 +1127,13 @@
 
 .QurilishXarajatlari h4{
     width: 70px;
-    padding: 10px 15px;
+    padding: 5px 10px;
     border-radius: 10px;
     border: 2px solid rgba(13, 138, 28, 0.5);
     color: rgba(21, 221, 44, 0.5);
     cursor: pointer;
     display: none;
+    margin-top: 5px;
 }
 
 .QurilishXarajatlari.expanded h2 span{
@@ -1141,6 +1142,110 @@
 
 .QurilishXarajatlari.expanded h4{
     display: block;
+}
+
+.QurilishXarajatlari.expanded .project-list-container{
+    display: flex;
+}
+
+.project-list-container {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    height: calc(100% - 50px); /* Leave room for the h2 */
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.project-list-container h4 {
+    margin: 0 0 10px 0;
+    width: auto;
+    max-width: 100px;
+    font-size: 14px;
+    color: rgb(40, 236, 112);
+    cursor: pointer;
+    padding: 5px 10px;
+    background: rgba(40, 236, 112, 0.1);
+    border-radius: 5px;
+    border: 1px dashed rgba(40, 236, 112, 0.3);
+    text-align: center;
+}
+
+.project-items {
+    overflow-y: auto;
+    flex: 1; /* Takes up remaining height inside container, allowing scroll */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 5px;
+}
+
+.project-items::-webkit-scrollbar {
+    width: 4px;
+}
+
+.project-items::-webkit-scrollbar-thumb {
+    background: rgba(161, 161, 241, 0.2);
+    border-radius: 10px;
+}
+
+.project-sidebar-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(161, 161, 241, 0.05);
+    border: 1px solid rgba(161, 161, 241, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.project-sidebar-item:hover, .project-sidebar-item.active {
+    background: rgba(161, 161, 241, 0.15);
+    border-color: rgb(86, 86, 255);
+}
+
+.project-name {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.delete-project-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px;
+    opacity: 0.5;
+    transition: 0.2s;
+    color: #fff;
+}
+
+.delete-project-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.modal-input {
+    width: 100%;
+    padding: 12px 15px;
+    background: rgba(0, 4, 45, 0.6);
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    color: white;
+    border-radius: 10px;
+    font-size: 16px;
+    outline: none;
+    margin: 10px 0;
+    box-sizing: border-box;
+}
+
+.modal-input:focus {
+    border-color: rgb(146, 151, 223);
+    box-shadow: 0 0 15px rgba(146, 151, 223, 0.2);
 }
 
 /* ─────────────── RESPONSIVE ≤ 1485px ─────────────── */

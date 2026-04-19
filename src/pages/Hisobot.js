@@ -3,6 +3,7 @@ import "../styles/Hisobot.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
+import ProjectReport from "./ProjectReport";
 
 function Hisobot() {
   const navigate = useNavigate();
@@ -60,6 +61,13 @@ function Hisobot() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isConstructionExpanded, setIsConstructionExpanded] = useState(false);
 
+  // Dynamic Project Files State
+  const [projectFiles, setProjectFiles] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState(null); // null = workers view
+  const [isFileModalOpen, setIsFileModalOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const [deleteProjectId, setDeleteProjectId] = useState(null);
+
   // Load from localStorage (Account Scoped)
   useEffect(() => {
     const storedUsername = localStorage.getItem("username");
@@ -82,6 +90,10 @@ function Hisobot() {
     );
     if (storedInitialBalance)
       setInitialBalance(JSON.parse(storedInitialBalance));
+
+    // Load Project Files
+    const storedProjects = localStorage.getItem(`projects_${storedUsername}`);
+    if (storedProjects) setProjectFiles(JSON.parse(storedProjects));
   }, [navigate]);
 
   // Save to localStorage (Account Scoped)
@@ -105,6 +117,11 @@ function Hisobot() {
       JSON.stringify(initialBalance),
     );
   }, [initialBalance, username]);
+
+  useEffect(() => {
+    if (!username) return;
+    localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
+  }, [projectFiles, username]);
 
   const confirmLogout = () => {
     localStorage.removeItem("username");
@@ -476,7 +493,27 @@ function Hisobot() {
     i18n.changeLanguage(lng);
   };
   const [age, setAge] = React.useState(i18n.language || "uz");
-  // const handleChange = (event) => setAge(event.target.value);
+  const handleAddProject = () => {
+    if (!newFileName.trim()) return;
+    const newProject = {
+      id: Date.now(),
+      name: newFileName.trim(),
+    };
+    setProjectFiles([...projectFiles, newProject]);
+    setNewFileName("");
+    setIsFileModalOpen(false);
+    setActiveProjectId(newProject.id); // Open the new project immediately
+  };
+
+  const confirmDeleteProject = () => {
+    if (deleteProjectId) {
+      setProjectFiles(projectFiles.filter(p => p.id !== deleteProjectId));
+      if (activeProjectId === deleteProjectId) {
+        setActiveProjectId(null); // Back to workers if active project is deleted
+      }
+      setDeleteProjectId(null);
+    }
+  };
 
   return (
     <div className="Hisobot">
@@ -520,7 +557,32 @@ function Hisobot() {
               <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
                 {t("qurilishxarajatlari")} <span>{">"}</span>
               </h2>
-              <h4>+ Fayl</h4>
+              <div className="project-list-container">
+                <h4 onClick={() => setIsFileModalOpen(true)}>+ Fayl</h4>
+                <div className="project-items">
+                  {projectFiles.map((project) => (
+                    <div 
+                      key={project.id} 
+                      className={`project-sidebar-item ${activeProjectId === project.id ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveProjectId(activeProjectId === project.id ? null : project.id);
+                        setIsSidebarOpen(false);
+                      }}
+                    >
+                      <span className="project-name">{project.name}</span>
+                      <button 
+                        className="delete-project-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteProjectId(project.id);
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           <div className="leftBottom">
@@ -563,11 +625,12 @@ function Hisobot() {
         ></div>
       )}
 
-      <div className="HisobotRight">
-        <div className="rightTop">
-          <h3 className="addH3" onClick={handleAddWorkerClick}>
-            + {t("qo'shish")}
-          </h3>
+      {activeProjectId === null ? (
+        <div className="HisobotRight">
+          <div className="rightTop">
+            <h3 className="addH3" onClick={handleAddWorkerClick}>
+              + {t("qo'shish")}
+            </h3>
           <h3 className="addH3" onClick={handleBalansClick}>
             + {t("balans")}
           </h3>
@@ -1051,8 +1114,14 @@ function Hisobot() {
               </div>
             </div>
           </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <ProjectReport 
+           projectId={activeProjectId} 
+           projectName={projectFiles.find(p => p.id === activeProjectId)?.name} 
+        />
+      )}
 
       {/* Logout Dialog */}
       {logoutDialog && (
@@ -1510,6 +1579,48 @@ function Hisobot() {
                   {t("Katta oylikli ishchilar")}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Creation Modal */}
+      {isFileModalOpen && (
+        <div className="confirm-overlay" onClick={() => setIsFileModalOpen(false)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="confirm-message">{t("Yangi fayl qo'shish")}</h2>
+            <input 
+              className="modal-input"
+              type="text" 
+              placeholder={t("Fayl nomi...")}
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              autoFocus
+            />
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setIsFileModalOpen(false)}>
+                {t("bekorqilish")}
+              </button>
+              <button className="confirm-btn confirm-logout" style={{backgroundColor: 'rgba(40, 236, 112, 0.1)', borderColor: 'rgba(40, 236, 112, 0.4)', color: 'rgb(40, 236, 112)'}} onClick={handleAddProject}>
+                {t("qo'shish")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Deletion Modal */}
+      {deleteProjectId && (
+        <div className="confirm-overlay" onClick={() => setDeleteProjectId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="confirm-message">{t("Ushbu faylni o'chirmoqchimisiz?")}</h2>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setDeleteProjectId(null)}>
+                {t("yo'q")}
+              </button>
+              <button className="confirm-btn confirm-logout" onClick={confirmDeleteProject}>
+                {t("ha")}
+              </button>
             </div>
           </div>
         </div>

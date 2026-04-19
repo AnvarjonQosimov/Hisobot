@@ -1,0 +1,597 @@
+/* =========================================
+   ProjectReport.css — Construction Foreman UI
+   Styled to match Hisobot / OfficeXarajat layout
+   ========================================= */
+
+/* Main wrapper — takes all space next to left sidebar */
+.ProjectReport {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---- Main content area (left/center) ---- */
+.pr-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 20px 20px 20px;
+  overflow-y: auto;
+  /* leave room for rightRight panel */
+  margin-right: 285px;
+}
+
+/* ---- Header ---- */
+.pr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pr-title-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pr-icon {
+  font-size: 26px;
+}
+
+.pr-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.pr-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---- Buttons ---- */
+.pr-btn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.pr-btn-add {
+  background: linear-gradient(135deg, rgba(86, 86, 255, 0.3), rgba(40, 236, 112, 0.2));
+  color: #ccc2ff;
+  border: 1px solid rgba(86, 86, 255, 0.4);
+}
+
+.pr-btn-add:hover {
+  background: linear-gradient(135deg, rgba(86, 86, 255, 0.5), rgba(40, 236, 112, 0.35));
+  transform: translateY(-1px);
+}
+
+.pr-btn-budget {
+  background: rgba(40, 200, 236, 0.1);
+  color: #7ee8fa;
+  border: 1px solid rgba(40, 200, 236, 0.3);
+}
+
+.pr-btn-budget:hover {
+  background: rgba(40, 200, 236, 0.2);
+  transform: translateY(-1px);
+}
+
+.pr-btn-cancel {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(200, 200, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pr-btn-save {
+  background: linear-gradient(135deg, rgba(86, 86, 255, 0.4), rgba(40, 236, 112, 0.3));
+  color: #fff;
+  border: 1px solid rgba(86, 86, 255, 0.5);
+}
+
+.pr-btn-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pr-btn-delete {
+  background: rgba(255, 60, 60, 0.15);
+  color: #ff8080;
+  border: 1px solid rgba(255, 60, 60, 0.3);
+}
+
+.pr-btn-delete:hover {
+  background: rgba(255, 60, 60, 0.25);
+}
+
+/* ---- Toolbar ---- */
+.pr-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pr-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pr-tab {
+  padding: 7px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(200, 190, 255, 0.6);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.pr-tab.active,
+.pr-tab:hover {
+  background: rgba(86, 86, 255, 0.2);
+  border-color: rgba(86, 86, 255, 0.5);
+  color: #ccc2ff;
+}
+
+.pr-search {
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  width: 200px;
+  transition: border-color 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.pr-search:focus {
+  border-color: rgba(86, 86, 255, 0.5);
+}
+
+.pr-search::placeholder {
+  color: rgba(200, 190, 255, 0.4);
+}
+
+/* ---- Expense List ---- */
+.pr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: rgba(200, 190, 255, 0.4);
+  font-size: 15px;
+}
+
+.pr-empty span {
+  font-size: 40px;
+}
+
+.pr-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: all 0.2s;
+}
+
+.pr-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(86, 86, 255, 0.2);
+}
+
+.pr-item-paid {
+  opacity: 0.65;
+  border-left: 3px solid rgba(40, 236, 112, 0.5);
+}
+
+.pr-item-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.pr-checkbox {
+  margin-top: 4px;
+  width: 16px;
+  height: 16px;
+  accent-color: #28ec70;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pr-item-cat-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.pr-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pr-item-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(220, 215, 255, 0.95);
+  margin: 0;
+}
+
+.pr-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pr-badge {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(200, 190, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pr-badge-cat {
+  background: rgba(86, 86, 255, 0.12);
+  color: rgba(180, 170, 255, 0.9);
+  border-color: rgba(86, 86, 255, 0.2);
+}
+
+.pr-badge-paid {
+  background: rgba(40, 236, 112, 0.12);
+  color: rgba(40, 236, 112, 0.9);
+  border-color: rgba(40, 236, 112, 0.25);
+}
+
+.pr-item-note {
+  font-size: 12px;
+  color: rgba(200, 190, 255, 0.45);
+  margin: 0;
+  font-style: italic;
+}
+
+.pr-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pr-item-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.pr-item-amount strong {
+  font-size: 16px;
+  color: rgba(220, 215, 255, 0.95);
+  font-weight: 700;
+}
+
+.pr-item-per-unit {
+  font-size: 11px;
+  color: rgba(200, 190, 255, 0.45);
+}
+
+.pr-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.pr-action-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.pr-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.pr-delete-btn:hover {
+  background: rgba(255, 60, 60, 0.15);
+}
+
+/* ---- Modals ---- */
+.pr-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.pr-modal {
+  background: rgba(22, 20, 45, 0.97);
+  border: 1px solid rgba(86, 86, 255, 0.25);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.pr-modal-sm {
+  max-width: 380px;
+}
+
+.pr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.pr-modal-header h3 {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.pr-close-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  color: rgba(200, 190, 255, 0.7);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.pr-close-btn:hover {
+  background: rgba(255, 60, 60, 0.15);
+  color: #ff8080;
+}
+
+.pr-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.pr-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ---- Form fields ---- */
+.pr-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pr-form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(200, 190, 255, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pr-form-group input,
+.pr-form-group select,
+.pr-form-group textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 13px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.pr-form-group input:focus,
+.pr-form-group select:focus,
+.pr-form-group textarea:focus {
+  border-color: rgba(86, 86, 255, 0.5);
+}
+
+.pr-form-group select option {
+  background: #1a1835;
+  color: #fff;
+}
+
+.pr-form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.pr-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pr-cat-select-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pr-cat-opt {
+  padding: 7px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(200, 190, 255, 0.65);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.pr-cat-opt.active,
+.pr-cat-opt:hover {
+  background: rgba(86, 86, 255, 0.2);
+  border-color: rgba(86, 86, 255, 0.5);
+  color: #ccc2ff;
+}
+
+.pr-total-preview {
+  background: rgba(40, 236, 112, 0.08);
+  border: 1px solid rgba(40, 236, 112, 0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: rgba(200, 190, 255, 0.7);
+}
+
+.pr-total-preview strong {
+  color: rgba(40, 236, 112, 0.9);
+  font-size: 15px;
+}
+
+.pr-form-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pr-form-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #28ec70;
+  cursor: pointer;
+}
+
+.pr-form-check label {
+  font-size: 13px;
+  color: rgba(200, 190, 255, 0.7);
+  cursor: pointer;
+}
+
+.pr-budget-current {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 4px;
+}
+
+.pr-budget-current p {
+  font-size: 11px;
+  color: rgba(200, 190, 255, 0.5);
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pr-budget-current strong {
+  font-size: 15px;
+  color: rgba(220, 215, 255, 0.9);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .pr-main {
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .pr-main {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .pr-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pr-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pr-search {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .pr-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pr-item {
+    flex-direction: column;
+  }
+
+  .pr-item-right {
+    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+}
