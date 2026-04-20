@@ -104,7 +104,7 @@
     "pr_texnika": "Machinery",
     "pr_boshqa": "Other",
     "pr_byudjet": "Budget",
-    "pr_xarajat_qoshish": "Add expense",
+    "pr_xarajat_qoshish": "Expense",
     "pr_byudjet_qoldiq": "Budget remaining",
     "pr_jami_xarajat": "Total expenses",
     "pr_tolangan": "Paid",
@@ -126,8 +126,8 @@
     "pr_tolandi_deb_belgilash": "Mark as paid",
     "pr_byudjet_qoshish": "Add budget",
     "pr_joriy_byudjet": "Current budget",
-    "pr_qoshish_som": "Add in soum",
-    "pr_qoshish_dollar": "Add in dollars",
+    "pr_qoshish_som": "Update balance in soum",
+    "pr_qoshish_dollar": "Update balance in dollars",
     "pr_ochirish_tasdiq": "Delete confirmation",
     "pr_ochirish_savol": "Delete this record? The expense amount will be returned to the budget."
 }

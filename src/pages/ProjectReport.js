@@ -18,7 +18,7 @@ function ProjectReport({ projectId, projectName }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [addModal, setAddModal] = useState(false);
   const [budgetModal, setBudgetModal] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
+  const [deleteItem, setDeleteItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
 
   // Form state
@@ -35,6 +35,11 @@ function ProjectReport({ projectId, projectName }) {
   });
 
   const [budgetForm, setBudgetForm] = useState({ sum: "", dollar: "" });
+
+  // Undo state
+  const [undoStack, setUndoStack] = useState([]);
+  const [undoConfirmModal, setUndoConfirmModal] = useState(false);
+  const [clearUndoModal, setClearUndoModal] = useState(false);
 
   // LocalStorage keys
   const expKey = (u) => `project_${projectId}_expenses_${u}`;
@@ -121,6 +126,7 @@ function ProjectReport({ projectId, projectName }) {
 
   const handleSave = () => {
     if (!form.name || !form.amountPerUnit) return;
+    saveForUndo();
     const total = parseFloat(form.amountPerUnit) * parseFloat(form.quantity || 1);
     if (editItem) {
       const oldTotal = parseFloat(editItem.amountPerUnit) * parseFloat(editItem.quantity || 1);
@@ -142,33 +148,56 @@ function ProjectReport({ projectId, projectName }) {
   };
 
   const handleDelete = () => {
-    const item = expenses.find((e) => e.id === deleteId);
-    if (item) {
-      const total = parseFloat(item.amountPerUnit) * parseFloat(item.quantity || 1);
-      setBudget((prev) => ({ ...prev, [item.currency]: prev[item.currency] + total }));
+    if (deleteItem) {
+      saveForUndo();
+      const total = parseFloat(deleteItem.amountPerUnit) * parseFloat(deleteItem.quantity || 1);
+      setBudget((prev) => ({ ...prev, [deleteItem.currency]: prev[deleteItem.currency] + total }));
+      setExpenses(expenses.filter((e) => e.id !== deleteItem.id));
     }
-    setExpenses(expenses.filter((e) => e.id !== deleteId));
-    setDeleteId(null);
+    setDeleteItem(null);
   };
 
   const handleTogglePaid = (id) =>
     setExpenses(expenses.map((e) => (e.id === id ? { ...e, isPaid: !e.isPaid } : e)));
 
+  // Save state for undo
+  const saveForUndo = () => {
+    setUndoStack([...undoStack, { expenses, budget, initialBudget }]);
+  };
+
+  // Undo function - show confirmation first
+  const handleUndoClick = () => {
+    if (undoStack.length === 0) return;
+    setUndoConfirmModal(true);
+  };
+
+  // Confirm undo
+  const confirmUndo = () => {
+    if (undoStack.length === 0) return;
+    const lastState = undoStack[undoStack.length - 1];
+    setExpenses(lastState.expenses);
+    setBudget(lastState.budget);
+    setInitialBudget(lastState.initialBudget);
+    setUndoStack(undoStack.slice(0, -1));
+    setUndoConfirmModal(false);
+  };
+
+  // Clear all undo history
+  const confirmClearUndo = () => {
+    setUndoStack([]);
+    setClearUndoModal(false);
+  };
+
   const handleBudgetSave = () => {
     const s = parseFloat(budgetForm.sum || 0);
     const d = parseFloat(budgetForm.dollar || 0);
-    setBudget((prev) => ({ sum: prev.sum + s, dollar: prev.dollar + d }));
-    setInitialBudget((prev) => ({ sum: prev.sum + s, dollar: prev.dollar + d }));
+    setBudget({ sum: s, dollar: d });
+    setInitialBudget({ sum: s, dollar: d });
     setBudgetForm({ sum: "", dollar: "" });
     setBudgetModal(false);
   };
 
   const isFormValid = form.name.trim() && form.amountPerUnit;
-
-  // Paid percent for the donut
-  const paidPercent = expenses.length === 0 ? 0
-    : Math.round((expenses.filter((e) => e.isPaid).length / expenses.length) * 100);
-  const dashArray = `${paidPercent * 2.51} 251.2`;
 
   return (
     <div className="ProjectReport">
@@ -184,12 +213,22 @@ function ProjectReport({ projectId, projectName }) {
             <h2 className="pr-title">{projectName}</h2>
           </div>
           <div className="pr-header-actions">
-            <button className="pr-btn pr-btn-budget" onClick={() => setBudgetModal(true)}>
-              + {t("pr_byudjet")}
-            </button>
             <button className="pr-btn pr-btn-add" onClick={openAdd}>
               + {t("pr_xarajat_qoshish")}
             </button>
+            <button className="pr-btn pr-btn-budget" onClick={() => setBudgetModal(true)}>
+              + {t("pr_byudjet")}
+            </button>
+            {undoStack.length > 0 && (
+              <div className="undo-group">
+                <button className="pr-btn pr-btn-undo" onClick={handleUndoClick} title="Undo">
+                  ↶
+                </button>
+                <button className="pr-btn pr-btn-undo-clear" onClick={() => setClearUndoModal(true)} title="Clear Undo">
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -253,7 +292,7 @@ function ProjectReport({ projectId, projectName }) {
                     </div>
                     <div className="pr-item-actions">
                       <button className="pr-action-btn pr-edit-btn" onClick={() => openEdit(item)}>✏️</button>
-                      <button className="pr-action-btn pr-delete-btn" onClick={() => setDeleteId(item.id)}>🗑️</button>
+                      <button className="pr-action-btn pr-delete-btn" onClick={() => setDeleteItem(item)}>🗑️</button>
                     </div>
                   </div>
                 </div>
@@ -267,74 +306,75 @@ function ProjectReport({ projectId, projectName }) {
       <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
         <button className="right-panel-close-btn" onClick={() => setIsRightPanelOpen(false)}>›</button>
         <div className="lrLine"></div>
-        <div className="statistic">
-          <h2>{t("statistika")}</h2>
+          {/* Statistics Section - like Hisobot */}
+          <div className="statistic">
+            <h2>{t("statistika")}</h2>
 
-          {/* Budget */}
-          <div className="statistic1">
+              {/* Remaining budget */}
+            <div className="statistic1">
             <h3>{t("pr_byudjet_qoldiq")}:</h3>
             <p className={remaining("sum") < 0 || remaining("dollar") < 0 ? "negative-balance" : ""}>
               {remaining("sum").toLocaleString()} so'm / {remaining("dollar").toLocaleString()} $
             </p>
           </div>
 
-          {/* Initial budget */}
-          <div className="statistic2">
-            <h3>{t("Boshlang'ich balans")}:</h3>
-            <p>{initialBudget.sum.toLocaleString()} so'm / {initialBudget.dollar.toLocaleString()} $</p>
-          </div>
+            {/* Total items */}
+            <div className="statistic2">
+              <h3>{t("jami_xarajatlar")}:</h3>
+              <p>{expenses.length}</p>
+            </div>
 
-          {/* Total expenses */}
-          <div className="statistic3">
-            <h3>{t("pr_jami_xarajat")}:</h3>
-            <p>{totalAmount("sum").toLocaleString()} so'm / {totalAmount("dollar").toLocaleString()} $</p>
-          </div>
+            {/* Highest expense */}
+            <div className="statistic3">
+              <h3>{t("eng_qimmat_xarajat")}:</h3>
+              <p>
+                {(() => {
+                  const sumHigh = expenses
+                    .filter((e) => e.currency === "sum")
+                    .sort((a, b) => (parseFloat(b.amountPerUnit) || 0) - (parseFloat(a.amountPerUnit) || 0))[0];
+                  const dolHigh = expenses
+                    .filter((e) => e.currency === "dollar")
+                    .sort((a, b) => (parseFloat(b.amountPerUnit) || 0) - (parseFloat(a.amountPerUnit) || 0))[0];
 
-          {/* Paid */}
-          <div className="statistic4">
-            <h3>{t("pr_tolangan")}:</h3>
-            <p>{paidAmount("sum").toLocaleString()} so'm / {paidAmount("dollar").toLocaleString()} $</p>
-          </div>
+                  const sumText = sumHigh ? `${sumHigh.name}: ${parseFloat(sumHigh.amountPerUnit).toLocaleString()} so'm` : "yo'q";
+                  const dolText = dolHigh ? `${dolHigh.name}: ${parseFloat(dolHigh.amountPerUnit).toLocaleString()} $` : "yo'q";
 
-          {/* Category breakdown */}
-          <div className="linear-stats" style={{ width: "100%", padding: "0 15px" }}>
-            <h2 style={{ textAlign: "center", marginTop: "20px" }}>{t("pr_kategoriya")}</h2>
-            {catStats.map(({ cat, count, sumTotal, dolTotal }) => (
-              <div key={cat} className="statistic1" style={{ marginBottom: "8px" }}>
-                <h3>{catIcon(cat)} {catLabel(cat)} <span style={{ color: "rgba(180,170,255,0.5)", fontSize: "12px" }}>({count})</span></h3>
-                {sumTotal > 0 && <p>{sumTotal.toLocaleString()} so'm</p>}
-                {dolTotal > 0 && <p>{dolTotal.toLocaleString()} $</p>}
-                {sumTotal === 0 && dolTotal === 0 && <p style={{ color: "rgba(200,190,255,0.3)", fontSize: "12px" }}>—</p>}
-              </div>
-            ))}
-          </div>
+                  return `${sumText} / ${dolText}`;
+                })()}
+              </p>
+            </div>
 
-          {/* Donut chart */}
-          <div className="circular-stats" style={{ marginTop: "20px" }}>
-            <h2>{t("aylanastatistika")}</h2>
-            <div className="pie-container">
-              <svg className="pie-chart" viewBox="0 0 100 100">
-                <circle className="pie-bg" cx="50" cy="50" r="40"
-                  fill="transparent" stroke="rgba(161,161,241,0.1)" strokeWidth="10" />
-                <circle className="pie-segment" cx="50" cy="50" r="40"
-                  fill="transparent" stroke="#5656ff" strokeWidth="10"
-                  strokeDasharray={dashArray} strokeDashoffset="0"
-                  strokeLinecap="round" transform="rotate(-90 50 50)" />
-                <text x="50" y="55" className="pie-text">{paidPercent}%</text>
-              </svg>
-              <div className="pie-legend">
-                <div className="legend-item">
-                  <span className="dot paid"></span>
-                  <span>{t("pr_tolangan")}: {expenses.filter((e) => e.isPaid).length}</span>
+            {/* Total expenses */}
+            <div className="statistic4">
+              <h3>{t("pr_jami_xarajat")}:</h3>
+              <p>{totalAmount("sum").toLocaleString()} so'm / {totalAmount("dollar").toLocaleString()} $</p>
+            </div>
+
+            {/* Paid expenses */}
+            <div className="statistic5">
+              <h3>{t("pr_tolangan")}:</h3>
+              <p>{paidAmount("sum").toLocaleString()} so'm / {paidAmount("dollar").toLocaleString()} $</p>
+            </div>
+
+            {/* Initial budget */}
+            <div className="statistic1">
+              <h3>{t("Boshlang'ich balans")}:</h3>
+              <p>{initialBudget.sum.toLocaleString()} so'm / {initialBudget.dollar.toLocaleString()} $</p>
+            </div>
+
+            {/* Category breakdown */}
+            <div className="linear-stats">
+              <h2>{t("pr_kategoriya")}</h2>
+              {catStats.map(({ cat, count, sumTotal, dolTotal }) => (
+                <div key={cat} className="statistic-item" style={{ marginBottom: "8px" }}>
+                  <h3>{catIcon(cat)} {catLabel(cat)} <span style={{ color: "rgba(180,170,255,0.5)", fontSize: "12px" }}>({count})</span></h3>
+                  {sumTotal > 0 && <p>{sumTotal.toLocaleString()} so'm</p>}
+                  {dolTotal > 0 && <p>{dolTotal.toLocaleString()} $</p>}
+                  {sumTotal === 0 && dolTotal === 0 && <p style={{ color: "rgba(200,190,255,0.3)", fontSize: "12px" }}>—</p>}
                 </div>
-                <div className="legend-item">
-                  <span className="dot unpaid"></span>
-                  <span>{t("qolgan")}: {expenses.filter((e) => !e.isPaid).length}</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
-        </div>
       </div>
 
       {/* === MODALS === */}
@@ -458,18 +498,76 @@ function ProjectReport({ projectId, projectName }) {
       )}
 
       {/* Delete Confirm */}
-      {deleteId && (
-        <div className="pr-overlay" onClick={() => setDeleteId(null)}>
+      {deleteItem && (
+        <div className="pr-overlay" onClick={() => setDeleteItem(null)}>
           <div className="pr-modal pr-modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="pr-modal-header">
               <h3>{t("pr_ochirish_tasdiq")}</h3>
+              <button className="pr-close-btn" onClick={() => setDeleteItem(null)}>✕</button>
             </div>
             <div className="pr-modal-body">
-              <p style={{ color: "rgba(200,190,255,0.75)", textAlign: "center" }}>{t("pr_ochirish_savol")}</p>
+              <p style={{ color: "rgba(200,190,255,0.6)", fontSize: "14px", marginBottom: "15px" }}>
+                {t("pr_ochirish_savol") || "Siz rostdan ham o'chirasizmi?"}
+              </p>
+              <div style={{ background: "rgba(255, 60, 60, 0.1)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255, 60, 60, 0.3)" }}>
+                <p style={{ fontSize: "12px", color: "rgba(200,190,255,0.5)", margin: "0 0 6px 0" }}>Ochiriladigan:</p>
+                <p style={{ fontSize: "15px", fontWeight: "600", color: "#fff", margin: "0" }}>📍 {deleteItem.name}</p>
+                <p style={{ fontSize: "12px", color: "rgba(200,190,255,0.5)", margin: "6px 0 0 0" }}>
+                  {parseFloat(deleteItem.amountPerUnit).toLocaleString()} {deleteItem.currency === "sum" ? "so'm" : "$"} × {deleteItem.quantity} {deleteItem.unit}
+                </p>
+              </div>
             </div>
             <div className="pr-modal-footer">
-              <button className="pr-btn pr-btn-cancel" onClick={() => setDeleteId(null)}>{t("yo'q")}</button>
+              <button className="pr-btn pr-btn-cancel" onClick={() => setDeleteItem(null)}>{t("yo'q")}</button>
               <button className="pr-btn pr-btn-delete" onClick={handleDelete}>{t("ha")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo Confirmation Modal */}
+      {undoConfirmModal && (
+        <div className="pr-overlay" onClick={() => setUndoConfirmModal(false)}>
+          <div className="pr-modal pr-modal-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="pr-modal-header">
+              <h3>{t("qaytarish") || "Undo"}</h3>
+              <button className="pr-close-btn" onClick={() => setUndoConfirmModal(false)}>✕</button>
+            </div>
+            <div className="pr-modal-body">
+              <p style={{ color: "rgba(200,190,255,0.75)", textAlign: "center" }}>
+                {t("oxirgi_o'zgarishni_qaytarmoqchisizmi") || "Oxirgi o'zgarishni qaytarmoqchisiz?"}
+              </p>
+              <p style={{ fontSize: "13px", color: "rgba(200,190,255,0.5)", textAlign: "center", marginTop: "8px" }}>
+                Undo qo'llanilgandan keyin {undoStack.length} ta amalni qayta bajarishingiz mumkin
+              </p>
+            </div>
+            <div className="pr-modal-footer">
+              <button className="pr-btn pr-btn-cancel" onClick={() => setUndoConfirmModal(false)}>{t("bekorqilish")}</button>
+              <button className="pr-btn pr-btn-undo" onClick={confirmUndo}>{t("qaytarish") || "Undo"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Undo History Modal */}
+      {clearUndoModal && (
+        <div className="pr-overlay" onClick={() => setClearUndoModal(false)}>
+          <div className="pr-modal pr-modal-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="pr-modal-header">
+              <h3>{t("undo_ochirilsin") || "Undo Tarixi Ochirilsin"}</h3>
+              <button className="pr-close-btn" onClick={() => setClearUndoModal(false)}>✕</button>
+            </div>
+            <div className="pr-modal-body">
+              <p style={{ color: "rgba(200,190,255,0.75)", textAlign: "center" }}>
+                {t("undo_tarixini_ochirilsinmi") || "Undo tarixini ochirilsinmi?"}
+              </p>
+              <p style={{ fontSize: "13px", color: "rgba(255, 60, 60, 0.75)", textAlign: "center", marginTop: "8px" }}>
+                Bu operatsiyani qayta bajarib bo'lmaydi. {undoStack.length} ta operatsiya yo'q bo'ladi.
+              </p>
+            </div>
+            <div className="pr-modal-footer">
+              <button className="pr-btn pr-btn-cancel" onClick={() => setClearUndoModal(false)}>{t("bekorqilish")}</button>
+              <button className="pr-btn pr-btn-delete" onClick={confirmClearUndo}>{t("ochirilsin") || "Ochirilsin"}</button>
             </div>
           </div>
         </div>

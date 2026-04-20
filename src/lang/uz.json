@@ -104,7 +104,7 @@
     "pr_texnika": "Texnika",
     "pr_boshqa": "Boshqa",
     "pr_byudjet": "Byudjet",
-    "pr_xarajat_qoshish": "Xarajat qo'shish",
+    "pr_xarajat_qoshish": "Xarajat",
     "pr_byudjet_qoldiq": "Byudjet qoldig'i",
     "pr_jami_xarajat": "Jami xarajat",
     "pr_tolangan": "To'langan",
@@ -126,8 +126,8 @@
     "pr_tolandi_deb_belgilash": "To'landi deb belgilash",
     "pr_byudjet_qoshish": "Byudjet qo'shish",
     "pr_joriy_byudjet": "Joriy byudjet",
-    "pr_qoshish_som": "Qo'shimcha so'm",
-    "pr_qoshish_dollar": "Qo'shimcha dollar",
+    "pr_qoshish_som": "Balans yangilash so'm",
+    "pr_qoshish_dollar": "Balans yangilash dollar",
     "pr_ochirish_tasdiq": "O'chirish tasdiqi",
     "pr_ochirish_savol": "Ushbu yozuvni o'chirmoqchimisiz? Bu xarajat summasi byudjetga qaytariladi."
 }
