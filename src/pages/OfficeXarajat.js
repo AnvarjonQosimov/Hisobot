@@ -3,6 +3,7 @@ import "../styles/OfficeXarajat.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
+import ProjectReport from "./ProjectReport";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
@@ -56,6 +57,14 @@ function OfficeXarajat() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [isConstructionExpanded, setIsConstructionExpanded] = useState(false);
+
+  // Dynamic Project Files State
+  const [projectFiles, setProjectFiles] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState(null); // null = office view
+  const [isFileModalOpen, setIsFileModalOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const [deleteProjectId, setDeleteProjectId] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [calcPosition, setCalcPosition] = useState({ x: 100, y: 100 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -84,9 +93,17 @@ function OfficeXarajat() {
     );
     if (storedInitialBalance)
       setInitialBalance(JSON.parse(storedInitialBalance));
+
+    // Load Project Files
+    const storedProjects = localStorage.getItem(`projects_${storedUsername}`);
+    if (storedProjects) setProjectFiles(JSON.parse(storedProjects));
   }, [navigate]);
 
   // Save to localStorage (Account Scoped)
+  useEffect(() => {
+    if (!username) return;
+    localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
+  }, [projectFiles, username]);
   useEffect(() => {
     if (!username) return;
     localStorage.setItem(
@@ -402,15 +419,15 @@ function OfficeXarajat() {
       return acc + currentCost + historyCost + lastPaid;
     }, 0);
 
-    setInitialBalance({
-      sum: balanceCurrency === "sum" ? newAmount : 0,
-      dollar: balanceCurrency === "dollar" ? newAmount : 0,
-    });
+    setInitialBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: newAmount,
+    }));
 
-    setTotalBalance({
-      sum: balanceCurrency === "sum" ? newAmount - totalSpent : 0,
-      dollar: balanceCurrency === "dollar" ? newAmount - totalSpent : 0,
-    });
+    setTotalBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: newAmount - totalSpent,
+    }));
 
     handleBalansModalClose();
   };
@@ -575,6 +592,28 @@ function OfficeXarajat() {
   const [age, setAge] = React.useState(i18n.language || "uz");
   // const handleChange = (event) => setAge(event.target.value);
 
+  const handleAddProject = () => {
+    if (!newFileName.trim()) return;
+    const newProject = {
+      id: Date.now(),
+      name: newFileName.trim(),
+    };
+    setProjectFiles([...projectFiles, newProject]);
+    setNewFileName("");
+    setIsFileModalOpen(false);
+    setActiveProjectId(newProject.id); // Open the new project immediately
+  };
+
+  const confirmDeleteProject = () => {
+    if (deleteProjectId) {
+      setProjectFiles(projectFiles.filter((p) => p.id !== deleteProjectId));
+      if (activeProjectId === deleteProjectId) {
+        setActiveProjectId(null); // Back to office if active project is deleted
+      }
+      setDeleteProjectId(null);
+    }
+  };
+
   return (
     <div className="OfficeXarajat">
       <button
@@ -584,13 +623,7 @@ function OfficeXarajat() {
         <HiMenu />
       </button>
 
-      {/* Right panel open button */}
-      <button
-        className="right-panel-toggle-btn"
-        onClick={() => setIsRightPanelOpen(true)}
-      >
-        ‹
-      </button>
+      {/* Sidebar and Main Layout */}
 
       <div className={`OfficeXarajatLeft ${isSidebarOpen ? "open" : ""}`}>
         <button
@@ -612,6 +645,42 @@ function OfficeXarajat() {
             <Link to="/hisobot" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("Ishchilar hisoboti")}</h3>
             </Link>
+            <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
+              <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
+                {t("qurilishxarajatlari")} <span>{">"}</span>
+              </h2>
+              <div className="project-list-container">
+                <h4 onClick={() => setIsFileModalOpen(true)}>+ Fayl</h4>
+                <div className="project-items">
+                  {projectFiles.map((project) => (
+                    <div
+                      key={project.id}
+                      className={`project-sidebar-item ${activeProjectId === project.id ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveProjectId(activeProjectId === project.id ? null : project.id);
+                        setIsSidebarOpen(false);
+                      }}
+                    >
+                      <span className="project-name">{project.name}</span>
+                      <button
+                        className="delete-project-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteProjectId(project.id);
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="leftBottom">
+            <div className="logout-btn-container" onClick={() => setLogoutDialog(true)}>
+              <h3>{t("chiqish")}</h3>
+            </div>
             <div className="translation">
               <select
                 className="translationSelect"
@@ -634,11 +703,6 @@ function OfficeXarajat() {
               </select>
             </div>
           </div>
-          <div className="leftBottom">
-            <Link to={"/login"}>
-              <h3>{t("chiqish")}</h3>
-            </Link>
-          </div>
         </div>
         <div className="leftLine"></div>
       </div>
@@ -653,7 +717,20 @@ function OfficeXarajat() {
         ></div>
       )}
 
-      <div className="OfficeXarajatRight">
+      {activeProjectId === null ? (
+        <div className="OfficeXarajatRight">
+          {isRightPanelOpen && (
+            <div
+              className="sidebar-overlay"
+              onClick={() => setIsRightPanelOpen(false)}
+            ></div>
+          )}
+          <button
+            className="right-panel-toggle-btn"
+            onClick={() => setIsRightPanelOpen(true)}
+          >
+            ‹
+          </button>
         <div className="rightTop">
           <h3 className="addH3" onClick={handleAddExpenseClick}>
             + {t("qo'shish")}
@@ -667,7 +744,7 @@ function OfficeXarajat() {
           <input
             className="searchWorker desktop-only-filter"
             type="search"
-            placeholder="Xarajatni izlash"
+            placeholder={t("qidiruv")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -766,7 +843,7 @@ function OfficeXarajat() {
                         <div className="val-group">
                           <p>{t("To'lanishi kerak")}:</p>
                           <strong className="to-receive">
-                            {expense.amountToPay}{" "}
+                            {parseFloat(expense.amountToPay || 0).toLocaleString()}{" "}
                             {expense.currencyToPay === "sum" ? "so'm" : "$"}
                           </strong>
                           <span className="small-date">
@@ -776,7 +853,7 @@ function OfficeXarajat() {
                         <div className="val-group">
                           <p>{t("To'langan summa")}:</p>
                           <strong className="received">
-                            {expense.amountAlreadyPaid}{" "}
+                            {parseFloat(expense.amountAlreadyPaid || 0).toLocaleString()}{" "}
                             {expense.currencyAlreadyPaid === "sum"
                               ? "so'm"
                               : "$"}
@@ -930,7 +1007,7 @@ function OfficeXarajat() {
                         (parseFloat(b.amountToPay) || 0) -
                         (parseFloat(a.amountToPay) || 0),
                     )[0];
-                  return `${sumHigh ? sumHigh.expenseName + ": " + parseFloat(sumHigh.amountToPay).toLocaleString() + " so'm" : "yo'q"} / ${dolHigh ? dolHigh.expenseName + ": " + parseFloat(dolHigh.amountToPay).toLocaleString() + " $" : "yo'q"}`;
+                  return `${sumHigh ? sumHigh.expenseName + ": " + parseFloat(sumHigh.amountToPay).toLocaleString() + " so'm" : t("yo'q")} / ${dolHigh ? dolHigh.expenseName + ": " + parseFloat(dolHigh.amountToPay).toLocaleString() + " $" : t("yo'q")}`;
                 })()}
               </p>
             </div>
@@ -1034,12 +1111,22 @@ function OfficeXarajat() {
             </div>
           </div>
         </div>
-      </div>
+      </div>) : (
+        <ProjectReport
+          projectId={activeProjectId}
+          onClose={() => setActiveProjectId(null)}
+          projectName={
+            projectFiles.find((p) => p.id === activeProjectId)
+              ? projectFiles.find((p) => p.id === activeProjectId).name
+              : ""
+          }
+        />
+      )}
 
       {/* Modals */}
       {logoutDialog && (
-        <div className="confirm-overlay">
-          <div className="confirm-modal">
+        <div className="confirm-overlay" onClick={handleLogoutCancel}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <p className="confirm-message">
               {t("Haqiqatdan ham chiqishni xohlaysizmi?")}
             </p>
@@ -1062,12 +1149,10 @@ function OfficeXarajat() {
       )}
 
       {addExpenseModal && (
-        <div className="modal-overlay">
-          <div className="modal-container">
+        <div className="modal-overlay" onClick={handleAddExpenseModalClose}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>
-                {editMode ? "Xarajatni tahrirlash" : t("qo'shish")}
-              </h2>
+              <h2>{editMode ? t("pr_tahrirlash") : t("qo'shish")}</h2>
               <button
                 className="close-btn"
                 onClick={handleAddExpenseModalClose}
@@ -1082,7 +1167,7 @@ function OfficeXarajat() {
                   <div className="input-wrapper">
                     <input
                       type="text"
-                      placeholder="Masalan: Ijara, Elektr..."
+                      placeholder={t("office_nom_placeholder")}
                       value={expenseName}
                       onChange={handleExpenseNameChange}
                     />
@@ -1182,8 +1267,8 @@ function OfficeXarajat() {
       )}
 
       {balansQoshish && (
-        <div className="modal-overlay">
-          <div className="modal-container">
+        <div className="modal-overlay" onClick={handleBalansModalClose}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{t("Balansni yangilash")}</h2>
               <button className="close-btn" onClick={handleBalansModalClose}>
@@ -1315,8 +1400,8 @@ function OfficeXarajat() {
       )}
 
       {deleteExpenseId && (
-        <div className="confirm-overlay">
-          <div className="confirm-modal">
+        <div className="confirm-overlay" onClick={() => setDeleteExpenseId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <p className="confirm-message">
               {t("Ushbu xarajatni o'chirib tashlamoqchimisiz?")}
             </p>
@@ -1366,12 +1451,10 @@ function OfficeXarajat() {
       )}
 
       {showUndoConfirm && (
-        <div className="confirm-overlay">
-          <div className="confirm-modal">
+        <div className="confirm-overlay" onClick={() => setShowUndoConfirm(false)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <p className="confirm-message">
-              {t(
-                "Bekor qilish imkoniyatini o'chirasizmi? (Amalni ortga qaytarib bo'lmaydi)",
-              )}
+              {t("bekor_qilish_imkoniyati_ochirilsinmi")}
             </p>
             <div className="confirm-buttons">
               <button
@@ -1494,8 +1577,77 @@ function OfficeXarajat() {
               >
                 {t("bekorqilish")}
               </button>
-              <button className="btn add" onClick={handleEditHistorySave}>
+              <button className="btn save" onClick={handleEditHistorySave}>
                 {t("saqlash")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFileModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setIsFileModalOpen(false)}
+        >
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{t("pr_fayl_ochish_header")}</h3>
+              <button
+                className="close-btn"
+                onClick={() => setIsFileModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="input-group">
+                <label>{t("pr_fayl_nomi_label")}</label>
+                <input
+                  type="text"
+                  placeholder={t("pr_fayl_nomi_placeholder")}
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => setIsFileModalOpen(false)}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button className="btn-submit" onClick={handleAddProject}>
+                {t("qo'shish")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteProjectId && (
+        <div
+          className="confirm-overlay"
+          onClick={() => setDeleteProjectId(null)}
+        >
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <p className="confirm-message">
+              {t("pr_faylni_ochirish_savoli")}
+            </p>
+            <div className="confirm-buttons">
+              <button
+                className="confirm-btn confirm-cancel"
+                onClick={() => setDeleteProjectId(null)}
+              >
+                {t("yo'q")}
+              </button>
+              <button
+                className="confirm-btn confirm-logout"
+                onClick={confirmDeleteProject}
+              >
+                {t("Ha, o'chirilsin")}
               </button>
             </div>
           </div>
@@ -1527,7 +1679,7 @@ function OfficeXarajat() {
                 <input
                   className="modal-search"
                   type="search"
-                  placeholder="Xarajatni izlash..."
+                  placeholder={t("office_qidiruv_placeholder")}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />

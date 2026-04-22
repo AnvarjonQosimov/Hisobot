@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import ProjectReport from "./ProjectReport";
+import NewProject from "../images/new-project.png";
 
 function Hisobot() {
   const navigate = useNavigate();
@@ -23,6 +24,14 @@ function Hisobot() {
   const [currencyAlreadyReceived, setCurrencyAlreadyReceived] = useState("sum");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
+
+  // New Work Fields States
+  const [currentWork, setCurrentWork] = useState("");
+  const [workPercent, setWorkPercent] = useState("");
+  const [isOtherWork, setIsOtherWork] = useState(false);
+  const [isOtherWorkPercent, setIsOtherWorkPercent] = useState(false);
+  const [customWork, setCustomWork] = useState("");
+  const [customWorkPercent, setCustomWorkPercent] = useState("");
 
   // Persistence States
   const [workers, setWorkers] = useState([]);
@@ -54,6 +63,11 @@ function Hisobot() {
 
   // Linear Stats State
   const [chartPeriod, setChartPeriod] = useState("week"); // day, week, month, year
+
+  // Detail Modal State
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [newProjectConfirmId, setNewProjectConfirmId] = useState(null);
 
   // Responsive State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -134,6 +148,7 @@ function Hisobot() {
   };
 
   const handleAddWorkerClick = () => {
+    handleAddWorkerModalClose(); // Reset all states
     setAddWorkerModal(true);
   };
 
@@ -148,6 +163,12 @@ function Hisobot() {
     setDateAlreadyReceived("");
     setCurrencyToReceive("sum");
     setCurrencyAlreadyReceived("sum");
+    setCurrentWork("");
+    setWorkPercent("");
+    setIsOtherWork(false);
+    setIsOtherWorkPercent(false);
+    setCustomWork("");
+    setCustomWorkPercent("");
   };
 
   const handleBalansModalClose = () => {
@@ -195,24 +216,33 @@ function Hisobot() {
 
   const handleAddWorker = () => {
     if (editMode) {
-      saveForUndo(); // Save state before edit
+      saveForUndo();
+      const finalWork = isOtherWork ? customWork : currentWork;
+      const finalPercent = isOtherWorkPercent ? customWorkPercent : workPercent;
+
       setWorkers(
         workers.map((w) =>
           w.id === editingWorkerId
             ? {
-              ...w,
-              workerName,
-              amountToReceive,
-              currencyToReceive,
-              dateToGive,
-              amountAlreadyReceived,
-              currencyAlreadyReceived,
-              dateAlreadyReceived,
-            }
+                ...w,
+                workerName,
+                amountToReceive,
+                currencyToReceive,
+                dateToGive,
+                amountAlreadyReceived,
+                currencyAlreadyReceived,
+                dateAlreadyReceived,
+                currentWork: finalWork,
+                workPercent: finalPercent,
+              }
             : w,
         ),
       );
     } else {
+      saveForUndo();
+      const finalWork = isOtherWork ? customWork : currentWork;
+      const finalPercent = isOtherWorkPercent ? customWorkPercent : workPercent;
+
       const newWorker = {
         id: Date.now(),
         workerName,
@@ -222,13 +252,76 @@ function Hisobot() {
         amountAlreadyReceived,
         currencyAlreadyReceived,
         dateAlreadyReceived,
+        currentWork: finalWork,
+        workPercent: finalPercent,
         createdAt: new Date().toISOString(),
         isPaid: false,
-        history: [], // Added history array
+        history: [],
       };
       setWorkers([newWorker, ...workers]);
     }
     handleAddWorkerModalClose();
+  };
+
+  const handleOpenDetail = (worker) => {
+    setSelectedWorker(worker);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleNewProject = (e, id) => {
+    e.stopPropagation();
+    setNewProjectConfirmId(id);
+  };
+
+  const confirmNewProject = () => {
+    const id = newProjectConfirmId;
+    saveForUndo();
+    setWorkers(workers.map(w => {
+      if (w.id !== id) return w;
+      
+      const archiveItem = {
+        date: new Date().toISOString().split('T')[0],
+        amount: w.amountToReceive,
+        currency: w.currencyToReceive,
+        received: w.amountAlreadyReceived,
+        receivedCurrency: w.currencyAlreadyReceived,
+        work: w.currentWork,
+        percent: w.workPercent,
+        type: "project_completed"
+      };
+
+      return {
+        ...w,
+        history: [...(w.history || []), archiveItem],
+        amountToReceive: "0",
+        amountAlreadyReceived: "0",
+        currentWork: "",
+        workPercent: "",
+        isPaid: false
+      };
+    }));
+    setNewProjectConfirmId(null);
+  };
+
+  const handleDeleteHistoryProject = (workerId, idx) => {
+    if (!window.confirm(t("Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?"))) return;
+    
+    saveForUndo();
+    setWorkers(prevWorkers => prevWorkers.map(w => {
+      if (w.id !== workerId) return w;
+      const newHistory = [...(w.history || [])];
+      newHistory.splice(idx, 1);
+      return { ...w, history: newHistory };
+    }));
+
+    // Update selectedWorker if it's currently open
+    if (selectedWorker && selectedWorker.id === workerId) {
+      setSelectedWorker(prev => {
+        const newHistory = [...(prev.history || [])];
+        newHistory.splice(idx, 1);
+        return { ...prev, history: newHistory };
+      });
+    }
   };
 
   const handleEditWorkerClick = (worker) => {
@@ -241,6 +334,38 @@ function Hisobot() {
     setDateAlreadyReceived(worker.dateAlreadyReceived);
     setCurrencyToReceive(worker.currencyToReceive);
     setCurrencyAlreadyReceived(worker.currencyAlreadyReceived);
+
+    // Set work fields
+    const workOptions = ["Dizayn", "Plan", "Barchasi"];
+    if (worker.currentWork) {
+      if (workOptions.includes(worker.currentWork)) {
+        setCurrentWork(worker.currentWork);
+        setIsOtherWork(false);
+      } else {
+        setCurrentWork("Boshqasi");
+        setIsOtherWork(true);
+        setCustomWork(worker.currentWork);
+      }
+    } else {
+      setCurrentWork("");
+      setIsOtherWork(false);
+    }
+
+    const percentOptions = ["5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"];
+    if (worker.workPercent) {
+      if (percentOptions.includes(worker.workPercent)) {
+        setWorkPercent(worker.workPercent);
+        setIsOtherWorkPercent(false);
+      } else {
+        setWorkPercent("Boshqasi");
+        setIsOtherWorkPercent(true);
+        setCustomWorkPercent(worker.workPercent);
+      }
+    } else {
+      setWorkPercent("");
+      setIsOtherWorkPercent(false);
+    }
+
     setAddWorkerModal(true);
   };
 
@@ -561,8 +686,8 @@ function Hisobot() {
                 <h4 onClick={() => setIsFileModalOpen(true)}>+ Fayl</h4>
                 <div className="project-items">
                   {projectFiles.map((project) => (
-                    <div 
-                      key={project.id} 
+                    <div
+                      key={project.id}
                       className={`project-sidebar-item ${activeProjectId === project.id ? "active" : ""}`}
                       onClick={() => {
                         setActiveProjectId(activeProjectId === project.id ? null : project.id);
@@ -570,7 +695,7 @@ function Hisobot() {
                       }}
                     >
                       <span className="project-name">{project.name}</span>
-                      <button 
+                      <button
                         className="delete-project-btn"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -631,495 +756,511 @@ function Hisobot() {
             <h3 className="addH3" onClick={handleAddWorkerClick}>
               + {t("qo'shish")}
             </h3>
-          <h3 className="addH3" onClick={handleBalansClick}>
-            + {t("balans")}
-          </h3>
-          <div className="ql">
-            <div className="qoshishLine"></div>
-          </div>
-          <input
-            className="searchWorker desktop-only-filter"
-            type="search"
-            placeholder="Ishchini izlash"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <div className="filterIshchilar desktop-only-filter">
-            <h3
-              className={activeFilter === "recent" ? "active-filter" : ""}
-              onClick={() =>
-                setActiveFilter(activeFilter === "recent" ? "all" : "recent")
-              }
-            >
-              {t("yangi")}
+            <h3 className="addH3" onClick={handleBalansClick}>
+              + {t("balans")}
             </h3>
-            <h3
-              className={activeFilter === "high" ? "active-filter" : ""}
-              onClick={() =>
-                setActiveFilter(activeFilter === "high" ? "all" : "high")
-              }
-            >
-              {t("yuqorimaosh")}
-            </h3>
-          </div>
-
-          <button
-            className="mobile-filter-btn"
-            onClick={() => setIsFilterModalOpen(true)}
-          >
-            {t("filtrlash")}
-          </button>
-
-          {undoState && (
-            <div className="undo-group">
-              <button
-                className="undo-btn icon-only"
-                onClick={handleUndoClick}
-                title="Eng so'nggi amalni bekor qilish"
-              >
-                ↩️
-              </button>
-              <button
-                className="undo-close-btn"
-                onClick={handleDismissUndoClick}
-                title="O'chirish"
-              >
-                ✕
-              </button>
+            <div className="ql">
+              <div className="qoshishLine"></div>
             </div>
-          )}
-        </div>
+            <input
+              className="searchWorker desktop-only-filter"
+              type="search"
+              placeholder={t("hisobot_qidiruv_placeholder")}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="filterIshchilar desktop-only-filter">
+              <h3
+                className={activeFilter === "recent" ? "active-filter" : ""}
+                onClick={() =>
+                  setActiveFilter(activeFilter === "recent" ? "all" : "recent")
+                }
+              >
+                {t("yangi")}
+              </h3>
+              <h3
+                className={activeFilter === "high" ? "active-filter" : ""}
+                onClick={() =>
+                  setActiveFilter(activeFilter === "high" ? "all" : "high")
+                }
+              >
+                {t("yuqorimaosh")}
+              </h3>
+            </div>
 
-        <div className="rightBottom">
-          {(() => {
-            let filtered = workers.filter((w) =>
-              w.workerName.toLowerCase().includes(searchTerm.toLowerCase()),
-            );
+            <button
+              className="mobile-filter-btn"
+              onClick={() => setIsFilterModalOpen(true)}
+            >
+              {t("filtrlash")}
+            </button>
 
-            if (activeFilter === "recent") {
-              filtered = [...filtered]
-                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                .slice(0, 5);
-            } else if (activeFilter === "high") {
-              filtered = filtered.filter((w) => {
-                const val = parseFloat(w.amountToReceive) || 0;
-                return w.currencyToReceive === "sum"
-                  ? val > 5000000
-                  : val > 500;
-              });
-            }
+            {undoState && (
+              <div className="undo-group">
+                <button
+                  className="undo-btn icon-only"
+                  onClick={handleUndoClick}
+                  title={t("undo_title")}
+                >
+                  ↩️
+                </button>
+                <button
+                  className="undo-close-btn"
+                  onClick={handleDismissUndoClick}
+                  title="O'chirish"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
 
-            if (filtered.length === 0) {
+          <div className="rightBottom">
+            {(() => {
+              let filtered = workers.filter((w) =>
+                w.workerName.toLowerCase().includes(searchTerm.toLowerCase()),
+              );
+
+              if (activeFilter === "recent") {
+                filtered = [...filtered]
+                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                  .slice(0, 5);
+              } else if (activeFilter === "high") {
+                filtered = filtered.filter((w) => {
+                  const val = parseFloat(w.amountToReceive) || 0;
+                  return w.currencyToReceive === "sum"
+                    ? val > 5000000
+                    : val > 500;
+                });
+              }
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="no-workers">
+                    <p>
+                      {searchTerm
+                        ? t("hisobot_no_results")
+                        : t("hisobot_no_workers")}
+                    </p>
+                  </div>
+                );
+              }
+
               return (
-                <div className="no-workers">
-                  <p>
-                    {searchTerm
-                      ? "Qidiruv bo'yicha hech narsa topilmadi."
-                      : "Hozircha ishchilar yo'q. \"+ Qo'shish\" tugmasini bosing."}
-                  </p>
+                <div className="worker-list">
+                  {filtered.map((worker) => (
+                    <div
+                      key={worker.id}
+                      className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}
+                      onClick={() => handleOpenDetail(worker)}
+                    >
+                      <div className="worker-item-main">
+                        <div className="worker-info">
+                          <input
+                            type="checkbox"
+                            className="paid-checkbox"
+                            checked={worker.isPaid}
+                            onChange={() => handleTogglePaid(worker.id)}
+                          />
+                          <div className="name-date">
+                            <h3>{worker.workerName}</h3>
+                            <span>
+                              {new Date(worker.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="worker-values">
+                          <div className="val-group">
+                            <p>{t("qilayotganishi")}</p>
+                            <strong>
+                              {worker.currentWork || t("yo'q")} ({worker.workPercent || "0%"})
+                            </strong>
+                          </div>
+                          <div className="val-group">
+                            <p>{t("olishikerak")}:</p>
+                            <strong className="to-receive">
+                              {worker.amountToReceive}{" "}
+                              {worker.currencyToReceive === "sum" ? "so'm" : "$"}
+                            </strong>
+                            <span className="small-date">
+                              {t("sana")}: {worker.dateToGive}
+                            </span>
+                          </div>
+                          <div className="val-group">
+                            <p>{t("olgansumma")}:</p>
+                            <strong className="received">
+                              {worker.amountAlreadyReceived}{" "}
+                              {worker.currencyAlreadyReceived === "sum"
+                                ? "so'm"
+                                : "$"}
+                            </strong>
+                            <span className="small-date">
+                              {t("olgan")}: {worker.dateAlreadyReceived}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="worker-actions">
+                          <button
+                            className="month-btn"
+                            onClick={() => handleNextMonth(worker.id)}
+                            title={t("yangi_oy_sikl") || "Yangi oy/Sikl"}
+                          >
+                            🔄
+                          </button>
+
+                          <button 
+                            className="addnewproject"
+                            onClick={(e) => handleNewProject(e, worker.id)}
+                            title={t("yangi_loyiha")}
+                          >
+                            <img src={NewProject} alt="NewProject" />
+                          </button>
+
+                          <button
+                            className="history-toggle-btn"
+                            onClick={() => toggleHistory(worker.id)}
+                            title={t("tarixni_korish") || "Tarixni ko'rish"}
+                          >
+                            📜
+                          </button>
+                          <button
+                            className="edit-btn"
+                            onClick={() => handleEditWorkerClick(worker)}
+                            title={t("tahrirlash") || "Tahrirlash"}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="delete-btn"
+                            onClick={() => handleDeleteWorkerClick(worker.id)}
+                            title={t("o'chirish") || "O'chirish"}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* History Section */}
+                      {expandedHistory.includes(worker.id) && (
+                        <div className="history-section">
+                          <h4>{t("to'lovlartarixi")}:</h4>
+                          {(worker.history || []).length === 0 ? (
+                            <p className="no-history">{t("tarix_mavjud_emas")}</p>
+                          ) : (
+                            worker.history.map((h, idx) => (
+                              <div key={idx} className="history-item">
+                                <span>{h.date}</span>
+                                <span>
+                                  {h.amount} {h.currency === "sum" ? "so'm" : "$"}
+                                </span>
+                                <span className="h-type">
+                                  {h.type === "archived"
+                                    ? t("arxivlandi")
+                                    : t("tolandi")}
+                                </span>
+                                <div
+                                  className="history-actions"
+                                  style={{
+                                    display: "flex",
+                                    gap: "5px",
+                                    marginLeft: "auto",
+                                  }}
+                                >
+                                  <button
+                                    className="edit-btn"
+                                    onClick={() =>
+                                      setEditingHistoryData({
+                                        workerId: worker.id,
+                                        index: idx,
+                                        ...h,
+                                      })
+                                    }
+                                    style={{
+                                      padding: "5px",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      fontSize: "16px",
+                                    }}
+                                    title={t("tahrirlash") || "Tahrirlash"}
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    className="delete-btn"
+                                    onClick={() =>
+                                      setDeleteHistoryData({
+                                        workerId: worker.id,
+                                        index: idx,
+                                      })
+                                    }
+                                    style={{
+                                      padding: "5px",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      fontSize: "16px",
+                                    }}
+                                    title={t("o'chirish") || "O'chirish"}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               );
-            }
+            })()}
+          </div>
 
-            return (
-              <div className="worker-list">
-                {filtered.map((worker) => (
-                  <div
-                    key={worker.id}
-                    className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}
+          <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
+            <button
+              className="right-panel-close-btn"
+              onClick={() => setIsRightPanelOpen(false)}
+            >
+              ›
+            </button>
+            <div className="lrLine"></div>
+            <div className="statistic">
+              <h2>{t("statistika")}</h2>
+              <div className="statistic1">
+                <h3>{t("boshlang'ichbalans")}:</h3>
+                <p>
+                  {initialBalance.sum.toLocaleString()} so'm /{" "}
+                  {initialBalance.dollar.toLocaleString()} $
+                </p>
+              </div>
+              <div className="statistic2">
+                <h3>{t("jamiishchilar")}:</h3>
+                <p>{workers.length}</p>
+              </div>
+              <div className="statistic3">
+                <h3>{t("engbalandmaosh")}:</h3>
+                <p>
+                  {(() => {
+                    const sumHigh = workers
+                      .filter((w) => w.currencyToReceive === "sum")
+                      .sort(
+                        (a, b) =>
+                          (parseFloat(b.amountToReceive) || 0) -
+                          (parseFloat(a.amountToReceive) || 0),
+                      )[0];
+                    const dolHigh = workers
+                      .filter((w) => w.currencyToReceive === "dollar")
+                      .sort(
+                        (a, b) =>
+                          (parseFloat(b.amountToReceive) || 0) -
+                          (parseFloat(a.amountToReceive) || 0),
+                      )[0];
+
+                    const sumText = sumHigh
+                      ? `${sumHigh.workerName}: ${parseFloat(sumHigh.amountToReceive).toLocaleString()} so'm`
+                      : "yo'q";
+                    const dolText = dolHigh
+                      ? `${dolHigh.workerName}: ${parseFloat(dolHigh.amountToReceive).toLocaleString()} $`
+                      : "yo'q";
+
+                    return `${sumText} / ${dolText}`;
+                  })()}
+                </p>
+              </div>
+              <div className="statistic4">
+                <h3>{t("jamimaoshlaruchunxarajat")}:</h3>
+                <p>
+                  {workers
+                    .reduce((acc, curr) => {
+                      const currentCost =
+                        curr.currencyToReceive === "sum"
+                          ? parseFloat(curr.amountToReceive) || 0
+                          : 0;
+                      const historyCost = (curr.history || []).reduce(
+                        (hAcc, hCurr) =>
+                          hCurr.currency === "sum"
+                            ? hAcc + (parseFloat(hCurr.amount) || 0)
+                            : hAcc,
+                        0,
+                      );
+                      const lastMonthPaid =
+                        curr.currencyAlreadyReceived === "sum"
+                          ? parseFloat(curr.amountAlreadyReceived) || 0
+                          : 0;
+                      return acc + currentCost + historyCost + lastMonthPaid;
+                    }, 0)
+                    .toLocaleString()}{" "}
+                  so'm /
+                  {workers
+                    .reduce((acc, curr) => {
+                      const currentCost =
+                        curr.currencyToReceive === "dollar"
+                          ? parseFloat(curr.amountToReceive) || 0
+                          : 0;
+                      const historyCost = (curr.history || []).reduce(
+                        (hAcc, hCurr) =>
+                          hCurr.currency === "dollar"
+                            ? hAcc + (parseFloat(hCurr.amount) || 0)
+                            : hAcc,
+                        0,
+                      );
+                      const lastMonthPaid =
+                        curr.currencyAlreadyReceived === "dollar"
+                          ? parseFloat(curr.amountAlreadyReceived) || 0
+                          : 0;
+                      return acc + currentCost + historyCost + lastMonthPaid;
+                    }, 0)
+                    .toLocaleString()}{" "}
+                  $
+                </p>
+              </div>
+              <div className="statistic5">
+                <h3>{t("to'lanishikerakbo'lganqoldiq")}:</h3>
+                <p>
+                  {workers
+                    .filter((w) => !w.isPaid)
+                    .reduce(
+                      (acc, curr) =>
+                        curr.currencyToReceive === "sum"
+                          ? acc + (parseFloat(curr.amountToReceive) || 0)
+                          : acc,
+                      0,
+                    )
+                    .toLocaleString()}{" "}
+                  so'm /
+                  {workers
+                    .filter((w) => !w.isPaid)
+                    .reduce(
+                      (acc, curr) =>
+                        curr.currencyToReceive === "dollar"
+                          ? acc + (parseFloat(curr.amountToReceive) || 0)
+                          : acc,
+                      0,
+                    )
+                    .toLocaleString()}{" "}
+                  $
+                </p>
+              </div>
+              <div className="statistic6">
+                <h3>{t("qolganbalans")}:</h3>
+                <p>
+                  {totalBalance.sum.toLocaleString()} so'm /{" "}
+                  {totalBalance.dollar.toLocaleString()} $
+                </p>
+              </div>
+
+              <div className="linear-stats">
+                <h2>{t("chiziqlistatistika")}</h2>
+                <div className="chart-controls">
+                  <button
+                    className={chartPeriod === "day" ? "active" : ""}
+                    onClick={() => setChartPeriod("day")}
                   >
-                    <div className="worker-item-main">
-                      <div className="worker-info">
-                        <input
-                          type="checkbox"
-                          className="paid-checkbox"
-                          checked={worker.isPaid}
-                          onChange={() => handleTogglePaid(worker.id)}
+                    {t("kun")}
+                  </button>
+                  <button
+                    className={chartPeriod === "week" ? "active" : ""}
+                    onClick={() => setChartPeriod("week")}
+                  >
+                    {t("hafta")}
+                  </button>
+                  <button
+                    className={chartPeriod === "month" ? "active" : ""}
+                    onClick={() => setChartPeriod("month")}
+                  >
+                    {t("oy")}
+                  </button>
+                  <button
+                    className={chartPeriod === "year" ? "active" : ""}
+                    onClick={() => setChartPeriod("year")}
+                  >
+                    {t("yil")}
+                  </button>
+                </div>
+                <div className="chart-container">
+                  <svg className="chart-svg" viewBox="0 0 300 150">
+                    <defs>
+                      <linearGradient
+                        id="chartGradient"
+                        x1="0%"
+                        y1="0%"
+                        x2="0%"
+                        y2="100%"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="rgb(86, 86, 255)"
+                          stopOpacity="1"
                         />
-                        <div className="name-date">
-                          <h3>{worker.workerName}</h3>
-                          <span>
-                            {new Date(worker.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
+                        <stop
+                          offset="100%"
+                          stopColor="rgb(204, 194, 255)"
+                          stopOpacity="0.2"
+                        />
+                      </linearGradient>
+                    </defs>
+                    <path className="chart-path" d={getChartData()} />
+                  </svg>
+                </div>
+              </div>
 
-                      <div className="worker-values">
-                        <div className="val-group">
-                          <p>{t("olishikerak")}:</p>
-                          <strong className="to-receive">
-                            {worker.amountToReceive}{" "}
-                            {worker.currencyToReceive === "sum" ? "so'm" : "$"}
-                          </strong>
-                          <span className="small-date">
-                            {t("sana")}: {worker.dateToGive}
-                          </span>
-                        </div>
-                        <div className="val-group">
-                          <p>{t("olgansumma")}:</p>
-                          <strong className="received">
-                            {worker.amountAlreadyReceived}{" "}
-                            {worker.currencyAlreadyReceived === "sum"
-                              ? "so'm"
-                              : "$"}
-                          </strong>
-                          <span className="small-date">
-                            {t("olgan")}: {worker.dateAlreadyReceived}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="worker-actions">
-                        <button
-                          className="month-btn"
-                          onClick={() => handleNextMonth(worker.id)}
-                          title="Yangi oy/Sikl"
-                        >
-                          🔄
-                        </button>
-                        <button
-                          className="history-toggle-btn"
-                          onClick={() => toggleHistory(worker.id)}
-                          title="Tarixni ko'rish"
-                        >
-                          📜
-                        </button>
-                        <button
-                          className="edit-btn"
-                          onClick={() => handleEditWorkerClick(worker)}
-                          title="Tahrirlash"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="delete-btn"
-                          onClick={() => handleDeleteWorkerClick(worker.id)}
-                          title="O'chirish"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+              <div className="circular-stats">
+                <h2>{t("aylanastatistika")}</h2>
+                <div className="pie-container">
+                  <svg className="pie-chart" viewBox="0 0 100 100">
+                    <circle
+                      className="pie-bg"
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke="rgba(161, 161, 241, 0.1)"
+                      strokeWidth="10"
+                    />
+                    <circle
+                      className="pie-segment"
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke="rgb(86, 86, 255)"
+                      strokeWidth="10"
+                      strokeDasharray={`${getCircularData().percent * 2.51} 251.2`}
+                      strokeDashoffset="0"
+                      strokeLinecap="round"
+                      transform="rotate(-90 50 50)"
+                    />
+                    <text x="50" y="55" className="pie-text">
+                      {getCircularData().percent}%
+                    </text>
+                  </svg>
+                  <div className="pie-legend">
+                    <div className="legend-item">
+                      <span className="dot paid"></span>
+                      <span>
+                        {t("to'langan")}: {getCircularData().paid}
+                      </span>
                     </div>
-
-                    {/* History Section */}
-                    {expandedHistory.includes(worker.id) && (
-                      <div className="history-section">
-                        <h4>{t("to'lovlartarixi")}:</h4>
-                        {(worker.history || []).length === 0 ? (
-                          <p className="no-history">Tarix mavjud emas</p>
-                        ) : (
-                          worker.history.map((h, idx) => (
-                            <div key={idx} className="history-item">
-                              <span>{h.date}</span>
-                              <span>
-                                {h.amount} {h.currency === "sum" ? "so'm" : "$"}
-                              </span>
-                              <span className="h-type">
-                                {h.type === "archived"
-                                  ? "Arxivlandi"
-                                  : "To'landi"}
-                              </span>
-                              <div
-                                className="history-actions"
-                                style={{
-                                  display: "flex",
-                                  gap: "5px",
-                                  marginLeft: "auto",
-                                }}
-                              >
-                                <button
-                                  className="edit-btn"
-                                  onClick={() =>
-                                    setEditingHistoryData({
-                                      workerId: worker.id,
-                                      index: idx,
-                                      ...h,
-                                    })
-                                  }
-                                  style={{
-                                    padding: "5px",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    fontSize: "16px",
-                                  }}
-                                  title="Tahrirlash"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  className="delete-btn"
-                                  onClick={() =>
-                                    setDeleteHistoryData({
-                                      workerId: worker.id,
-                                      index: idx,
-                                    })
-                                  }
-                                  style={{
-                                    padding: "5px",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    fontSize: "16px",
-                                  }}
-                                  title="O'chirish"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </div>
-
-        <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
-          <button
-            className="right-panel-close-btn"
-            onClick={() => setIsRightPanelOpen(false)}
-          >
-            ›
-          </button>
-          <div className="lrLine"></div>
-          <div className="statistic">
-            <h2>{t("statistika")}</h2>
-            <div className="statistic1">
-              <h3>{t("boshlang'ichbalans")}:</h3>
-              <p>
-                {initialBalance.sum.toLocaleString()} so'm /{" "}
-                {initialBalance.dollar.toLocaleString()} $
-              </p>
-            </div>
-            <div className="statistic2">
-              <h3>{t("jamiishchilar")}:</h3>
-              <p>{workers.length}</p>
-            </div>
-            <div className="statistic3">
-              <h3>{t("engbalandmaosh")}:</h3>
-              <p>
-                {(() => {
-                  const sumHigh = workers
-                    .filter((w) => w.currencyToReceive === "sum")
-                    .sort(
-                      (a, b) =>
-                        (parseFloat(b.amountToReceive) || 0) -
-                        (parseFloat(a.amountToReceive) || 0),
-                    )[0];
-                  const dolHigh = workers
-                    .filter((w) => w.currencyToReceive === "dollar")
-                    .sort(
-                      (a, b) =>
-                        (parseFloat(b.amountToReceive) || 0) -
-                        (parseFloat(a.amountToReceive) || 0),
-                    )[0];
-
-                  const sumText = sumHigh
-                    ? `${sumHigh.workerName}: ${parseFloat(sumHigh.amountToReceive).toLocaleString()} so'm`
-                    : "yo'q";
-                  const dolText = dolHigh
-                    ? `${dolHigh.workerName}: ${parseFloat(dolHigh.amountToReceive).toLocaleString()} $`
-                    : "yo'q";
-
-                  return `${sumText} / ${dolText}`;
-                })()}
-              </p>
-            </div>
-            <div className="statistic4">
-              <h3>{t("jamimaoshlaruchunxarajat")}:</h3>
-              <p>
-                {workers
-                  .reduce((acc, curr) => {
-                    const currentCost =
-                      curr.currencyToReceive === "sum"
-                        ? parseFloat(curr.amountToReceive) || 0
-                        : 0;
-                    const historyCost = (curr.history || []).reduce(
-                      (hAcc, hCurr) =>
-                        hCurr.currency === "sum"
-                          ? hAcc + (parseFloat(hCurr.amount) || 0)
-                          : hAcc,
-                      0,
-                    );
-                    const lastMonthPaid =
-                      curr.currencyAlreadyReceived === "sum"
-                        ? parseFloat(curr.amountAlreadyReceived) || 0
-                        : 0;
-                    return acc + currentCost + historyCost + lastMonthPaid;
-                  }, 0)
-                  .toLocaleString()}{" "}
-                so'm /
-                {workers
-                  .reduce((acc, curr) => {
-                    const currentCost =
-                      curr.currencyToReceive === "dollar"
-                        ? parseFloat(curr.amountToReceive) || 0
-                        : 0;
-                    const historyCost = (curr.history || []).reduce(
-                      (hAcc, hCurr) =>
-                        hCurr.currency === "dollar"
-                          ? hAcc + (parseFloat(hCurr.amount) || 0)
-                          : hAcc,
-                      0,
-                    );
-                    const lastMonthPaid =
-                      curr.currencyAlreadyReceived === "dollar"
-                        ? parseFloat(curr.amountAlreadyReceived) || 0
-                        : 0;
-                    return acc + currentCost + historyCost + lastMonthPaid;
-                  }, 0)
-                  .toLocaleString()}{" "}
-                $
-              </p>
-            </div>
-            <div className="statistic5">
-              <h3>{t("to'lanishikerakbo'lganqoldiq")}:</h3>
-              <p>
-                {workers
-                  .filter((w) => !w.isPaid)
-                  .reduce(
-                    (acc, curr) =>
-                      curr.currencyToReceive === "sum"
-                        ? acc + (parseFloat(curr.amountToReceive) || 0)
-                        : acc,
-                    0,
-                  )
-                  .toLocaleString()}{" "}
-                so'm /
-                {workers
-                  .filter((w) => !w.isPaid)
-                  .reduce(
-                    (acc, curr) =>
-                      curr.currencyToReceive === "dollar"
-                        ? acc + (parseFloat(curr.amountToReceive) || 0)
-                        : acc,
-                    0,
-                  )
-                  .toLocaleString()}{" "}
-                $
-              </p>
-            </div>
-            <div className="statistic6">
-              <h3>{t("qolganbalans")}:</h3>
-              <p>
-                {totalBalance.sum.toLocaleString()} so'm /{" "}
-                {totalBalance.dollar.toLocaleString()} $
-              </p>
-            </div>
-
-            <div className="linear-stats">
-              <h2>{t("chiziqlistatistika")}</h2>
-              <div className="chart-controls">
-                <button
-                  className={chartPeriod === "day" ? "active" : ""}
-                  onClick={() => setChartPeriod("day")}
-                >
-                  {t("kun")}
-                </button>
-                <button
-                  className={chartPeriod === "week" ? "active" : ""}
-                  onClick={() => setChartPeriod("week")}
-                >
-                  {t("hafta")}
-                </button>
-                <button
-                  className={chartPeriod === "month" ? "active" : ""}
-                  onClick={() => setChartPeriod("month")}
-                >
-                  {t("oy")}
-                </button>
-                <button
-                  className={chartPeriod === "year" ? "active" : ""}
-                  onClick={() => setChartPeriod("year")}
-                >
-                  {t("yil")}
-                </button>
-              </div>
-              <div className="chart-container">
-                <svg className="chart-svg" viewBox="0 0 300 150">
-                  <defs>
-                    <linearGradient
-                      id="chartGradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="0%"
-                      y2="100%"
-                    >
-                      <stop
-                        offset="0%"
-                        stopColor="rgb(86, 86, 255)"
-                        stopOpacity="1"
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor="rgb(204, 194, 255)"
-                        stopOpacity="0.2"
-                      />
-                    </linearGradient>
-                  </defs>
-                  <path className="chart-path" d={getChartData()} />
-                </svg>
-              </div>
-            </div>
-
-            <div className="circular-stats">
-              <h2>{t("aylanastatistika")}</h2>
-              <div className="pie-container">
-                <svg className="pie-chart" viewBox="0 0 100 100">
-                  <circle
-                    className="pie-bg"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="rgba(161, 161, 241, 0.1)"
-                    strokeWidth="10"
-                  />
-                  <circle
-                    className="pie-segment"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="rgb(86, 86, 255)"
-                    strokeWidth="10"
-                    strokeDasharray={`${getCircularData().percent * 2.51} 251.2`}
-                    strokeDashoffset="0"
-                    strokeLinecap="round"
-                    transform="rotate(-90 50 50)"
-                  />
-                  <text x="50" y="55" className="pie-text">
-                    {getCircularData().percent}%
-                  </text>
-                </svg>
-                <div className="pie-legend">
-                  <div className="legend-item">
-                    <span className="dot paid"></span>
-                    <span>
-                      {t("to'langan")}: {getCircularData().paid}
-                    </span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="dot unpaid"></span>
-                    <span>
-                      {t("qolgan")}: {getCircularData().unpaid}
-                    </span>
+                    <div className="legend-item">
+                      <span className="dot unpaid"></span>
+                      <span>
+                        {t("qolgan")}: {getCircularData().unpaid}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
           </div>
         </div>
       ) : (
-        <ProjectReport 
-           projectId={activeProjectId} 
-           projectName={projectFiles.find(p => p.id === activeProjectId)?.name} 
+        <ProjectReport
+          projectId={activeProjectId}
+          projectName={projectFiles.find(p => p.id === activeProjectId)?.name}
         />
       )}
 
@@ -1155,11 +1296,11 @@ function Hisobot() {
             {/* HEADER */}
             <div className="modal-header">
               <div>
-                <h2>{editMode ? "Ishchini tahrirlash" : "Ishchi qo'shish"}</h2>
+                <h2>{editMode ? t("ishchini_tahrirlash") : t("ishchi_qoshish")}</h2>
                 <p>
                   {editMode
-                    ? "Ma'lumotlarni o'zgartiring"
-                    : "Barcha ma'lumotlarni kiriting"}
+                    ? t("malumotlarni_ozgartiring")
+                    : t("barcha_malumotlarni_kiriting")}
                 </p>
               </div>
               <button className="close-btn" onClick={handleAddWorkerModalClose}>
@@ -1177,7 +1318,7 @@ function Hisobot() {
                     type="text"
                     value={workerName}
                     onChange={handleWorkerNameChange}
-                    placeholder="Ism kiriting"
+                    placeholder={t("ism_kiriting_placeholder")}
                   />
                 </div>
 
@@ -1202,6 +1343,77 @@ function Hisobot() {
                       <option value="dollar">$</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="input-group">
+                  <label>{t("qilayotganishi")}</label>
+                  <select
+                    value={currentWork}
+                    onChange={(e) => {
+                      setCurrentWork(e.target.value);
+                      setIsOtherWork(e.target.value === "Boshqasi");
+                    }}
+                  >
+                    <option value="">{t("tanlang")}</option>
+                    <option value="Dizayn">Dizayn</option>
+                    <option value="Plan">Plan</option>
+                    <option value="Barchasi">Barchasi</option>
+                    <option value="Boshqasi">{t("Boshqasi")}</option>
+                  </select>
+                  {isOtherWork && (
+                    <input
+                      type="text"
+                      className="custom-input"
+                      value={customWork}
+                      onChange={(e) => setCustomWork(e.target.value)}
+                      placeholder={t("ish_nomi_placeholder")}
+                      autoFocus
+                    />
+                  )}
+                </div>
+
+                <div className="input-group">
+                  <label>{t("qilinayotganishfoizi")}</label>
+                  <select
+                    value={workPercent}
+                    onChange={(e) => {
+                      setWorkPercent(e.target.value);
+                      setIsOtherWorkPercent(e.target.value === "Boshqasi");
+                    }}
+                  >
+                    <option value="">{t("tanlang")}</option>
+                    <option value="5%">5%</option>
+                    <option value="10%">10%</option>
+                    <option value="15%">15%</option>
+                    <option value="20%">20%</option>
+                    <option value="25%">25%</option>
+                    <option value="30%">30%</option>
+                    <option value="35%">35%</option>
+                    <option value="40%">40%</option>
+                    <option value="45%">45%</option>
+                    <option value="50%">50%</option>
+                    <option value="55%">55%</option>
+                    <option value="60%">60%</option>
+                    <option value="65%">65%</option>
+                    <option value="70%">70%</option>
+                    <option value="75%">75%</option>
+                    <option value="80%">80%</option>
+                    <option value="85%">85%</option>
+                    <option value="90%">90%</option>
+                    <option value="95%">95%</option>
+                    <option value="100%">100%</option>
+                    <option value="Boshqasi">{t("Boshqasi")}</option>
+                  </select>
+                  {isOtherWorkPercent && (
+                    <input
+                      type="text"
+                      className="custom-input"
+                      value={customWorkPercent}
+                      onChange={(e) => setCustomWorkPercent(e.target.value)}
+                      placeholder="%"
+                      autoFocus
+                    />
+                  )}
                 </div>
 
                 <div className="input-group">
@@ -1263,7 +1475,7 @@ function Hisobot() {
                 onClick={isFormValid ? handleAddWorker : null}
                 disabled={!isFormValid}
               >
-                {editMode ? "Saqlash" : "Qo'shish"}
+                {editMode ? t("saqlash_btn") : t("qoshish_btn")}
               </button>
             </div>
           </div>
@@ -1433,13 +1645,13 @@ function Hisobot() {
                 className="confirm-btn confirm-cancel"
                 onClick={() => setDeleteHistoryData(null)}
               >
-                Bekor qilish
+                {t("bekor_qilish_btn")}
               </button>
               <button
                 className="confirm-btn confirm-logout"
                 onClick={confirmDeleteHistory}
               >
-                O'chirish
+                {t("ochirish_btn")}
               </button>
             </div>
           </div>
@@ -1516,10 +1728,10 @@ function Hisobot() {
                 className="btn cancel"
                 onClick={() => setEditingHistoryData(null)}
               >
-                Bekor qilish
+                {t("bekor_qilish_btn")}
               </button>
               <button className="btn add" onClick={handleEditHistorySave}>
-                Saqlash
+                {t("saqlash_btn")}
               </button>
             </div>
           </div>
@@ -1551,7 +1763,7 @@ function Hisobot() {
                 <input
                   className="modal-search"
                   type="search"
-                  placeholder="Ishchini izlash..."
+                  placeholder={t("ishchini_izlash_placeholder")}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1589,9 +1801,9 @@ function Hisobot() {
         <div className="confirm-overlay" onClick={() => setIsFileModalOpen(false)}>
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="confirm-message">{t("Yangi fayl qo'shish")}</h2>
-            <input 
+            <input
               className="modal-input"
-              type="text" 
+              type="text"
               placeholder={t("Fayl nomi...")}
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
@@ -1601,7 +1813,7 @@ function Hisobot() {
               <button className="confirm-btn confirm-cancel" onClick={() => setIsFileModalOpen(false)}>
                 {t("bekorqilish")}
               </button>
-              <button className="confirm-btn confirm-logout" style={{backgroundColor: 'rgba(40, 236, 112, 0.1)', borderColor: 'rgba(40, 236, 112, 0.4)', color: 'rgb(40, 236, 112)'}} onClick={handleAddProject}>
+              <button className="confirm-btn confirm-logout" style={{ backgroundColor: 'rgba(40, 236, 112, 0.1)', borderColor: 'rgba(40, 236, 112, 0.4)', color: 'rgb(40, 236, 112)' }} onClick={handleAddProject}>
                 {t("qo'shish")}
               </button>
             </div>
@@ -1620,6 +1832,125 @@ function Hisobot() {
               </button>
               <button className="confirm-btn confirm-logout" onClick={confirmDeleteProject}>
                 {t("ha")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Project Confirmation Modal */}
+      {newProjectConfirmId && (
+        <div className="confirm-overlay" onClick={() => setNewProjectConfirmId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="confirm-message">{t("tasdiqlash_yangiprojekt")}</h2>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setNewProjectConfirmId(null)}>
+                {t("yo'q")}
+              </button>
+              <button 
+                className="confirm-btn confirm-logout" 
+                style={{ backgroundColor: 'rgba(40, 236, 112, 0.1)', borderColor: 'rgba(40, 236, 112, 0.4)', color: 'rgb(40, 236, 112)' }} 
+                onClick={confirmNewProject}
+              >
+                {t("ha")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Worker Detail Modal (About Worker) */}
+      {isDetailModalOpen && selectedWorker && (
+        <div className="modal-overlay" onClick={() => setIsDetailModalOpen(false)}>
+          <div className="modal-container finishedworks" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{selectedWorker.workerName}</h2>
+              </div>
+              <button className="close-btn" onClick={() => setIsDetailModalOpen(false)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="aboutTop">
+                <div className="aboutTopLeft">
+                  <div className="val-group">
+                    <p>{t("olishikerak")}:</p>
+                    <strong className="to-receive">
+                      {selectedWorker.amountToReceive} {selectedWorker.currencyToReceive === "sum" ? "so'm" : "$"}
+                    </strong>
+                    <span className="small-date">{t("sana")}: {selectedWorker.dateToGive}</span>
+                  </div>
+                  <div className="work-field">
+                    <label>{t("qilayotganishi")}:</label>
+                    <span>{selectedWorker.currentWork || t("yo'q")}</span>
+                  </div>
+                  <div className="work-field">
+                    <label>{t("qilinayotganishfoizi")}:</label>
+                    <strong className="progress-text">{selectedWorker.workPercent || "0%"}</strong>
+                  </div>
+                </div>
+
+                <div className="aboutTopRight">
+                  <div className="val-group">
+                    <p>{t("olgansumma")}:</p>
+                    <strong className="received">
+                      {selectedWorker.amountAlreadyReceived} {selectedWorker.currencyAlreadyReceived === "sum" ? "so'm" : "$"}
+                    </strong>
+                    <span className="small-date">{t("olgan")}: {selectedWorker.dateAlreadyReceived}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="aboutBottom">
+                <h3>{t("loyiha_tarixi")}</h3>
+                <div className="project-history-list">
+                  {(!selectedWorker.history || selectedWorker.history.filter(h => h.type === "project_completed").length === 0) ? (
+                    <p className="no-history">{t("tarix_mavjud_emas")}</p>
+                  ) : (
+                    selectedWorker.history
+                      .map((h, idx) => ({ ...h, originalIdx: idx }))
+                      .filter(h => h.type === "project_completed")
+                      .reverse()
+                      .map((h) => (
+                        <div key={h.originalIdx} className="project-history-item">
+                          <div className="history-main">
+                            <div className="history-text">
+                              <strong>{h.work || t("noma'lum_ish")}</strong>
+                              <span>{h.percent || "100%"}</span>
+                            </div>
+                            <button 
+                              className="delete-history-btn"
+                              onClick={() => handleDeleteHistoryProject(selectedWorker.id, h.originalIdx)}
+                              title={t("ochirish_btn")}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="history-details">
+                            <small>{h.date}</small>
+                            <small>
+                              {h.amount} {h.currency === "sum" ? "so'm" : "$"} / {h.received} {h.receivedCurrency === "sum" ? "so'm" : "$"}
+                            </small>
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="btn edit" 
+                onClick={() => {
+                  setIsDetailModalOpen(false);
+                  handleEditWorkerClick(selectedWorker);
+                }}
+              >
+                {t("tahrirlash")}
+              </button>
+              <button className="btn cancel" onClick={() => setIsDetailModalOpen(false)}>
+                {t("yopish")}
               </button>
             </div>
           </div>

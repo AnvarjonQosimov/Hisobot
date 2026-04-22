@@ -413,7 +413,11 @@ function ProjectReport({ projectId, projectName }) {
                 <div className="pr-form-group">
                   <label>{t("pr_olchov")}</label>
                   <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-                    {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+                    {unitOptions.map((u) => (
+                      <option key={u} value={u}>
+                        {t(`unit_${u === "m²" ? "m2" : u === "m³" ? "m3" : u}`)}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -507,7 +511,7 @@ function ProjectReport({ projectId, projectName }) {
             </div>
             <div className="pr-modal-body">
               <p style={{ color: "rgba(200,190,255,0.6)", fontSize: "14px", marginBottom: "15px" }}>
-                {t("pr_ochirish_savol") || "Siz rostdan ham o'chirasizmi?"}
+                {t("pr_ochirish_savol")}
               </p>
               <div style={{ background: "rgba(255, 60, 60, 0.1)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255, 60, 60, 0.3)" }}>
                 <p style={{ fontSize: "12px", color: "rgba(200,190,255,0.5)", margin: "0 0 6px 0" }}>Ochiriladigan:</p>
@@ -535,15 +539,15 @@ function ProjectReport({ projectId, projectName }) {
             </div>
             <div className="pr-modal-body">
               <p style={{ color: "rgba(200,190,255,0.75)", textAlign: "center" }}>
-                {t("oxirgi_o'zgarishni_qaytarmoqchisizmi") || "Oxirgi o'zgarishni qaytarmoqchisiz?"}
+                {t("oxirgi_ozgarishni_qaytarish")}
               </p>
               <p style={{ fontSize: "13px", color: "rgba(200,190,255,0.5)", textAlign: "center", marginTop: "8px" }}>
-                Undo qo'llanilgandan keyin {undoStack.length} ta amalni qayta bajarishingiz mumkin
+                {t("operatsiyani_qayta_bajarib_bolmaydi")}
               </p>
             </div>
             <div className="pr-modal-footer">
               <button className="pr-btn pr-btn-cancel" onClick={() => setUndoConfirmModal(false)}>{t("bekorqilish")}</button>
-              <button className="pr-btn pr-btn-undo" onClick={confirmUndo}>{t("qaytarish") || "Undo"}</button>
+              <button className="pr-btn pr-btn-undo" onClick={confirmUndo}>{t("qaytarish")}</button>
             </div>
           </div>
         </div>
@@ -554,20 +558,20 @@ function ProjectReport({ projectId, projectName }) {
         <div className="pr-overlay" onClick={() => setClearUndoModal(false)}>
           <div className="pr-modal pr-modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="pr-modal-header">
-              <h3>{t("undo_ochirilsin") || "Undo Tarixi Ochirilsin"}</h3>
+              <h3>{t("undo_ochirilsin")}</h3>
               <button className="pr-close-btn" onClick={() => setClearUndoModal(false)}>✕</button>
             </div>
             <div className="pr-modal-body">
               <p style={{ color: "rgba(200,190,255,0.75)", textAlign: "center" }}>
-                {t("undo_tarixini_ochirilsinmi") || "Undo tarixini ochirilsinmi?"}
+                {t("undo_tarixini_ochirilsinmi")}
               </p>
               <p style={{ fontSize: "13px", color: "rgba(255, 60, 60, 0.75)", textAlign: "center", marginTop: "8px" }}>
-                Bu operatsiyani qayta bajarib bo'lmaydi. {undoStack.length} ta operatsiya yo'q bo'ladi.
+                {t("operatsiyani_qayta_bajarib_bolmaydi")}
               </p>
             </div>
             <div className="pr-modal-footer">
               <button className="pr-btn pr-btn-cancel" onClick={() => setClearUndoModal(false)}>{t("bekorqilish")}</button>
-              <button className="pr-btn pr-btn-delete" onClick={confirmClearUndo}>{t("ochirilsin") || "Ochirilsin"}</button>
+              <button className="pr-btn pr-btn-delete" onClick={confirmClearUndo}>{t("ochirilsin")}</button>
             </div>
           </div>
         </div>
