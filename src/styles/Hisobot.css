@@ -896,6 +896,26 @@
   box-shadow: 0 0 10px rgba(146,151,223,0.4);
 }
 
+.custom-input-wrapper {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.custom-input.percent-input {
+  flex: 1;
+  margin-top: 10px !important;
+}
+
+.percent-symbol {
+  margin-top: 10px;
+  color: #fff;
+  font-weight: bold;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
 /* Row */
 .row {
   display: flex;
@@ -1530,6 +1550,10 @@
     padding-bottom: 25px;
     border-bottom: 1px solid rgba(161, 161, 241, 0.2);
     margin-bottom: 20px;
+}
+
+.aboutTopLeft{
+    border-right: 1px solid rgba(161, 161, 241, 0.2);
 }
 
 .aboutTopLeft, .aboutTopRight {

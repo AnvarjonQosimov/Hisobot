@@ -32,6 +32,12 @@ function Hisobot() {
   const [isOtherWorkPercent, setIsOtherWorkPercent] = useState(false);
   const [customWork, setCustomWork] = useState("");
   const [customWorkPercent, setCustomWorkPercent] = useState("");
+  const [prevWork, setPrevWork] = useState("");
+  const [prevWorkPercent, setPrevWorkPercent] = useState("");
+  const [isOtherPrevWork, setIsOtherPrevWork] = useState(false);
+  const [isOtherPrevWorkPercent, setIsOtherPrevWorkPercent] = useState(false);
+  const [customPrevWork, setCustomPrevWork] = useState("");
+  const [customPrevWorkPercent, setCustomPrevWorkPercent] = useState("");
 
   // Persistence States
   const [workers, setWorkers] = useState([]);
@@ -169,6 +175,12 @@ function Hisobot() {
     setIsOtherWorkPercent(false);
     setCustomWork("");
     setCustomWorkPercent("");
+    setPrevWork("");
+    setPrevWorkPercent("");
+    setIsOtherPrevWork(false);
+    setIsOtherPrevWorkPercent(false);
+    setCustomPrevWork("");
+    setCustomPrevWorkPercent("");
   };
 
   const handleBalansModalClose = () => {
@@ -215,11 +227,18 @@ function Hisobot() {
   };
 
   const handleAddWorker = () => {
+    const finalWork = isOtherWork ? customWork : currentWork;
+    const finalPercent = isOtherWorkPercent 
+      ? (customWorkPercent && !customWorkPercent.includes('%') ? `${customWorkPercent}%` : customWorkPercent) 
+      : workPercent;
+    
+    const finalPrevWork = isOtherPrevWork ? customPrevWork : prevWork;
+    const finalPrevPercent = isOtherPrevWorkPercent 
+      ? (customPrevWorkPercent && !customPrevWorkPercent.includes('%') ? `${customPrevWorkPercent}%` : customPrevWorkPercent) 
+      : prevWorkPercent;
+
     if (editMode) {
       saveForUndo();
-      const finalWork = isOtherWork ? customWork : currentWork;
-      const finalPercent = isOtherWorkPercent ? customWorkPercent : workPercent;
-
       setWorkers(
         workers.map((w) =>
           w.id === editingWorkerId
@@ -234,15 +253,14 @@ function Hisobot() {
                 dateAlreadyReceived,
                 currentWork: finalWork,
                 workPercent: finalPercent,
+                prevWork: finalPrevWork,
+                prevWorkPercent: finalPrevPercent,
               }
             : w,
         ),
       );
     } else {
       saveForUndo();
-      const finalWork = isOtherWork ? customWork : currentWork;
-      const finalPercent = isOtherWorkPercent ? customWorkPercent : workPercent;
-
       const newWorker = {
         id: Date.now(),
         workerName,
@@ -254,6 +272,8 @@ function Hisobot() {
         dateAlreadyReceived,
         currentWork: finalWork,
         workPercent: finalPercent,
+        prevWork: finalPrevWork,
+        prevWorkPercent: finalPrevPercent,
         createdAt: new Date().toISOString(),
         isPaid: false,
         history: [],
@@ -304,24 +324,7 @@ function Hisobot() {
   };
 
   const handleDeleteHistoryProject = (workerId, idx) => {
-    if (!window.confirm(t("Haqiqatan ham ushbu tarixni o'chirmoqchimisiz?"))) return;
-    
-    saveForUndo();
-    setWorkers(prevWorkers => prevWorkers.map(w => {
-      if (w.id !== workerId) return w;
-      const newHistory = [...(w.history || [])];
-      newHistory.splice(idx, 1);
-      return { ...w, history: newHistory };
-    }));
-
-    // Update selectedWorker if it's currently open
-    if (selectedWorker && selectedWorker.id === workerId) {
-      setSelectedWorker(prev => {
-        const newHistory = [...(prev.history || [])];
-        newHistory.splice(idx, 1);
-        return { ...prev, history: newHistory };
-      });
-    }
+    setDeleteHistoryData({ workerId, index: idx });
   };
 
   const handleEditWorkerClick = (worker) => {
@@ -359,11 +362,40 @@ function Hisobot() {
       } else {
         setWorkPercent("Boshqasi");
         setIsOtherWorkPercent(true);
-        setCustomWorkPercent(worker.workPercent);
+        setCustomWorkPercent(worker.workPercent ? worker.workPercent.replace('%', '') : "");
       }
     } else {
       setWorkPercent("");
       setIsOtherWorkPercent(false);
+    }
+
+    // Set previous work fields
+    if (worker.prevWork) {
+      if (workOptions.includes(worker.prevWork)) {
+        setPrevWork(worker.prevWork);
+        setIsOtherPrevWork(false);
+      } else {
+        setPrevWork("Boshqasi");
+        setIsOtherPrevWork(true);
+        setCustomPrevWork(worker.prevWork);
+      }
+    } else {
+      setPrevWork("");
+      setIsOtherPrevWork(false);
+    }
+
+    if (worker.prevWorkPercent) {
+      if (percentOptions.includes(worker.prevWorkPercent)) {
+        setPrevWorkPercent(worker.prevWorkPercent);
+        setIsOtherPrevWorkPercent(false);
+      } else {
+        setPrevWorkPercent("Boshqasi");
+        setIsOtherPrevWorkPercent(true);
+        setCustomPrevWorkPercent(worker.prevWorkPercent.replace('%', ''));
+      }
+    } else {
+      setPrevWorkPercent("");
+      setIsOtherPrevWorkPercent(false);
     }
 
     setAddWorkerModal(true);
@@ -384,16 +416,28 @@ function Hisobot() {
   const confirmDeleteHistory = () => {
     if (deleteHistoryData) {
       saveForUndo();
+      const { workerId, index } = deleteHistoryData;
+
       setWorkers(
         workers.map((w) => {
-          if (w.id === deleteHistoryData.workerId) {
+          if (w.id === workerId) {
             const newHistory = [...(w.history || [])];
-            newHistory.splice(deleteHistoryData.index, 1);
+            newHistory.splice(index, 1);
             return { ...w, history: newHistory };
           }
           return w;
         }),
       );
+
+      // Update selectedWorker if it's currently open
+      if (selectedWorker && selectedWorker.id === workerId) {
+        setSelectedWorker((prev) => {
+          const newHistory = [...(prev.history || [])];
+          newHistory.splice(index, 1);
+          return { ...prev, history: newHistory };
+        });
+      }
+
       setDeleteHistoryData(null);
     }
   };
@@ -448,10 +492,14 @@ function Hisobot() {
 
         // Rotate: old alreadyReceived goes to history, current amountToReceive becomes alreadyReceived
         const newHistoryItem = {
-          amount: w.amountAlreadyReceived,
-          currency: w.currencyAlreadyReceived,
-          date: w.dateAlreadyReceived,
-          type: "archived",
+          amount: w.amountAlreadyReceived || "0",
+          currency: w.currencyAlreadyReceived || "sum",
+          date: w.dateAlreadyReceived || new Date().toISOString().split("T")[0],
+          type: "project_completed", // Standard type for history list in detail modal
+          work: w.currentWork || t("yo'q"),
+          percent: w.workPercent || "0%",
+          received: w.amountAlreadyReceived || "0",
+          receivedCurrency: w.currencyAlreadyReceived || "sum",
         };
 
         return {
@@ -461,6 +509,10 @@ function Hisobot() {
           currencyAlreadyReceived: w.currencyToReceive,
           dateAlreadyReceived: new Date().toISOString().split("T")[0], // Today's date for the transition
           amountToReceive: "", // Reset for new month
+          prevWork: w.currentWork,
+          prevWorkPercent: w.workPercent,
+          currentWork: "",
+          workPercent: "",
           isPaid: false, // Reset payment status for new month
         };
       }),
@@ -861,6 +913,7 @@ function Hisobot() {
                             className="paid-checkbox"
                             checked={worker.isPaid}
                             onChange={() => handleTogglePaid(worker.id)}
+                            onClick={(e) => e.stopPropagation()}
                           />
                           <div className="name-date">
                             <h3>{worker.workerName}</h3>
@@ -904,7 +957,10 @@ function Hisobot() {
                         <div className="worker-actions">
                           <button
                             className="month-btn"
-                            onClick={() => handleNextMonth(worker.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNextMonth(worker.id);
+                            }}
                             title={t("yangi_oy_sikl") || "Yangi oy/Sikl"}
                           >
                             🔄
@@ -920,21 +976,30 @@ function Hisobot() {
 
                           <button
                             className="history-toggle-btn"
-                            onClick={() => toggleHistory(worker.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleHistory(worker.id);
+                            }}
                             title={t("tarixni_korish") || "Tarixni ko'rish"}
                           >
                             📜
                           </button>
                           <button
                             className="edit-btn"
-                            onClick={() => handleEditWorkerClick(worker)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditWorkerClick(worker);
+                            }}
                             title={t("tahrirlash") || "Tahrirlash"}
                           >
                             ✏️
                           </button>
                           <button
                             className="delete-btn"
-                            onClick={() => handleDeleteWorkerClick(worker.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteWorkerClick(worker.id);
+                            }}
                             title={t("o'chirish") || "O'chirish"}
                           >
                             🗑️
@@ -970,13 +1035,14 @@ function Hisobot() {
                                 >
                                   <button
                                     className="edit-btn"
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setEditingHistoryData({
                                         workerId: worker.id,
                                         index: idx,
                                         ...h,
-                                      })
-                                    }
+                                      });
+                                    }}
                                     style={{
                                       padding: "5px",
                                       background: "none",
@@ -990,12 +1056,13 @@ function Hisobot() {
                                   </button>
                                   <button
                                     className="delete-btn"
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setDeleteHistoryData({
                                         workerId: worker.id,
                                         index: idx,
-                                      })
-                                    }
+                                      });
+                                    }}
                                     style={{
                                       padding: "5px",
                                       background: "none",
@@ -1345,75 +1412,64 @@ function Hisobot() {
                   </div>
                 </div>
 
-                <div className="input-group">
-                  <label>{t("qilayotganishi")}</label>
-                  <select
-                    value={currentWork}
-                    onChange={(e) => {
-                      setCurrentWork(e.target.value);
-                      setIsOtherWork(e.target.value === "Boshqasi");
-                    }}
-                  >
-                    <option value="">{t("tanlang")}</option>
-                    <option value="Dizayn">Dizayn</option>
-                    <option value="Plan">Plan</option>
-                    <option value="Barchasi">Barchasi</option>
-                    <option value="Boshqasi">{t("Boshqasi")}</option>
-                  </select>
-                  {isOtherWork && (
-                    <input
-                      type="text"
-                      className="custom-input"
-                      value={customWork}
-                      onChange={(e) => setCustomWork(e.target.value)}
-                      placeholder={t("ish_nomi_placeholder")}
-                      autoFocus
-                    />
-                  )}
-                </div>
 
-                <div className="input-group">
-                  <label>{t("qilinayotganishfoizi")}</label>
-                  <select
-                    value={workPercent}
-                    onChange={(e) => {
-                      setWorkPercent(e.target.value);
-                      setIsOtherWorkPercent(e.target.value === "Boshqasi");
-                    }}
-                  >
-                    <option value="">{t("tanlang")}</option>
-                    <option value="5%">5%</option>
-                    <option value="10%">10%</option>
-                    <option value="15%">15%</option>
-                    <option value="20%">20%</option>
-                    <option value="25%">25%</option>
-                    <option value="30%">30%</option>
-                    <option value="35%">35%</option>
-                    <option value="40%">40%</option>
-                    <option value="45%">45%</option>
-                    <option value="50%">50%</option>
-                    <option value="55%">55%</option>
-                    <option value="60%">60%</option>
-                    <option value="65%">65%</option>
-                    <option value="70%">70%</option>
-                    <option value="75%">75%</option>
-                    <option value="80%">80%</option>
-                    <option value="85%">85%</option>
-                    <option value="90%">90%</option>
-                    <option value="95%">95%</option>
-                    <option value="100%">100%</option>
-                    <option value="Boshqasi">{t("Boshqasi")}</option>
-                  </select>
-                  {isOtherWorkPercent && (
-                    <input
-                      type="text"
-                      className="custom-input"
-                      value={customWorkPercent}
-                      onChange={(e) => setCustomWorkPercent(e.target.value)}
-                      placeholder="%"
-                      autoFocus
-                    />
-                  )}
+
+                <div className="row">
+                  <div className="input-group">
+                    <label>{t("qilayotganishi")}</label>
+                    <select
+                      value={currentWork}
+                      onChange={(e) => {
+                        setCurrentWork(e.target.value);
+                        setIsOtherWork(e.target.value === "Boshqasi");
+                      }}
+                    >
+                      <option value="Dizayn">Dizayn</option>
+                      <option value="Plan">Plan</option>
+                      <option value="Barchasi">Barchasi</option>
+                      <option value="Boshqasi">{t("Boshqasi")}</option>
+                    </select>
+                    {isOtherWork && (
+                      <input
+                        type="text"
+                        className="custom-input"
+                        value={customWork}
+                        onChange={(e) => setCustomWork(e.target.value)}
+                        placeholder={t("ish_nomi_placeholder")}
+                        autoFocus
+                      />
+                    )}
+                  </div>
+
+                  <div className="input-group">
+                    <label>{t("qilinayotganishfoizi")}</label>
+                    <select
+                      value={workPercent}
+                      onChange={(e) => {
+                        setWorkPercent(e.target.value);
+                        setIsOtherWorkPercent(e.target.value === "Boshqasi");
+                      }}
+                    >
+                      <option value="">{t("tanlang")}</option>
+                      {["5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"].map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                      <option value="Boshqasi">{t("Boshqasi")}</option>
+                    </select>
+                    {isOtherWorkPercent && (
+                      <div className="custom-input-wrapper">
+                        <input
+                          type="text"
+                          className="custom-input percent-input"
+                          value={customWorkPercent}
+                          onChange={(e) => setCustomWorkPercent(e.target.value)}
+                          placeholder="0"
+                          autoFocus
+                        />
+                        <span className="percent-symbol">%</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="input-group">
@@ -1450,6 +1506,65 @@ function Hisobot() {
                   </div>
                 </div>
 
+                <div className="row">
+                  <div className="input-group">
+                    <label>{t("oxirgi_qilingan_ish") || "Oldin qilingan ish"}</label>
+                    <select
+                      value={prevWork}
+                      onChange={(e) => {
+                        setPrevWork(e.target.value);
+                        setIsOtherPrevWork(e.target.value === "Boshqasi");
+                      }}
+                    >
+                      <option value="">{t("tanlang")}</option>
+                      <option value="Dizayn">Dizayn</option>
+                      <option value="Plan">Plan</option>
+                      <option value="Barchasi">Barchasi</option>
+                      <option value="Boshqasi">{t("Boshqasi")}</option>
+                    </select>
+                    {isOtherPrevWork && (
+                      <input
+                        type="text"
+                        className="custom-input"
+                        value={customPrevWork}
+                        onChange={(e) => setCustomPrevWork(e.target.value)}
+                        placeholder={t("ish_nomi_placeholder")}
+                        autoFocus
+                      />
+                    )}
+                  </div>
+
+                  <div className="input-group">
+                    <label>{t("oxirgi_qilingan_foiz") || "Oldin qilingan foiz"}</label>
+                    <select
+                      value={prevWorkPercent}
+                      onChange={(e) => {
+                        setPrevWorkPercent(e.target.value);
+                        setIsOtherPrevWorkPercent(e.target.value === "Boshqasi");
+                      }}
+                    >
+                      <option value="">{t("tanlang")}</option>
+                      {["5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"].map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                      <option value="Boshqasi">{t("Boshqasi")}</option>
+                    </select>
+                    {isOtherPrevWorkPercent && (
+                      <div className="custom-input-wrapper">
+                        <input
+                          type="text"
+                          className="custom-input percent-input"
+                          value={customPrevWorkPercent}
+                          onChange={(e) => setCustomPrevWorkPercent(e.target.value)}
+                          placeholder="0"
+                          autoFocus
+                        />
+                        <span className="percent-symbol">%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="input-group">
                   <label>{t("olgansana")}</label>
                   <input
@@ -1458,6 +1573,8 @@ function Hisobot() {
                     onChange={(e) => setDateAlreadyReceived(e.target.value)}
                   />
                 </div>
+
+
               </div>
             </div>
 
@@ -1882,7 +1999,7 @@ function Hisobot() {
                   </div>
                   <div className="work-field">
                     <label>{t("qilayotganishi")}:</label>
-                    <span>{selectedWorker.currentWork || t("yo'q")}</span>
+                    <span style={{ color: "#fff", fontWeight: "600" }}>{selectedWorker.currentWork || t("yo'q")}</span>
                   </div>
                   <div className="work-field">
                     <label>{t("qilinayotganishfoizi")}:</label>
@@ -1898,8 +2015,17 @@ function Hisobot() {
                     </strong>
                     <span className="small-date">{t("olgan")}: {selectedWorker.dateAlreadyReceived}</span>
                   </div>
+                  <div className="work-field">
+                    <label>{t("oldin_qilingan_ish") || "Oldin qilingan ish"}:</label>
+                    <span style={{ color: "#fff", fontWeight: "600" }}>{selectedWorker.prevWork || t("yo'q")}</span>
+                  </div>
+                  <div className="work-field">
+                    <label>{t("oldin_qilingan_foiz") || "Oldin qilingan foiz"}:</label>
+                    <strong className="progress-text">{selectedWorker.prevWorkPercent || "0%"}</strong>
+                  </div>
                 </div>
               </div>
+
 
               <div className="aboutBottom">
                 <h3>{t("loyiha_tarixi")}</h3>
@@ -1909,7 +2035,7 @@ function Hisobot() {
                   ) : (
                     selectedWorker.history
                       .map((h, idx) => ({ ...h, originalIdx: idx }))
-                      .filter(h => h.type === "project_completed")
+                      .filter(h => h.type === "project_completed" || h.type === "archived")
                       .reverse()
                       .map((h) => (
                         <div key={h.originalIdx} className="project-history-item">
