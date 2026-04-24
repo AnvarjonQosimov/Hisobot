@@ -55,7 +55,7 @@
   font-size: 24px;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-right: 5px;
+  margin-left: 80px;
 }
 
 .pr-back-btn:hover {
@@ -95,7 +95,7 @@
 }
 
 .pr-btn-add {
-  background: linear-gradient(135deg, rgba(86, 86, 255, 0.3), rgba(40, 236, 112, 0.2));
+  background: rgba(40, 236, 112, 0.5);
   color: #ccc2ff;
   border: 1px solid rgba(86, 86, 255, 0.4);
 }
