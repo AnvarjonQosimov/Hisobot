@@ -50,7 +50,7 @@ function Profil() {
     if (field === 'username') {
       setConfirmDialog({
         isOpen: true,
-        message: t('Are you sure you want to save username changes?'),
+        message: t('save_changes_username'),
         onConfirm: () => {
           localStorage.setItem("username", newUsername);
           setUsername(newUsername);
@@ -61,7 +61,7 @@ function Profil() {
     } else if (field === 'password') {
       setConfirmDialog({
         isOpen: true,
-        message: t('Are you sure you want to save password changes?'),
+        message: t('save_changes_password'),
         onConfirm: () => {
           localStorage.setItem("password", newPassword);
           setPassword(newPassword);
@@ -89,11 +89,11 @@ function Profil() {
     <div className="Profil">
       <div className="prevBtn">
         <Link to="/hisobot">
-          <GrFormPrevious /> Orqaga
+          <GrFormPrevious /> {t("ortga")}
         </Link>
       </div>
       <div className="profileText">
-        {t("Profile")}
+        {t("profil")}
       </div>
       <div className="profilCard">
         <div className="image">
@@ -101,7 +101,7 @@ function Profil() {
         </div>
         <div className="profilInfo">
           <div className="nameProfil">
-            <h3>{t("Username")}:</h3>
+            <h3>{t("username_label")}:</h3>
             <div className="nameLine"></div>
             {isEditingUsername ? (
               <div className="editContainer">
@@ -110,14 +110,14 @@ function Profil() {
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   className="editInput"
-                  placeholder={t("Enter new username")}
+                  placeholder={t("enter_new_username")}
                 />
                 <div className="editButtons">
                   <button className="btn-save" onClick={() => handleSave('username')}>
-                    {t("Save")}
+                    {t("saqlash_btn")}
                   </button>
                   <button className="btn-cancel" onClick={() => handleCancel('username')}>
-                    {t("Cancel")}
+                    {t("bekor_qilish_btn")}
                   </button>
                 </div>
               </div>
@@ -131,7 +131,7 @@ function Profil() {
             )}
           </div>
           <div className="passwordProfil">
-            <h3>{t("Password")}:</h3>
+            <h3>{t("password_label")}:</h3>
             <div className="passwordLine"></div>
             {isEditingPassword ? (
               <div className="editContainer">
@@ -140,14 +140,14 @@ function Profil() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="editInput"
-                  placeholder={t("Enter new password")}
+                  placeholder={t("enter_new_password")}
                 />
                 <div className="editButtons">
                   <button className="btn-save" onClick={() => handleSave('password')}>
-                    {t("Save")}
+                    {t("saqlash_btn")}
                   </button>
                   <button className="btn-cancel" onClick={() => handleCancel('password')}>
-                    {t("Cancel")}
+                    {t("bekor_qilish_btn")}
                   </button>
                 </div>
               </div>
@@ -173,13 +173,13 @@ function Profil() {
                 className="confirm-btn confirm-cancel"
                 onClick={handleConfirmCancel}
               >
-                {t("Cancel")}
+                {t("bekor_qilish_btn")}
               </button>
               <button 
                 className="confirm-btn confirm-save"
                 onClick={confirmDialog.onConfirm}
               >
-                {t("Save")}
+                {t("saqlash_btn")}
               </button>
             </div>
           </div>

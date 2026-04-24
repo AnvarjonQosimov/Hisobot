@@ -173,7 +173,22 @@
     "ishchi_haqida_batafsil": "Подробная информация о сотруднике",
     "yopish": "Закрыть",
     "loyiha_tarixi": "История проектов",
-    "noma'lum_ish": "Неизвестная работа"
+    "noma'lum_ish": "Неизвестная работа",
+    "ortga": "Назад",
+    "dizayn": "Дизайн",
+    "plan": "План",
+    "barchasi": "Все",
+    "som": "сум",
+    "dollar": "доллар",
+    "ochiriladigan": "Удаляемый",
+    "oldin_qilingan_ish": "Предыдущая работа",
+    "oldin_qilingan_foiz": "Предыдущий процент",
+    "username_label": "Имя пользователя",
+    "password_label": "Пароль",
+    "save_changes_username": "Вы уверены, что хотите сохранить изменения имени пользователя?",
+    "save_changes_password": "Вы уверены, что хотите сохранить изменения пароля?",
+    "enter_new_username": "Введите новое имя пользователя",
+    "enter_new_password": "Введите новый пароль"
 }
 
 

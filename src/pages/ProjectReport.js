@@ -4,7 +4,7 @@ import "../styles/ProjectReport.css";
 
 const CATEGORIES = ["hammasi", "material", "ishchi", "texnika", "boshqa"];
 
-function ProjectReport({ projectId, projectName }) {
+function ProjectReport({ projectId, projectName, onBack }) {
   const { t } = useTranslation();
 
   const [username, setUsername] = useState("");
@@ -209,6 +209,9 @@ function ProjectReport({ projectId, projectName }) {
         {/* Header */}
         <div className="pr-header">
           <div className="pr-title-area">
+            <button className="pr-back-btn" onClick={onBack} title={t("ortga")}>
+              ‹
+            </button>
             <span className="pr-icon">🏗️</span>
             <h2 className="pr-title">{projectName}</h2>
           </div>
@@ -283,7 +286,7 @@ function ProjectReport({ projectId, projectName }) {
                   </div>
                   <div className="pr-item-right">
                     <div className="pr-item-amount">
-                      <strong>{itemTotal.toLocaleString()} {item.currency === "sum" ? "so'm" : "$"}</strong>
+                      <strong>{itemTotal.toLocaleString()} {item.currency === "sum" ? t("som") : "$"}</strong>
                       {parseFloat(item.quantity) > 1 && (
                         <span className="pr-item-per-unit">
                           ({parseFloat(item.amountPerUnit).toLocaleString()}/{item.unit})
@@ -314,7 +317,7 @@ function ProjectReport({ projectId, projectName }) {
             <div className="statistic1">
             <h3>{t("pr_byudjet_qoldiq")}:</h3>
             <p className={remaining("sum") < 0 || remaining("dollar") < 0 ? "negative-balance" : ""}>
-              {remaining("sum").toLocaleString()} so'm / {remaining("dollar").toLocaleString()} $
+              {remaining("sum").toLocaleString()} {t("som")} / {remaining("dollar").toLocaleString()} $
             </p>
           </div>
 
@@ -336,8 +339,8 @@ function ProjectReport({ projectId, projectName }) {
                     .filter((e) => e.currency === "dollar")
                     .sort((a, b) => (parseFloat(b.amountPerUnit) || 0) - (parseFloat(a.amountPerUnit) || 0))[0];
 
-                  const sumText = sumHigh ? `${sumHigh.name}: ${parseFloat(sumHigh.amountPerUnit).toLocaleString()} so'm` : "yo'q";
-                  const dolText = dolHigh ? `${dolHigh.name}: ${parseFloat(dolHigh.amountPerUnit).toLocaleString()} $` : "yo'q";
+                  const sumText = sumHigh ? `${sumHigh.name}: ${parseFloat(sumHigh.amountPerUnit).toLocaleString()} ${t("som")}` : t("yo'q");
+                  const dolText = dolHigh ? `${dolHigh.name}: ${parseFloat(dolHigh.amountPerUnit).toLocaleString()} $` : t("yo'q");
 
                   return `${sumText} / ${dolText}`;
                 })()}
@@ -347,19 +350,19 @@ function ProjectReport({ projectId, projectName }) {
             {/* Total expenses */}
             <div className="statistic4">
               <h3>{t("pr_jami_xarajat")}:</h3>
-              <p>{totalAmount("sum").toLocaleString()} so'm / {totalAmount("dollar").toLocaleString()} $</p>
+              <p>{totalAmount("sum").toLocaleString()} {t("som")} / {totalAmount("dollar").toLocaleString()} $</p>
             </div>
 
             {/* Paid expenses */}
             <div className="statistic5">
               <h3>{t("pr_tolangan")}:</h3>
-              <p>{paidAmount("sum").toLocaleString()} so'm / {paidAmount("dollar").toLocaleString()} $</p>
+              <p>{paidAmount("sum").toLocaleString()} {t("som")} / {paidAmount("dollar").toLocaleString()} $</p>
             </div>
 
             {/* Initial budget */}
             <div className="statistic1">
               <h3>{t("Boshlang'ich balans")}:</h3>
-              <p>{initialBudget.sum.toLocaleString()} so'm / {initialBudget.dollar.toLocaleString()} $</p>
+              <p>{initialBudget.sum.toLocaleString()} {t("som")} / {initialBudget.dollar.toLocaleString()} $</p>
             </div>
 
             {/* Category breakdown */}
@@ -368,7 +371,7 @@ function ProjectReport({ projectId, projectName }) {
               {catStats.map(({ cat, count, sumTotal, dolTotal }) => (
                 <div key={cat} className="statistic-item" style={{ marginBottom: "8px" }}>
                   <h3>{catIcon(cat)} {catLabel(cat)} <span style={{ color: "rgba(180,170,255,0.5)", fontSize: "12px" }}>({count})</span></h3>
-                  {sumTotal > 0 && <p>{sumTotal.toLocaleString()} so'm</p>}
+                  {sumTotal > 0 && <p>{sumTotal.toLocaleString()} {t("som")}</p>}
                   {dolTotal > 0 && <p>{dolTotal.toLocaleString()} $</p>}
                   {sumTotal === 0 && dolTotal === 0 && <p style={{ color: "rgba(200,190,255,0.3)", fontSize: "12px" }}>—</p>}
                 </div>
@@ -430,8 +433,8 @@ function ProjectReport({ projectId, projectName }) {
                 <div className="pr-form-group">
                   <label>{t("valyuta")}</label>
                   <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
-                    <option value="sum">So'm</option>
-                    <option value="dollar">Dollar ($)</option>
+                    <option value="sum">{t("som")}</option>
+                    <option value="dollar">{t("dollar")} ($)</option>
                   </select>
                 </div>
               </div>
@@ -514,10 +517,10 @@ function ProjectReport({ projectId, projectName }) {
                 {t("pr_ochirish_savol")}
               </p>
               <div style={{ background: "rgba(255, 60, 60, 0.1)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255, 60, 60, 0.3)" }}>
-                <p style={{ fontSize: "12px", color: "rgba(200,190,255,0.5)", margin: "0 0 6px 0" }}>Ochiriladigan:</p>
+                <p style={{ fontSize: "12px", color: "rgba(200,190,255,0.5)", margin: "0 0 6px 0" }}>{t("ochiriladigan")}:</p>
                 <p style={{ fontSize: "15px", fontWeight: "600", color: "#fff", margin: "0" }}>📍 {deleteItem.name}</p>
                 <p style={{ fontSize: "12px", color: "rgba(200,190,255,0.5)", margin: "6px 0 0 0" }}>
-                  {parseFloat(deleteItem.amountPerUnit).toLocaleString()} {deleteItem.currency === "sum" ? "so'm" : "$"} × {deleteItem.quantity} {deleteItem.unit}
+                  {parseFloat(deleteItem.amountPerUnit).toLocaleString()} {deleteItem.currency === "sum" ? t("som") : "$"} × {deleteItem.quantity} {deleteItem.unit}
                 </p>
               </div>
             </div>

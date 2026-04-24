@@ -173,7 +173,22 @@
     "ishchi_haqida_batafsil": "Detailed worker information",
     "yopish": "Close",
     "loyiha_tarixi": "Project history",
-    "noma'lum_ish": "Unknown work"
+    "noma'lum_ish": "Unknown work",
+    "ortga": "Back",
+    "dizayn": "Design",
+    "plan": "Plan",
+    "barchasi": "All",
+    "som": "soum",
+    "dollar": "dollar",
+    "ochiriladigan": "Deleting",
+    "oldin_qilingan_ish": "Previous work",
+    "oldin_qilingan_foiz": "Previous percentage",
+    "username_label": "Username",
+    "password_label": "Password",
+    "save_changes_username": "Are you sure you want to save username changes?",
+    "save_changes_password": "Are you sure you want to save password changes?",
+    "enter_new_username": "Enter new username",
+    "enter_new_password": "Enter new password"
 }
 
 

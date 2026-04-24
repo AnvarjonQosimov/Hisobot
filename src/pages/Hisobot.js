@@ -1128,11 +1128,11 @@ function Hisobot() {
                       )[0];
 
                     const sumText = sumHigh
-                      ? `${sumHigh.workerName}: ${parseFloat(sumHigh.amountToReceive).toLocaleString()} so'm`
-                      : "yo'q";
+                      ? `${sumHigh.workerName}: ${parseFloat(sumHigh.amountToReceive).toLocaleString()} ${t("som")}`
+                      : t("yo'q");
                     const dolText = dolHigh
                       ? `${dolHigh.workerName}: ${parseFloat(dolHigh.amountToReceive).toLocaleString()} $`
-                      : "yo'q";
+                      : t("yo'q");
 
                     return `${sumText} / ${dolText}`;
                   })()}
@@ -1161,7 +1161,7 @@ function Hisobot() {
                       return acc + currentCost + historyCost + lastMonthPaid;
                     }, 0)
                     .toLocaleString()}{" "}
-                  so'm /
+                  {t("som")} /
                   {workers
                     .reduce((acc, curr) => {
                       const currentCost =
@@ -1198,7 +1198,7 @@ function Hisobot() {
                       0,
                     )
                     .toLocaleString()}{" "}
-                  so'm /
+                  {t("som")} /
                   {workers
                     .filter((w) => !w.isPaid)
                     .reduce(
@@ -1215,7 +1215,7 @@ function Hisobot() {
               <div className="statistic6">
                 <h3>{t("qolganbalans")}:</h3>
                 <p>
-                  {totalBalance.sum.toLocaleString()} so'm /{" "}
+                  {totalBalance.sum.toLocaleString()} {t("som")} /{" "}
                   {totalBalance.dollar.toLocaleString()} $
                 </p>
               </div>
@@ -1328,6 +1328,7 @@ function Hisobot() {
         <ProjectReport
           projectId={activeProjectId}
           projectName={projectFiles.find(p => p.id === activeProjectId)?.name}
+          onBack={() => setActiveProjectId(null)}
         />
       )}
 
@@ -1336,20 +1337,20 @@ function Hisobot() {
         <div className="confirm-overlay" onClick={handleLogoutCancel}>
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-message">
-              {t("Are you sure you want to logout?")}
+              {t("Haqiqatdan ham chiqishni xohlaysizmi?")}
             </div>
             <div className="confirm-buttons">
               <button
                 className="confirm-btn confirm-cancel"
                 onClick={handleLogoutCancel}
               >
-                {t("Cancel")}
+                {t("bekorqilish")}
               </button>
               <button
                 className="confirm-btn confirm-logout"
                 onClick={confirmLogout}
               >
-                {t("Logout")}
+                {t("chiqish")}
               </button>
             </div>
           </div>
@@ -1406,7 +1407,7 @@ function Hisobot() {
                       value={currencyToReceive}
                       onChange={(e) => setCurrencyToReceive(e.target.value)}
                     >
-                      <option value="sum">So'm</option>
+                      <option value="sum">{t("som")}</option>
                       <option value="dollar">$</option>
                     </select>
                   </div>
@@ -1424,9 +1425,9 @@ function Hisobot() {
                         setIsOtherWork(e.target.value === "Boshqasi");
                       }}
                     >
-                      <option value="Dizayn">Dizayn</option>
-                      <option value="Plan">Plan</option>
-                      <option value="Barchasi">Barchasi</option>
+                      <option value="Dizayn">{t("dizayn")}</option>
+                      <option value="Plan">{t("plan")}</option>
+                      <option value="Barchasi">{t("barchasi")}</option>
                       <option value="Boshqasi">{t("Boshqasi")}</option>
                     </select>
                     {isOtherWork && (
@@ -1500,7 +1501,7 @@ function Hisobot() {
                         setCurrencyAlreadyReceived(e.target.value)
                       }
                     >
-                      <option value="sum">So'm</option>
+                      <option value="sum">{t("som")}</option>
                       <option value="dollar">$</option>
                     </select>
                   </div>
@@ -1517,9 +1518,9 @@ function Hisobot() {
                       }}
                     >
                       <option value="">{t("tanlang")}</option>
-                      <option value="Dizayn">Dizayn</option>
-                      <option value="Plan">Plan</option>
-                      <option value="Barchasi">Barchasi</option>
+                      <option value="Dizayn">{t("dizayn")}</option>
+                      <option value="Plan">{t("plan")}</option>
+                      <option value="Barchasi">{t("barchasi")}</option>
                       <option value="Boshqasi">{t("Boshqasi")}</option>
                     </select>
                     {isOtherPrevWork && (
@@ -1633,7 +1634,7 @@ function Hisobot() {
                       value={balanceCurrency}
                       onChange={(e) => setBalanceCurrency(e.target.value)}
                     >
-                      <option value="sum">So'm</option>
+                      <option value="sum">{t("som")}</option>
                       <option value="dollar">$</option>
                     </select>
                   </div>
@@ -1820,7 +1821,7 @@ function Hisobot() {
                         })
                       }
                     >
-                      <option value="sum">So'm</option>
+                      <option value="sum">{t("som")}</option>
                       <option value="dollar">$</option>
                     </select>
                   </div>
@@ -1993,7 +1994,7 @@ function Hisobot() {
                   <div className="val-group">
                     <p>{t("olishikerak")}:</p>
                     <strong className="to-receive">
-                      {selectedWorker.amountToReceive} {selectedWorker.currencyToReceive === "sum" ? "so'm" : "$"}
+                      {selectedWorker.amountToReceive} {selectedWorker.currencyToReceive === "sum" ? t("som") : "$"}
                     </strong>
                     <span className="small-date">{t("sana")}: {selectedWorker.dateToGive}</span>
                   </div>
@@ -2011,16 +2012,16 @@ function Hisobot() {
                   <div className="val-group">
                     <p>{t("olgansumma")}:</p>
                     <strong className="received">
-                      {selectedWorker.amountAlreadyReceived} {selectedWorker.currencyAlreadyReceived === "sum" ? "so'm" : "$"}
+                      {selectedWorker.amountAlreadyReceived} {selectedWorker.currencyAlreadyReceived === "sum" ? t("som") : "$"}
                     </strong>
                     <span className="small-date">{t("olgan")}: {selectedWorker.dateAlreadyReceived}</span>
                   </div>
                   <div className="work-field">
-                    <label>{t("oldin_qilingan_ish") || "Oldin qilingan ish"}:</label>
+                    <label>{t("oldin_qilingan_ish")}:</label>
                     <span style={{ color: "#fff", fontWeight: "600" }}>{selectedWorker.prevWork || t("yo'q")}</span>
                   </div>
                   <div className="work-field">
-                    <label>{t("oldin_qilingan_foiz") || "Oldin qilingan foiz"}:</label>
+                    <label>{t("oldin_qilingan_foiz")}:</label>
                     <strong className="progress-text">{selectedWorker.prevWorkPercent || "0%"}</strong>
                   </div>
                 </div>
@@ -2055,7 +2056,7 @@ function Hisobot() {
                           <div className="history-details">
                             <small>{h.date}</small>
                             <small>
-                              {h.amount} {h.currency === "sum" ? "so'm" : "$"} / {h.received} {h.receivedCurrency === "sum" ? "so'm" : "$"}
+                              {h.amount} {h.currency === "sum" ? t("som") : "$"} / {h.received} {h.receivedCurrency === "sum" ? t("som") : "$"}
                             </small>
                           </div>
                         </div>

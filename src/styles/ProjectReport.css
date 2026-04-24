@@ -42,6 +42,27 @@
   gap: 10px;
 }
 
+.pr-back-btn {
+  background: rgba(161, 161, 241, 0.1);
+  border: 1px solid rgba(161, 161, 241, 0.3);
+  color: rgb(204, 194, 255);
+  width: 35px;
+  height: 35px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 5px;
+}
+
+.pr-back-btn:hover {
+  background: rgba(161, 161, 241, 0.2);
+  transform: scale(1.05);
+}
+
 .pr-icon {
   font-size: 26px;
 }

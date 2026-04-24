@@ -173,5 +173,20 @@
     "ishchi_haqida_batafsil": "Ishchi haqida batafsil ma'lumot",
     "yopish": "Yopish",
     "loyiha_tarixi": "Loyihalar tarixi",
-    "noma'lum_ish": "Noma'lum ish"
+    "noma'lum_ish": "Noma'lum ish",
+    "ortga": "Ortga",
+    "dizayn": "Dizayn",
+    "plan": "Reja",
+    "barchasi": "Barchasi",
+    "som": "so'm",
+    "dollar": "dollar",
+    "ochiriladigan": "O'chiriladigan",
+    "oldin_qilingan_ish": "Oldin qilingan ish",
+    "oldin_qilingan_foiz": "Oldin qilingan foiz",
+    "username_label": "Foydalanuvchi nomi",
+    "password_label": "Parol",
+    "save_changes_username": "Foydalanuvchi nomini saqlashni xohlaysizmi?",
+    "save_changes_password": "Parolni saqlashni xohlaysizmi?",
+    "enter_new_username": "Yangi foydalanuvchi nomini kiriting",
+    "enter_new_password": "Yangi parolni kiriting"
 }

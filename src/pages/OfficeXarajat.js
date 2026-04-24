@@ -810,8 +810,8 @@ function OfficeXarajat() {
                 <div className="no-workers">
                   <p>
                     {searchTerm
-                      ? "Qidiruv bo'yicha hech narsa topilmadi."
-                      : "Hozircha xarajatlar yo'q. \"+ Qo'shish\" tugmasini bosing."}
+                      ? t("hisobot_qidiruv_placeholder")
+                      : t("hisobot_no_workers")}
                   </p>
                 </div>
               );
@@ -844,7 +844,7 @@ function OfficeXarajat() {
                           <p>{t("To'lanishi kerak")}:</p>
                           <strong className="to-receive">
                             {parseFloat(expense.amountToPay || 0).toLocaleString()}{" "}
-                            {expense.currencyToPay === "sum" ? "so'm" : "$"}
+                            {expense.currencyToPay === "sum" ? t("som") : "$"}
                           </strong>
                           <span className="small-date">
                             {t("sana")}: {expense.dateToPay}
@@ -855,7 +855,7 @@ function OfficeXarajat() {
                           <strong className="received">
                             {parseFloat(expense.amountAlreadyPaid || 0).toLocaleString()}{" "}
                             {expense.currencyAlreadyPaid === "sum"
-                              ? "so'm"
+                              ? t("som")
                               : "$"}
                           </strong>
                           <span className="small-date">
@@ -895,17 +895,17 @@ function OfficeXarajat() {
                       <div className="history-section">
                         <h4>{t("Xarajatlar tarixi")}:</h4>
                         {(expense.history || []).length === 0 ? (
-                          <p className="no-history">Tarix mavjud emas</p>
+                          <p className="no-history">{t("tarix_mavjud_emas")}</p>
                         ) : (
                           expense.history.map((h, idx) => (
                             <div key={idx} className="history-item">
                               <span>{h.date}</span>
                               <span>
-                                {h.amount} {h.currency === "sum" ? "so'm" : "$"}
+                                {h.amount} {h.currency === "sum" ? t("som") : "$"}
                               </span>
                               <span className="h-type">
                                 {h.type === "archived"
-                                  ? "Arxivlandi"
+                                  ? t("arxivlandi")
                                   : t("To'langan")}
                               </span>
                               <div
@@ -1020,7 +1020,7 @@ function OfficeXarajat() {
                     : ""
                 }
               >
-                {totalBalance.sum.toLocaleString()} so'm /{" "}
+                {totalBalance.sum.toLocaleString()} {t("som")} /{" "}
                 {totalBalance.dollar.toLocaleString()} $
               </p>
             </div>
@@ -1197,8 +1197,8 @@ function OfficeXarajat() {
                       onChange={(e) => setCurrencyToPay(e.target.value)}
                       className="modal-select"
                     >
-                      <option value="sum">So'm</option>
-                      <option value="dollar">Dollar ($)</option>
+                      <option value="sum">{t("som")}</option>
+                      <option value="dollar">{t("dollar")} ($)</option>
                     </select>
                   </div>
                 </div>
@@ -1230,8 +1230,8 @@ function OfficeXarajat() {
                       onChange={(e) => setCurrencyAlreadyPaid(e.target.value)}
                       className="modal-select"
                     >
-                      <option value="sum">So'm</option>
-                      <option value="dollar">Dollar ($)</option>
+                      <option value="sum">{t("som")}</option>
+                      <option value="dollar">{t("dollar")} ($)</option>
                     </select>
                   </div>
                 </div>
@@ -1550,7 +1550,7 @@ function OfficeXarajat() {
                         })
                       }
                     >
-                      <option value="sum">So'm</option>
+                      <option value="sum">{t("som")}</option>
                       <option value="dollar">$</option>
                     </select>
                   </div>
