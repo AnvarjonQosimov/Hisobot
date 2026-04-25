@@ -188,7 +188,9 @@
     "save_changes_username": "Вы уверены, что хотите сохранить изменения имени пользователя?",
     "save_changes_password": "Вы уверены, что хотите сохранить изменения пароля?",
     "enter_new_username": "Введите новое имя пользователя",
-    "enter_new_password": "Введите новый пароль"
+    "enter_new_password": "Введите новый пароль",
+    "global_worker_email": "Общая почта для рабочих",
+    "global_worker_email_placeholder": "example@gmail.com"
 }
 
 

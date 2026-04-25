@@ -176,7 +176,7 @@
     "noma'lum_ish": "Noma'lum ish",
     "ortga": "Ortga",
     "dizayn": "Dizayn",
-    "plan": "Reja",
+    "plan": "Plan",
     "barchasi": "Barchasi",
     "som": "so'm",
     "dollar": "dollar",
@@ -188,5 +188,7 @@
     "save_changes_username": "Foydalanuvchi nomini saqlashni xohlaysizmi?",
     "save_changes_password": "Parolni saqlashni xohlaysizmi?",
     "enter_new_username": "Yangi foydalanuvchi nomini kiriting",
-    "enter_new_password": "Yangi parolni kiriting"
+    "enter_new_password": "Yangi parolni kiriting",
+    "global_worker_email": "Ishchilar uchun umumiy email",
+    "global_worker_email_placeholder": "example@gmail.com"
 }

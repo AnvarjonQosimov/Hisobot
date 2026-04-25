@@ -6,6 +6,8 @@ import LogIn from "./pages/LogIn.js"
 import Hisobot from "./pages/Hisobot.js"
 import Profil from "./pages/Profil.js"
 import OfficeXarajat from "./pages/OfficeXarajat.js"
+import WorkerDashboard from "./pages/WorkerDashboard.js"
+import WorkerAuth from "./pages/WorkerAuth.js"
 import { Route, Routes } from 'react-router-dom'
 
 function App() {
@@ -18,6 +20,8 @@ function App() {
         <Route path="/calculator2" element={<Calculator2 />} />
         <Route path="/login" element={<LogIn />} />
         <Route path="/hisobot" element={<Hisobot />} />
+        <Route path="/workerdashboard" element={<WorkerDashboard />} />
+        <Route path="/worker-auth" element={<WorkerAuth />} />
         <Route path="/profil" element={<Profil />} />
         <Route path="/officexarajat" element={<OfficeXarajat />} />
       </Routes>

@@ -188,7 +188,9 @@
     "save_changes_username": "Are you sure you want to save username changes?",
     "save_changes_password": "Are you sure you want to save password changes?",
     "enter_new_username": "Enter new username",
-    "enter_new_password": "Enter new password"
+    "enter_new_password": "Enter new password",
+    "global_worker_email": "Global worker email",
+    "global_worker_email_placeholder": "example@gmail.com"
 }
 
 

@@ -1,0 +1,11 @@
+@import "./Hisobot.css";
+
+.WorkerDashboard {
+    background-color: rgb(8, 7, 16);
+    min-height: 100vh;
+}
+
+.WorkerDashboard .HisobotRight {
+    padding-bottom: 50px;
+    background-color: transparent;
+}

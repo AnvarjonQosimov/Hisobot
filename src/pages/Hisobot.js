@@ -5,6 +5,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import ProjectReport from "./ProjectReport";
 import NewProject from "../images/new-project.png";
+import { db } from "../Firebase/Firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 function Hisobot() {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ function Hisobot() {
   const [addWorkerModal, setAddWorkerModal] = useState(false);
   const [balansQoshish, setBalansQoshish] = useState(false);
   const [workerName, setWorkerName] = useState("");
+  const [workerCode, setWorkerCode] = useState("");
   const [amountToReceive, setAmountToReceive] = useState("");
   const [dateToGive, setDateToGive] = useState("");
   const [amountAlreadyReceived, setAmountAlreadyReceived] = useState("");
@@ -88,7 +91,38 @@ function Hisobot() {
   const [newFileName, setNewFileName] = useState("");
   const [deleteProjectId, setDeleteProjectId] = useState(null);
 
-  // Load from localStorage (Account Scoped)
+  // Global Worker Email State
+  const [globalWorkerEmail, setGlobalWorkerEmail] = useState("");
+  const [savedGlobalWorkerEmail, setSavedGlobalWorkerEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+
+  const validateEmail = (email) => {
+    return String(email)
+      .toLowerCase()
+      .match(
+        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+      );
+  };
+
+  const handleSaveGlobalEmail = async () => {
+    const val = globalWorkerEmail.trim();
+    if (!val) return;
+
+    if (!validateEmail(val)) {
+      setEmailError(true);
+      return;
+    }
+
+    setEmailError(false);
+    try {
+      await setDoc(doc(db, "globalWorkerEmails", val.toLowerCase()), { bossEmail: username });
+      setSavedGlobalWorkerEmail(globalWorkerEmail);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Load from localStorage and Sync from Cloud
   useEffect(() => {
     const storedUsername = localStorage.getItem("username");
     if (!storedUsername) {
@@ -114,7 +148,66 @@ function Hisobot() {
     // Load Project Files
     const storedProjects = localStorage.getItem(`projects_${storedUsername}`);
     if (storedProjects) setProjectFiles(JSON.parse(storedProjects));
+
+    const storedGlobalEmail = localStorage.getItem(`globalEmail_${storedUsername}`);
+    if (storedGlobalEmail) {
+      setGlobalWorkerEmail(storedGlobalEmail);
+      setSavedGlobalWorkerEmail(storedGlobalEmail);
+    }
+
+    // Try to sync from Firestore to ensure cloud data represents the source of truth if it exists
+    const syncFromCloud = async () => {
+      try {
+        const docRef = doc(db, "cabinets", storedUsername);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.workers) setWorkers(data.workers);
+          if (data.totalBalance) setTotalBalance(data.totalBalance);
+          if (data.initialBalance) setInitialBalance(data.initialBalance);
+          if (data.projectFiles) setProjectFiles(data.projectFiles);
+          if (data.globalWorkerEmail) {
+            setGlobalWorkerEmail(data.globalWorkerEmail);
+            setSavedGlobalWorkerEmail(data.globalWorkerEmail);
+          }
+
+          // Update localStorage with cloud data
+          if (data.workers) localStorage.setItem(`workers_${storedUsername}`, JSON.stringify(data.workers));
+          if (data.totalBalance) localStorage.setItem(`totalBalance_${storedUsername}`, JSON.stringify(data.totalBalance));
+          if (data.initialBalance) localStorage.setItem(`initialBalance_${storedUsername}`, JSON.stringify(data.initialBalance));
+          if (data.projectFiles) localStorage.setItem(`projects_${storedUsername}`, JSON.stringify(data.projectFiles));
+          if (data.globalWorkerEmail) localStorage.setItem(`globalEmail_${storedUsername}`, data.globalWorkerEmail);
+        }
+      } catch (e) {
+        console.error("Failed to sync from cloud", e);
+      }
+    };
+    syncFromCloud();
   }, [navigate]);
+
+  // Sync back to Firestore when things change
+  useEffect(() => {
+    if (!username) return;
+    const syncToCloud = async () => {
+      try {
+        await setDoc(doc(db, "cabinets", username), {
+          workers,
+          totalBalance,
+          initialBalance,
+          projectFiles,
+          globalWorkerEmail
+        }, { merge: true });
+      } catch (e) {
+        console.error("Failed to sync to cloud", e);
+      }
+    };
+
+    const debounceSync = setTimeout(() => {
+      syncToCloud();
+    }, 1500); // 1.5s debounce to avoid spamming writes
+
+    return () => clearTimeout(debounceSync);
+  }, [workers, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail]);
 
   // Save to localStorage (Account Scoped)
   useEffect(() => {
@@ -137,6 +230,11 @@ function Hisobot() {
       JSON.stringify(initialBalance),
     );
   }, [initialBalance, username]);
+
+  useEffect(() => {
+    if (!username) return;
+    localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
+  }, [globalWorkerEmail, username]);
 
   useEffect(() => {
     if (!username) return;
@@ -163,6 +261,7 @@ function Hisobot() {
     setEditMode(false);
     setEditingWorkerId(null);
     setWorkerName("");
+    setWorkerCode("");
     setAmountToReceive("");
     setDateToGive("");
     setAmountAlreadyReceived("");
@@ -226,15 +325,15 @@ function Hisobot() {
     setWorkerName(capitalizedValue);
   };
 
-  const handleAddWorker = () => {
+  const handleAddWorker = async () => {
     const finalWork = isOtherWork ? customWork : currentWork;
-    const finalPercent = isOtherWorkPercent 
-      ? (customWorkPercent && !customWorkPercent.includes('%') ? `${customWorkPercent}%` : customWorkPercent) 
+    const finalPercent = isOtherWorkPercent
+      ? (customWorkPercent && !customWorkPercent.includes('%') ? `${customWorkPercent}%` : customWorkPercent)
       : workPercent;
-    
+
     const finalPrevWork = isOtherPrevWork ? customPrevWork : prevWork;
-    const finalPrevPercent = isOtherPrevWorkPercent 
-      ? (customPrevWorkPercent && !customPrevWorkPercent.includes('%') ? `${customPrevWorkPercent}%` : customPrevWorkPercent) 
+    const finalPrevPercent = isOtherPrevWorkPercent
+      ? (customPrevWorkPercent && !customPrevWorkPercent.includes('%') ? `${customPrevWorkPercent}%` : customPrevWorkPercent)
       : prevWorkPercent;
 
     if (editMode) {
@@ -243,26 +342,35 @@ function Hisobot() {
         workers.map((w) =>
           w.id === editingWorkerId
             ? {
-                ...w,
-                workerName,
-                amountToReceive,
-                currencyToReceive,
-                dateToGive,
-                amountAlreadyReceived,
-                currencyAlreadyReceived,
-                dateAlreadyReceived,
-                currentWork: finalWork,
-                workPercent: finalPercent,
-                prevWork: finalPrevWork,
-                prevWorkPercent: finalPrevPercent,
-              }
+              ...w,
+              workerName,
+              amountToReceive,
+              currencyToReceive,
+              dateToGive,
+              amountAlreadyReceived,
+              currencyAlreadyReceived,
+              dateAlreadyReceived,
+              currentWork: finalWork,
+              workPercent: finalPercent,
+              prevWork: finalPrevWork,
+              prevWorkPercent: finalPrevPercent,
+              workerCode: workerCode.trim()
+            }
             : w,
         ),
       );
+      if (workerCode.trim()) {
+        try {
+          await setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: editingWorkerId });
+        } catch (e) {
+          console.error("Failed to save invite code:", e);
+        }
+      }
     } else {
       saveForUndo();
+      const newWorkerId = Date.now();
       const newWorker = {
-        id: Date.now(),
+        id: newWorkerId,
         workerName,
         amountToReceive,
         currencyToReceive,
@@ -277,8 +385,16 @@ function Hisobot() {
         createdAt: new Date().toISOString(),
         isPaid: false,
         history: [],
+        workerCode: workerCode.trim()
       };
       setWorkers([newWorker, ...workers]);
+      if (workerCode.trim()) {
+        try {
+          await setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: newWorkerId });
+        } catch (e) {
+          console.error("Failed to save invite code:", e);
+        }
+      }
     }
     handleAddWorkerModalClose();
   };
@@ -298,7 +414,7 @@ function Hisobot() {
     saveForUndo();
     setWorkers(workers.map(w => {
       if (w.id !== id) return w;
-      
+
       const archiveItem = {
         date: new Date().toISOString().split('T')[0],
         amount: w.amountToReceive,
@@ -331,6 +447,7 @@ function Hisobot() {
     setEditMode(true);
     setEditingWorkerId(worker.id);
     setWorkerName(worker.workerName);
+    setWorkerCode(worker.workerCode || "");
     setAmountToReceive(worker.amountToReceive);
     setDateToGive(worker.dateToGive);
     setAmountAlreadyReceived(worker.amountAlreadyReceived);
@@ -730,6 +847,68 @@ function Hisobot() {
             <Link to="/officexarajat" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("o'fisxarajatlari")}</h3>
             </Link>
+
+            <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "10px" }}>
+              <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>{t("global_worker_email") || "Ishchilar uchun umumiy email"}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input
+                  type="email"
+                  placeholder={t("global_worker_email_placeholder") || "example@gmail.com"}
+                  value={globalWorkerEmail}
+                  onChange={(e) => {
+                    setGlobalWorkerEmail(e.target.value);
+                    if (emailError) setEmailError(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    border: emailError ? "1px solid #ff4d4d" : "1px solid rgba(255,255,255,0.2)",
+                    background: "rgba(255,255,255,0.1)",
+                    color: globalWorkerEmail ? "rgba(204, 194, 255, 0.5)" : "#fff",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    fontSize: "14px",
+                    fontWeight: globalWorkerEmail ? "500" : "400"
+                  }}
+                />
+                {emailError && (
+                  <p style={{ color: "#ff4d4d", fontSize: "12px", margin: "4px 0 0 0" }}>
+                    {t("email_xato") || "Email noto'g'ri kiritilgan"}
+                  </p>
+                )}
+                <button
+                  onClick={handleSaveGlobalEmail}
+                  disabled={globalWorkerEmail === savedGlobalWorkerEmail || !globalWorkerEmail.trim()}
+                  style={{
+                    width: "100%",
+                    padding: "10px 15px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: globalWorkerEmail === savedGlobalWorkerEmail ? "rgba(0, 0, 0, 0.3)" : "rgb(146, 151, 223)",
+                    color: globalWorkerEmail === savedGlobalWorkerEmail ? "rgba(255, 255, 255, 0.2)" : "#fff",
+                    cursor: globalWorkerEmail === savedGlobalWorkerEmail ? "default" : "pointer",
+                    fontWeight: "600",
+                    whiteSpace: "nowrap",
+                    fontSize: "13px",
+                    transition: "all 0.3s ease",
+                    border: globalWorkerEmail === savedGlobalWorkerEmail ? "1px solid rgba(255, 255, 255, 0.05)" : "none"
+                  }}
+                  onMouseOver={(e) => {
+                    if (globalWorkerEmail !== savedGlobalWorkerEmail && globalWorkerEmail.trim()) {
+                      e.target.style.opacity = "0.8";
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (globalWorkerEmail !== savedGlobalWorkerEmail && globalWorkerEmail.trim()) {
+                      e.target.style.opacity = "1";
+                    }
+                  }}
+                >
+                  {t("saqlash") || "Saqlash"}
+                </button>
+              </div>
+            </div>
             <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
               <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
                 {t("qurilishxarajatlari")} <span>{">"}</span>
@@ -916,7 +1095,12 @@ function Hisobot() {
                             onClick={(e) => e.stopPropagation()}
                           />
                           <div className="name-date">
-                            <h3>{worker.workerName}</h3>
+                            <h3 style={{ display: 'flex', alignItems: 'center' }}>
+                              {worker.workerName}
+                              <span style={{ fontSize: "14px", marginLeft: "10px", lineHeight: 1 }} title={worker.workerCode ? "Has Access Code" : "No Access Code"}>
+                                {worker.workerCode ? "🟢" : "🔴"}
+                              </span>
+                            </h3>
                             <span>
                               {new Date(worker.createdAt).toLocaleDateString()}
                             </span>
@@ -924,7 +1108,7 @@ function Hisobot() {
                         </div>
 
                         <div className="worker-values">
-                          <div className="val-group">
+                          <div className="val-group-procent">
                             <p>{t("qilayotganishi")}</p>
                             <strong>
                               {worker.currentWork || t("yo'q")} ({worker.workPercent || "0%"})
@@ -966,7 +1150,7 @@ function Hisobot() {
                             🔄
                           </button>
 
-                          <button 
+                          <button
                             className="addnewproject"
                             onClick={(e) => handleNewProject(e, worker.id)}
                             title={t("yangi_loyiha")}
@@ -1390,6 +1574,16 @@ function Hisobot() {
                   />
                 </div>
 
+                <div className="input-group">
+                  <label>Worker Code (Password)</label>
+                  <input
+                    type="text"
+                    value={workerCode}
+                    onChange={(e) => setWorkerCode(e.target.value)}
+                    placeholder="Enter worker code"
+                  />
+                </div>
+
                 <div className="row">
                   <div className="input-group">
                     <label>{t("olishikerak")}</label>
@@ -1425,6 +1619,7 @@ function Hisobot() {
                         setIsOtherWork(e.target.value === "Boshqasi");
                       }}
                     >
+                      <option value="">{t("tanlang")}</option>
                       <option value="Dizayn">{t("dizayn")}</option>
                       <option value="Plan">{t("plan")}</option>
                       <option value="Barchasi">{t("barchasi")}</option>
@@ -1965,9 +2160,9 @@ function Hisobot() {
               <button className="confirm-btn confirm-cancel" onClick={() => setNewProjectConfirmId(null)}>
                 {t("yo'q")}
               </button>
-              <button 
-                className="confirm-btn confirm-logout" 
-                style={{ backgroundColor: 'rgba(40, 236, 112, 0.1)', borderColor: 'rgba(40, 236, 112, 0.4)', color: 'rgb(40, 236, 112)' }} 
+              <button
+                className="confirm-btn confirm-logout"
+                style={{ backgroundColor: 'rgba(40, 236, 112, 0.1)', borderColor: 'rgba(40, 236, 112, 0.4)', color: 'rgb(40, 236, 112)' }}
                 onClick={confirmNewProject}
               >
                 {t("ha")}
@@ -1982,8 +2177,21 @@ function Hisobot() {
         <div className="modal-overlay" onClick={() => setIsDetailModalOpen(false)}>
           <div className="modal-container finishedworks" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div>
-                <h2>{selectedWorker.workerName}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <h2 style={{ margin: 0 }}>{selectedWorker.workerName}</h2>
+                {selectedWorker.workerCode && (
+                  <span style={{
+                    fontSize: '0.8rem',
+                    color: 'rgb(146, 151, 223)',
+                    fontWeight: '600',
+                    background: 'rgba(146, 151, 223, 0.15)',
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    marginLeft: '10px'
+                  }}>
+                    Password: {selectedWorker.workerCode}
+                  </span>
+                )}
               </div>
               <button className="close-btn" onClick={() => setIsDetailModalOpen(false)}>✕</button>
             </div>
@@ -2045,7 +2253,7 @@ function Hisobot() {
                               <strong>{h.work || t("noma'lum_ish")}</strong>
                               <span>{h.percent || "100%"}</span>
                             </div>
-                            <button 
+                            <button
                               className="delete-history-btn"
                               onClick={() => handleDeleteHistoryProject(selectedWorker.id, h.originalIdx)}
                               title={t("ochirish_btn")}
@@ -2067,8 +2275,8 @@ function Hisobot() {
             </div>
 
             <div className="modal-footer">
-              <button 
-                className="btn edit" 
+              <button
+                className="btn edit"
                 onClick={() => {
                   setIsDetailModalOpen(false);
                   handleEditWorkerClick(selectedWorker);

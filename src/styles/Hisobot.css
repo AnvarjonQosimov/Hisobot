@@ -1675,3 +1675,9 @@
         margin-left: 30px;
     }
 }
+
+.val-group-procent p{
+    font-size: 0.8rem;
+    color: rgb(146, 151, 223);
+    margin: 0;
+}
