@@ -3,20 +3,33 @@ import "../styles/WorkerDashboard.css";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
-import { db } from "../Firebase/Firebase";
+import { db, auth } from "../Firebase/Firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 import Loading from "../components/Loading";
 
 function WorkerDashboard() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  
+
+  const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
+
+  useEffect(() => {
+    const handleStatus = () => setIsOffline(!window.navigator.onLine);
+    window.addEventListener("online", handleStatus);
+    window.addEventListener("offline", handleStatus);
+    return () => {
+      window.removeEventListener("online", handleStatus);
+      window.removeEventListener("offline", handleStatus);
+    };
+  }, []);
+
   const [worker, setWorker] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [logoutDialog, setLogoutDialog] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState([]);
-  
+
   const [bossEmail, setBossEmail] = useState("");
   const [workerId, setWorkerId] = useState("");
   const [fullWorkers, setFullWorkers] = useState([]);
@@ -29,7 +42,7 @@ function WorkerDashboard() {
     const role = localStorage.getItem("role");
     const bEmail = localStorage.getItem("bossEmail");
     const wId = localStorage.getItem("workerId");
-    
+
     if (role !== "worker" || !bEmail || !wId) {
       navigate("/login");
       return;
@@ -52,8 +65,8 @@ function WorkerDashboard() {
             }
           }
         }
-      } catch(e) {
-        console.error(e);
+      } catch (e) {
+        console.log("Worker cloud sync paused (offline).");
       } finally {
         setLoading(false);
       }
@@ -78,7 +91,7 @@ function WorkerDashboard() {
     const newIsPaid = !worker.isPaid;
     const newWorkerDetails = { ...worker, isPaid: newIsPaid };
     setWorker(newWorkerDetails);
-    
+
     const updatedWorkers = fullWorkers.map(w => w.id === worker.id ? newWorkerDetails : w);
     setFullWorkers(updatedWorkers);
     saveToCloud(updatedWorkers);
@@ -90,13 +103,16 @@ function WorkerDashboard() {
     );
   };
 
-  const confirmLogout = () => {
-    localStorage.removeItem("username");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("role");
-    localStorage.removeItem("bossEmail");
-    localStorage.removeItem("workerId");
-    navigate("/login");
+  const confirmLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.clear();
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+      localStorage.clear();
+      navigate("/login");
+    }
   };
 
   const getCircularData = () => {
@@ -211,7 +227,12 @@ function WorkerDashboard() {
         <div className="hisobotLeftText">
           <div className="leftTop">
             <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
-            <p style={{color: "rgba(40, 236, 112, 1)"}}>Worker: {worker?.workerName}</p>
+            <p style={{ color: "rgba(40, 236, 112, 1)" }}>Worker: {worker?.workerName}</p>
+            {isOffline && (
+              <div style={{ color: '#ffa500', fontSize: '10px', marginTop: '5px' }}>
+                ⚠️ {t("Working Offline")}
+              </div>
+            )}
           </div>
           <div className="leftBottom">
             <div className="logout-btn-container" onClick={() => setLogoutDialog(true)}>
@@ -241,17 +262,17 @@ function WorkerDashboard() {
         <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
       )}
 
-      <div className="HisobotRight" style={{display: 'flex', flexDirection: 'column'}}>
+      <div className="HisobotRight" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="rightTop">
-          <h2 style={{color: "#fff", marginLeft: "30px", marginTop: "20px"}}>{t("Ishchining Shaxsiy Paneli")}</h2>
+          <h2 style={{ color: "#fff", marginLeft: "30px", marginTop: "20px" }}>{t("Ishchining Shaxsiy Paneli")}</h2>
         </div>
-        
-        <div className="rightBottom" style={{flex: 1, padding: "30px"}}>
+
+        <div className="rightBottom" style={{ flex: 1, padding: "30px" }}>
           {worker ? (
-            <div className="worker-list" style={{height: "auto"}}>
+            <div className="worker-list" style={{ height: "auto" }}>
               <div className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}>
                 <div className="worker-item-main">
-                  <div className="worker-info" style={{width: '25%'}}>
+                  <div className="worker-info" style={{ width: '25%' }}>
                     <input
                       type="checkbox"
                       className="paid-checkbox"
@@ -265,7 +286,7 @@ function WorkerDashboard() {
                     </div>
                   </div>
 
-                  <div className="worker-values" style={{width: '55%'}}>
+                  <div className="worker-values" style={{ width: '55%' }}>
                     <div className="val-group">
                       <p>{t("qilayotganishi")}</p>
                       <strong>
@@ -296,7 +317,7 @@ function WorkerDashboard() {
                     </div>
                   </div>
 
-                  <div className="worker-actions" style={{width: '20%', justifyContent: 'flex-end'}}>
+                  <div className="worker-actions" style={{ width: '20%', justifyContent: 'flex-end' }}>
                     <button
                       className="history-toggle-btn"
                       onClick={(e) => {
@@ -335,54 +356,54 @@ function WorkerDashboard() {
                   </div>
                 )}
               </div>
-              
-              {/* Circular stats below the card */}
-              <div style={{display: 'flex', gap: '20px', marginTop: '40px', flexWrap: 'wrap'}}>
-                   <div className="linear-stats" style={{flex: 1, minWidth: '300px', background: 'rgba(255, 255, 255, 0.03)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)'}}>
-                      <h2 style={{color: '#fff', marginBottom: '10px'}}>{t("chiziqlistatistika")}</h2>
-                      <div className="chart-controls" style={{display: 'flex', gap: '10px', marginBottom: '20px'}}>
-                        <button className={chartPeriod === "day" ? "active" : ""} onClick={() => setChartPeriod("day")}>{t("kun")}</button>
-                        <button className={chartPeriod === "week" ? "active" : ""} onClick={() => setChartPeriod("week")}>{t("hafta")}</button>
-                        <button className={chartPeriod === "month" ? "active" : ""} onClick={() => setChartPeriod("month")}>{t("oy")}</button>
-                        <button className={chartPeriod === "year" ? "active" : ""} onClick={() => setChartPeriod("year")}>{t("yil")}</button>
-                      </div>
-                      <div className="chart-container" style={{position: 'relative', width: '100%', aspectRatio: '2/1'}}>
-                        <svg className="chart-svg" viewBox="0 0 300 150" style={{width: '100%', height: '100%'}}>
-                          <defs>
-                            <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="rgb(86, 86, 255)" stopOpacity="1" />
-                              <stop offset="100%" stopColor="rgb(204, 194, 255)" stopOpacity="0.2" />
-                            </linearGradient>
-                          </defs>
-                          <path className="chart-path" d={getChartData()} style={{fill: 'none', stroke: 'url(#chartGradient)', strokeWidth: '3', strokeLinecap: 'round', strokeLinejoin: 'round'}} />
-                        </svg>
-                      </div>
-                    </div>
 
-                    <div className="circular-stats" style={{flex: 1, minWidth: '300px', background: 'rgba(255, 255, 255, 0.03)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)'}}>
-                      <h2 style={{color: '#fff', marginBottom: '10px'}}>{t("aylanastatistika")}</h2>
-                      <div className="pie-container" style={{display: 'flex', alignItems: 'center', gap: '30px', marginTop: '20px'}}>
-                        <svg className="pie-chart" viewBox="0 0 100 100" style={{width: '140px', height: '140px'}}>
-                          <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(161, 161, 241, 0.1)" strokeWidth="10" />
-                          <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgb(86, 86, 255)" strokeWidth="10" strokeDasharray={`${getCircularData().percent * 2.51} 251.2`} strokeDashoffset="0" strokeLinecap="round" transform="rotate(-90 50 50)" style={{transition: 'stroke-dasharray 1s ease-in-out'}} />
-                          <text x="50" y="55" fontSize="20" fill="#fff" textAnchor="middle" fontWeight="bold">{getCircularData().percent}%</text>
-                        </svg>
-                        <div className="pie-legend">
-                          <div className="legend-item" style={{display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', color: '#fff'}}>
-                            <span className="dot" style={{width: '12px', height: '12px', borderRadius: '50%', background: 'rgb(86, 86, 255)'}}></span>
-                            <span>{t("to'langan")}: {getCircularData().paid}</span>
-                          </div>
-                          <div className="legend-item" style={{display: 'flex', alignItems: 'center', gap: '10px', color: '#fff'}}>
-                            <span className="dot" style={{width: '12px', height: '12px', borderRadius: '50%', background: 'rgba(161, 161, 241, 0.2)'}}></span>
-                            <span>{t("qolgan")}: {getCircularData().unpaid}</span>
-                          </div>
-                        </div>
+              {/* Circular stats below the card */}
+              <div style={{ display: 'flex', gap: '20px', marginTop: '40px', flexWrap: 'wrap' }}>
+                <div className="linear-stats" style={{ flex: 1, minWidth: '300px', background: 'rgba(255, 255, 255, 0.03)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <h2 style={{ color: '#fff', marginBottom: '10px' }}>{t("chiziqlistatistika")}</h2>
+                  <div className="chart-controls" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <button className={chartPeriod === "day" ? "active" : ""} onClick={() => setChartPeriod("day")}>{t("kun")}</button>
+                    <button className={chartPeriod === "week" ? "active" : ""} onClick={() => setChartPeriod("week")}>{t("hafta")}</button>
+                    <button className={chartPeriod === "month" ? "active" : ""} onClick={() => setChartPeriod("month")}>{t("oy")}</button>
+                    <button className={chartPeriod === "year" ? "active" : ""} onClick={() => setChartPeriod("year")}>{t("yil")}</button>
+                  </div>
+                  <div className="chart-container" style={{ position: 'relative', width: '100%', aspectRatio: '2/1' }}>
+                    <svg className="chart-svg" viewBox="0 0 300 150" style={{ width: '100%', height: '100%' }}>
+                      <defs>
+                        <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="rgb(86, 86, 255)" stopOpacity="1" />
+                          <stop offset="100%" stopColor="rgb(204, 194, 255)" stopOpacity="0.2" />
+                        </linearGradient>
+                      </defs>
+                      <path className="chart-path" d={getChartData()} style={{ fill: 'none', stroke: 'url(#chartGradient)', strokeWidth: '3', strokeLinecap: 'round', strokeLinejoin: 'round' }} />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="circular-stats" style={{ flex: 1, minWidth: '300px', background: 'rgba(255, 255, 255, 0.03)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <h2 style={{ color: '#fff', marginBottom: '10px' }}>{t("aylanastatistika")}</h2>
+                  <div className="pie-container" style={{ display: 'flex', alignItems: 'center', gap: '30px', marginTop: '20px' }}>
+                    <svg className="pie-chart" viewBox="0 0 100 100" style={{ width: '140px', height: '140px' }}>
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(161, 161, 241, 0.1)" strokeWidth="10" />
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgb(86, 86, 255)" strokeWidth="10" strokeDasharray={`${getCircularData().percent * 2.51} 251.2`} strokeDashoffset="0" strokeLinecap="round" transform="rotate(-90 50 50)" style={{ transition: 'stroke-dasharray 1s ease-in-out' }} />
+                      <text x="50" y="55" fontSize="20" fill="#fff" textAnchor="middle" fontWeight="bold">{getCircularData().percent}%</text>
+                    </svg>
+                    <div className="pie-legend">
+                      <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', color: '#fff' }}>
+                        <span className="dot" style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'rgb(86, 86, 255)' }}></span>
+                        <span>{t("to'langan")}: {getCircularData().paid}</span>
+                      </div>
+                      <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#fff' }}>
+                        <span className="dot" style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'rgba(161, 161, 241, 0.2)' }}></span>
+                        <span>{t("qolgan")}: {getCircularData().unpaid}</span>
                       </div>
                     </div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
-            <div style={{color: "#fff", textAlign: "center", marginTop: "100px"}}>Worker Data Not Found</div>
+            <div style={{ color: "#fff", textAlign: "center", marginTop: "100px" }}>Worker Data Not Found</div>
           )}
         </div>
       </div>

@@ -4,13 +4,16 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import ProjectReport from "./ProjectReport";
+import { db, auth } from "../Firebase/Firebase";
+import { signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
 
   // State Definitions
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(localStorage.getItem("username")?.toLowerCase() || "");
   const [logoutDialog, setLogoutDialog] = useState(false);
   const [addExpenseModal, setAddExpenseModal] = useState(false);
   const [balansQoshish, setBalansQoshish] = useState(false);
@@ -68,70 +71,105 @@ function OfficeXarajat() {
   const [isDragging, setIsDragging] = useState(false);
   const [calcPosition, setCalcPosition] = useState({ x: 100, y: 100 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [syncStatus, setSyncStatus] = useState("synced");
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [showInitialLoader, setShowInitialLoader] = useState(false);
 
-  // Load from localStorage (Account Scoped)
+  const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
+
+  useEffect(() => {
+    const handleStatus = () => setIsOffline(!window.navigator.onLine);
+    window.addEventListener("online", handleStatus);
+    window.addEventListener("offline", handleStatus);
+    return () => {
+      window.removeEventListener("online", handleStatus);
+      window.removeEventListener("offline", handleStatus);
+    };
+  }, []);
+
+  // --- RELIABLE SYNC LOGIC ---
   useEffect(() => {
     const storedUsername = localStorage.getItem("username");
-    if (!storedUsername) {
-      navigate("/login");
-      return;
-    }
+    if (!storedUsername) { navigate("/login"); return; }
     setUsername(storedUsername);
 
-    const storedExpenses = localStorage.getItem(
-      `office_expenses_${storedUsername}`,
-    );
-    if (storedExpenses) setExpenses(JSON.parse(storedExpenses));
+    // 1. Load Local
+    const se = localStorage.getItem(`office_expenses_${storedUsername}`);
+    if (se) setExpenses(JSON.parse(se));
+    const sb = localStorage.getItem(`office_balance_${storedUsername}`);
+    if (sb) setTotalBalance(JSON.parse(sb));
+    const sib = localStorage.getItem(`office_initial_balance_${storedUsername}`);
+    if (sib) setInitialBalance(JSON.parse(sib));
+    const sp = localStorage.getItem(`projects_${storedUsername}`);
+    if (sp) setProjectFiles(JSON.parse(sp));
 
-    const storedBalance = localStorage.getItem(
-      `office_balance_${storedUsername}`,
-    );
-    if (storedBalance) setTotalBalance(JSON.parse(storedBalance));
-
-    const storedInitialBalance = localStorage.getItem(
-      `office_initial_balance_${storedUsername}`,
-    );
-    if (storedInitialBalance)
-      setInitialBalance(JSON.parse(storedInitialBalance));
-
-    // Load Project Files
-    const storedProjects = localStorage.getItem(`projects_${storedUsername}`);
-    if (storedProjects) setProjectFiles(JSON.parse(storedProjects));
+    // 2. Load Cloud
+    const loadCloud = async () => {
+      try {
+        const snap = await getDoc(doc(db, "cabinets", storedUsername));
+        if (snap.exists()) {
+          const d = snap.data();
+          if (d.officeExpenses?.length) setExpenses(d.officeExpenses);
+          if (d.officeTotalBalance) setTotalBalance(d.officeTotalBalance);
+          if (d.officeInitialBalance) setInitialBalance(d.officeInitialBalance);
+          if (d.projectFiles?.length) setProjectFiles(d.projectFiles);
+        }
+      } catch (e) { console.log("Office cloud load offline"); }
+      setDataLoaded(true);
+      setShowInitialLoader(false);
+    };
+    loadCloud();
+    const t = setTimeout(() => { setDataLoaded(true); setShowInitialLoader(false); }, 2500);
+    return () => clearTimeout(t);
   }, [navigate]);
 
-  // Save to localStorage (Account Scoped)
   useEffect(() => {
-    if (!username) return;
+    if (!username || !dataLoaded) return;
+    
+    // Safety: Don't save if everything is empty and we just started
+    const isTotallyEmpty = expenses.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0;
+    if (isTotallyEmpty) {
+       const loadedTime = window.sessionStorage.getItem('office_loaded_at') || Date.now();
+       if (Date.now() - loadedTime < 5000) {
+         console.log("Skipping empty office save...");
+         return;
+       }
+    }
+
+    // Local Save
+    localStorage.setItem(`office_expenses_${username}`, JSON.stringify(expenses));
+    localStorage.setItem(`office_balance_${username}`, JSON.stringify(totalBalance));
+    localStorage.setItem(`office_initial_balance_${username}`, JSON.stringify(initialBalance));
     localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
-  }, [projectFiles, username]);
-  useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(
-      `office_expenses_${username}`,
-      JSON.stringify(expenses),
-    );
-  }, [expenses, username]);
+
+    // Cloud Save
+    const save = async () => {
+      try {
+        await setDoc(doc(db, "cabinets", username), {
+          officeExpenses: expenses, officeTotalBalance: totalBalance, officeInitialBalance: initialBalance, projectFiles: projectFiles
+        }, { merge: true });
+      } catch (e) { console.error("Office save failed", e); }
+    };
+    save();
+  }, [expenses, totalBalance, initialBalance, projectFiles, username, dataLoaded]);
 
   useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(
-      `office_balance_${username}`,
-      JSON.stringify(totalBalance),
-    );
-  }, [totalBalance, username]);
+    window.sessionStorage.setItem('office_loaded_at', Date.now().toString());
+  }, []);
 
-  useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(
-      `office_initial_balance_${username}`,
-      JSON.stringify(initialBalance),
-    );
-  }, [initialBalance, username]);
+  // --- END SYNC LOGIC ---
 
-  const confirmLogout = () => {
-    localStorage.removeItem("username");
-    localStorage.removeItem("password");
-    navigate("/login");
+
+  const confirmLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.clear();
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+      localStorage.clear();
+      navigate("/login");
+    }
   };
 
   const handleLogoutCancel = () => {
@@ -247,15 +285,15 @@ function OfficeXarajat() {
         expenses.map((e) =>
           e.id === editingExpenseId
             ? {
-                ...e,
-                expenseName,
-                amountToPay,
-                currencyToPay,
-                dateToPay,
-                amountAlreadyPaid,
-                currencyAlreadyPaid,
-                dateAlreadyPaid,
-              }
+              ...e,
+              expenseName,
+              amountToPay,
+              currencyToPay,
+              dateToPay,
+              amountAlreadyPaid,
+              currencyAlreadyPaid,
+              dateAlreadyPaid,
+            }
             : e,
         ),
       );
@@ -636,6 +674,11 @@ function OfficeXarajat() {
           <div className="leftTop">
             <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
             <p>{username}</p>
+            {isOffline && (
+              <div style={{ color: '#ffa500', fontSize: '10px', marginTop: '5px' }}>
+                ⚠️ {t("Working Offline")}
+              </div>
+            )}
             <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("profil")}</h3>
             </Link>
@@ -731,387 +774,387 @@ function OfficeXarajat() {
           >
             ‹
           </button>
-        <div className="rightTop">
-          <h3 className="addH3" onClick={handleAddExpenseClick}>
-            + {t("qo'shish")}
-          </h3>
-          <h3 className="addH3" onClick={handleBalansClick}>
-            + {t("balans")}
-          </h3>
-          <div className="ql">
-            <div className="qoshishLine"></div>
-          </div>
-          <input
-            className="searchWorker desktop-only-filter"
-            type="search"
-            placeholder={t("qidiruv")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <div className="filterIshchilar desktop-only-filter">
-            <h3
-              className={activeFilter === "recent" ? "active-filter" : ""}
-              onClick={() =>
-                setActiveFilter(activeFilter === "recent" ? "all" : "recent")
-              }
-            >
-              {t("Yangi qo'shilganlar")}
+          <div className="rightTop">
+            <h3 className="addH3" onClick={handleAddExpenseClick}>
+              + {t("qo'shish")}
             </h3>
-            <h3
-              className={activeFilter === "high" ? "active-filter" : ""}
-              onClick={() =>
-                setActiveFilter(activeFilter === "high" ? "all" : "high")
-              }
-            >
-              {t("Katta sarflar")}
+            <h3 className="addH3" onClick={handleBalansClick}>
+              + {t("balans")}
             </h3>
-          </div>
-
-          <button
-            className="mobile-filter-btn"
-            onClick={() => setIsFilterModalOpen(true)}
-          >
-            {t("filtrlash")}
-          </button>
-
-          {undoState && (
-            <div className="undo-group">
-              <button className="undo-btn icon-only" onClick={handleUndoClick}>
-                ↩️
-              </button>
-              <button
-                className="undo-close-btn"
-                onClick={handleDismissUndoClick}
-              >
-                ✕
-              </button>
+            <div className="ql">
+              <div className="qoshishLine"></div>
             </div>
-          )}
-        </div>
-
-        <div className="rightBottom">
-          {(() => {
-            let filtered = expenses.filter((e) =>
-              e.expenseName.toLowerCase().includes(searchTerm.toLowerCase()),
-            );
-            if (activeFilter === "recent") {
-              filtered = [...filtered]
-                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                .slice(0, 5);
-            } else if (activeFilter === "high") {
-              filtered = filtered.filter((e) => {
-                const val = parseFloat(e.amountToPay) || 0;
-                return e.currencyToPay === "sum" ? val > 5000000 : val > 500;
-              });
-            }
-
-            if (filtered.length === 0) {
-              return (
-                <div className="no-workers">
-                  <p>
-                    {searchTerm
-                      ? t("hisobot_qidiruv_placeholder")
-                      : t("hisobot_no_workers")}
-                  </p>
-                </div>
-              );
-            }
-
-            return (
-              <div className="worker-list">
-                {filtered.map((expense) => (
-                  <div
-                    key={expense.id}
-                    className={`worker-item ${expense.isPaid ? "paid-row" : ""}`}
-                  >
-                    <div className="worker-item-main">
-                      <div className="worker-info">
-                        <input
-                          type="checkbox"
-                          className="paid-checkbox"
-                          checked={expense.isPaid}
-                          onChange={() => handleTogglePaid(expense.id)}
-                        />
-                        <div className="name-date">
-                          <h3>{expense.expenseName}</h3>
-                          <span>
-                            {new Date(expense.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="worker-values">
-                        <div className="val-group">
-                          <p>{t("To'lanishi kerak")}:</p>
-                          <strong className="to-receive">
-                            {parseFloat(expense.amountToPay || 0).toLocaleString()}{" "}
-                            {expense.currencyToPay === "sum" ? t("som") : "$"}
-                          </strong>
-                          <span className="small-date">
-                            {t("sana")}: {expense.dateToPay}
-                          </span>
-                        </div>
-                        <div className="val-group">
-                          <p>{t("To'langan summa")}:</p>
-                          <strong className="received">
-                            {parseFloat(expense.amountAlreadyPaid || 0).toLocaleString()}{" "}
-                            {expense.currencyAlreadyPaid === "sum"
-                              ? t("som")
-                              : "$"}
-                          </strong>
-                          <span className="small-date">
-                            {t("sana")}: {expense.dateAlreadyPaid}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="worker-actions">
-                        <button
-                          className="month-btn"
-                          onClick={() => handleNextCycle(expense.id)}
-                          title="Yangi sikl"
-                        >
-                          🔄
-                        </button>
-                        <button
-                          className="history-toggle-btn"
-                          onClick={() => toggleHistory(expense.id)}
-                        >
-                          📜
-                        </button>
-                        <button
-                          className="edit-btn"
-                          onClick={() => handleEditExpenseClick(expense)}
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="delete-btn"
-                          onClick={() => handleDeleteExpenseClick(expense.id)}
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                    {expandedHistory.includes(expense.id) && (
-                      <div className="history-section">
-                        <h4>{t("Xarajatlar tarixi")}:</h4>
-                        {(expense.history || []).length === 0 ? (
-                          <p className="no-history">{t("tarix_mavjud_emas")}</p>
-                        ) : (
-                          expense.history.map((h, idx) => (
-                            <div key={idx} className="history-item">
-                              <span>{h.date}</span>
-                              <span>
-                                {h.amount} {h.currency === "sum" ? t("som") : "$"}
-                              </span>
-                              <span className="h-type">
-                                {h.type === "archived"
-                                  ? t("arxivlandi")
-                                  : t("To'langan")}
-                              </span>
-                              <div
-                                className="history-actions"
-                                style={{
-                                  display: "flex",
-                                  gap: "5px",
-                                  marginLeft: "auto",
-                                }}
-                              >
-                                <button
-                                  className="edit-btn"
-                                  onClick={() =>
-                                    setEditingHistoryData({
-                                      expenseId: expense.id,
-                                      index: idx,
-                                      ...h,
-                                    })
-                                  }
-                                  style={{
-                                    padding: "5px",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    fontSize: "16px",
-                                  }}
-                                  title="Tahrirlash"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  className="delete-btn"
-                                  onClick={() =>
-                                    setDeleteHistoryData({
-                                      expenseId: expense.id,
-                                      index: idx,
-                                    })
-                                  }
-                                  style={{
-                                    padding: "5px",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    fontSize: "16px",
-                                  }}
-                                  title="O'chirish"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </div>
-
-        <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
-          <button
-            className="right-panel-close-btn"
-            onClick={() => setIsRightPanelOpen(false)}
-          >
-            ›
-          </button>
-          <div className="lrLine"></div>
-          <div className="statistic">
-            <h2>{t("statistika")}</h2>
-            <div className="statistic1">
-              <h3>{t("Boshlang'ich balans")}:</h3>
-              <p>
-                {initialBalance.sum.toLocaleString()} so'm /{" "}
-                {initialBalance.dollar.toLocaleString()} $
-              </p>
-            </div>
-            <div className="statistic2">
-              <h3>{t("Jami xarajatlar")}:</h3>
-              <p>{expenses.length}</p>
-            </div>
-            <div className="statistic3">
-              <h3>{t("Eng katta xarajat")}:</h3>
-              <p>
-                {(() => {
-                  const sumHigh = expenses
-                    .filter((e) => e.currencyToPay === "sum")
-                    .sort(
-                      (a, b) =>
-                        (parseFloat(b.amountToPay) || 0) -
-                        (parseFloat(a.amountToPay) || 0),
-                    )[0];
-                  const dolHigh = expenses
-                    .filter((e) => e.currencyToPay === "dollar")
-                    .sort(
-                      (a, b) =>
-                        (parseFloat(b.amountToPay) || 0) -
-                        (parseFloat(a.amountToPay) || 0),
-                    )[0];
-                  return `${sumHigh ? sumHigh.expenseName + ": " + parseFloat(sumHigh.amountToPay).toLocaleString() + " so'm" : t("yo'q")} / ${dolHigh ? dolHigh.expenseName + ": " + parseFloat(dolHigh.amountToPay).toLocaleString() + " $" : t("yo'q")}`;
-                })()}
-              </p>
-            </div>
-            <div className="statistic4">
-              <h3>{t("Qolgan balans")}:</h3>
-              <p
-                className={
-                  totalBalance.sum < 0 || totalBalance.dollar < 0
-                    ? "negative-balance"
-                    : ""
+            <input
+              className="searchWorker desktop-only-filter"
+              type="search"
+              placeholder={t("qidiruv")}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="filterIshchilar desktop-only-filter">
+              <h3
+                className={activeFilter === "recent" ? "active-filter" : ""}
+                onClick={() =>
+                  setActiveFilter(activeFilter === "recent" ? "all" : "recent")
                 }
               >
-                {totalBalance.sum.toLocaleString()} {t("som")} /{" "}
-                {totalBalance.dollar.toLocaleString()} $
-              </p>
+                {t("Yangi qo'shilganlar")}
+              </h3>
+              <h3
+                className={activeFilter === "high" ? "active-filter" : ""}
+                onClick={() =>
+                  setActiveFilter(activeFilter === "high" ? "all" : "high")
+                }
+              >
+                {t("Katta sarflar")}
+              </h3>
             </div>
 
-            <div className="linear-stats">
-              <h2>{t("Xarajatlar o'zgarishi")}</h2>
-              <div className="chart-controls">
-                {["day", "week", "month", "year"].map((p) => (
-                  <button
-                    key={p}
-                    className={chartPeriod === p ? "active" : ""}
-                    onClick={() => setChartPeriod(p)}
-                  >
-                    {p === "day"
-                      ? t("kun")
-                      : p === "week"
-                        ? t("hafta")
-                        : p === "month"
-                          ? t("oy")
-                          : t("yil")}
-                  </button>
-                ))}
-              </div>
-              <div className="chart-container">
-                <svg className="chart-svg" viewBox="0 0 300 150">
-                  <defs>
-                    <linearGradient
-                      id="chartGradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="100%"
-                      y2="0%"
-                    >
-                      <stop offset="0%" stopColor="#5656ff" />
-                      <stop offset="100%" stopColor="#28ec70" />
-                    </linearGradient>
-                  </defs>
-                  <path className="chart-path" d={getChartData()} />
-                </svg>
-              </div>
-            </div>
+            <button
+              className="mobile-filter-btn"
+              onClick={() => setIsFilterModalOpen(true)}
+            >
+              {t("filtrlash")}
+            </button>
 
-            <div className="circular-stats">
-              <h2>{t("Aylana Statistika")}</h2>
-              <div className="pie-container">
-                <svg className="pie-chart" viewBox="0 0 100 100">
-                  <circle
-                    className="pie-bg"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="rgba(161, 161, 241, 0.1)"
-                    strokeWidth="10"
-                  />
-                  <circle
-                    className="pie-segment"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="#5656ff"
-                    strokeWidth="10"
-                    strokeDasharray={`${getCircularData().percent * 2.51} 251.2`}
-                    strokeDashoffset="0"
-                    strokeLinecap="round"
-                    transform="rotate(-90 50 50)"
-                  />
-                  <text x="50" y="55" className="pie-text">
-                    {getCircularData().percent}%
-                  </text>
-                </svg>
-                <div className="pie-legend">
-                  <div className="legend-item">
-                    <span className="dot paid"></span>
-                    <span>
-                      {t("To'langan")}: {getCircularData().paid}
-                    </span>
+            {undoState && (
+              <div className="undo-group">
+                <button className="undo-btn icon-only" onClick={handleUndoClick}>
+                  ↩️
+                </button>
+                <button
+                  className="undo-close-btn"
+                  onClick={handleDismissUndoClick}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="rightBottom">
+            {(() => {
+              let filtered = expenses.filter((e) =>
+                e.expenseName.toLowerCase().includes(searchTerm.toLowerCase()),
+              );
+              if (activeFilter === "recent") {
+                filtered = [...filtered]
+                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                  .slice(0, 5);
+              } else if (activeFilter === "high") {
+                filtered = filtered.filter((e) => {
+                  const val = parseFloat(e.amountToPay) || 0;
+                  return e.currencyToPay === "sum" ? val > 5000000 : val > 500;
+                });
+              }
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="no-workers">
+                    <p>
+                      {searchTerm
+                        ? t("hisobot_qidiruv_placeholder")
+                        : t("hisobot_no_workers")}
+                    </p>
                   </div>
-                  <div className="legend-item">
-                    <span className="dot unpaid"></span>
-                    <span>
-                      {t("Qolgan")}: {getCircularData().unpaid}
-                    </span>
+                );
+              }
+
+              return (
+                <div className="worker-list">
+                  {filtered.map((expense) => (
+                    <div
+                      key={expense.id}
+                      className={`worker-item ${expense.isPaid ? "paid-row" : ""}`}
+                    >
+                      <div className="worker-item-main">
+                        <div className="worker-info">
+                          <input
+                            type="checkbox"
+                            className="paid-checkbox"
+                            checked={expense.isPaid}
+                            onChange={() => handleTogglePaid(expense.id)}
+                          />
+                          <div className="name-date">
+                            <h3>{expense.expenseName}</h3>
+                            <span>
+                              {new Date(expense.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="worker-values">
+                          <div className="val-group">
+                            <p>{t("To'lanishi kerak")}:</p>
+                            <strong className="to-receive">
+                              {parseFloat(expense.amountToPay || 0).toLocaleString()}{" "}
+                              {expense.currencyToPay === "sum" ? t("som") : "$"}
+                            </strong>
+                            <span className="small-date">
+                              {t("sana")}: {expense.dateToPay}
+                            </span>
+                          </div>
+                          <div className="val-group">
+                            <p>{t("To'langan summa")}:</p>
+                            <strong className="received">
+                              {parseFloat(expense.amountAlreadyPaid || 0).toLocaleString()}{" "}
+                              {expense.currencyAlreadyPaid === "sum"
+                                ? t("som")
+                                : "$"}
+                            </strong>
+                            <span className="small-date">
+                              {t("sana")}: {expense.dateAlreadyPaid}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="worker-actions">
+                          <button
+                            className="month-btn"
+                            onClick={() => handleNextCycle(expense.id)}
+                            title="Yangi sikl"
+                          >
+                            🔄
+                          </button>
+                          <button
+                            className="history-toggle-btn"
+                            onClick={() => toggleHistory(expense.id)}
+                          >
+                            📜
+                          </button>
+                          <button
+                            className="edit-btn"
+                            onClick={() => handleEditExpenseClick(expense)}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="delete-btn"
+                            onClick={() => handleDeleteExpenseClick(expense.id)}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                      {expandedHistory.includes(expense.id) && (
+                        <div className="history-section">
+                          <h4>{t("Xarajatlar tarixi")}:</h4>
+                          {(expense.history || []).length === 0 ? (
+                            <p className="no-history">{t("tarix_mavjud_emas")}</p>
+                          ) : (
+                            expense.history.map((h, idx) => (
+                              <div key={idx} className="history-item">
+                                <span>{h.date}</span>
+                                <span>
+                                  {h.amount} {h.currency === "sum" ? t("som") : "$"}
+                                </span>
+                                <span className="h-type">
+                                  {h.type === "archived"
+                                    ? t("arxivlandi")
+                                    : t("To'langan")}
+                                </span>
+                                <div
+                                  className="history-actions"
+                                  style={{
+                                    display: "flex",
+                                    gap: "5px",
+                                    marginLeft: "auto",
+                                  }}
+                                >
+                                  <button
+                                    className="edit-btn"
+                                    onClick={() =>
+                                      setEditingHistoryData({
+                                        expenseId: expense.id,
+                                        index: idx,
+                                        ...h,
+                                      })
+                                    }
+                                    style={{
+                                      padding: "5px",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      fontSize: "16px",
+                                    }}
+                                    title="Tahrirlash"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    className="delete-btn"
+                                    onClick={() =>
+                                      setDeleteHistoryData({
+                                        expenseId: expense.id,
+                                        index: idx,
+                                      })
+                                    }
+                                    style={{
+                                      padding: "5px",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      fontSize: "16px",
+                                    }}
+                                    title="O'chirish"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
+            <button
+              className="right-panel-close-btn"
+              onClick={() => setIsRightPanelOpen(false)}
+            >
+              ›
+            </button>
+            <div className="lrLine"></div>
+            <div className="statistic">
+              <h2>{t("statistika")}</h2>
+              <div className="statistic1">
+                <h3>{t("Boshlang'ich balans")}:</h3>
+                <p>
+                  {initialBalance.sum.toLocaleString()} so'm /{" "}
+                  {initialBalance.dollar.toLocaleString()} $
+                </p>
+              </div>
+              <div className="statistic2">
+                <h3>{t("Jami xarajatlar")}:</h3>
+                <p>{expenses.length}</p>
+              </div>
+              <div className="statistic3">
+                <h3>{t("Eng katta xarajat")}:</h3>
+                <p>
+                  {(() => {
+                    const sumHigh = expenses
+                      .filter((e) => e.currencyToPay === "sum")
+                      .sort(
+                        (a, b) =>
+                          (parseFloat(b.amountToPay) || 0) -
+                          (parseFloat(a.amountToPay) || 0),
+                      )[0];
+                    const dolHigh = expenses
+                      .filter((e) => e.currencyToPay === "dollar")
+                      .sort(
+                        (a, b) =>
+                          (parseFloat(b.amountToPay) || 0) -
+                          (parseFloat(a.amountToPay) || 0),
+                      )[0];
+                    return `${sumHigh ? sumHigh.expenseName + ": " + parseFloat(sumHigh.amountToPay).toLocaleString() + " so'm" : t("yo'q")} / ${dolHigh ? dolHigh.expenseName + ": " + parseFloat(dolHigh.amountToPay).toLocaleString() + " $" : t("yo'q")}`;
+                  })()}
+                </p>
+              </div>
+              <div className="statistic4">
+                <h3>{t("Qolgan balans")}:</h3>
+                <p
+                  className={
+                    totalBalance.sum < 0 || totalBalance.dollar < 0
+                      ? "negative-balance"
+                      : ""
+                  }
+                >
+                  {totalBalance.sum.toLocaleString()} {t("som")} /{" "}
+                  {totalBalance.dollar.toLocaleString()} $
+                </p>
+              </div>
+
+              <div className="linear-stats">
+                <h2>{t("Xarajatlar o'zgarishi")}</h2>
+                <div className="chart-controls">
+                  {["day", "week", "month", "year"].map((p) => (
+                    <button
+                      key={p}
+                      className={chartPeriod === p ? "active" : ""}
+                      onClick={() => setChartPeriod(p)}
+                    >
+                      {p === "day"
+                        ? t("kun")
+                        : p === "week"
+                          ? t("hafta")
+                          : p === "month"
+                            ? t("oy")
+                            : t("yil")}
+                    </button>
+                  ))}
+                </div>
+                <div className="chart-container">
+                  <svg className="chart-svg" viewBox="0 0 300 150">
+                    <defs>
+                      <linearGradient
+                        id="chartGradient"
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="0%"
+                      >
+                        <stop offset="0%" stopColor="#5656ff" />
+                        <stop offset="100%" stopColor="#28ec70" />
+                      </linearGradient>
+                    </defs>
+                    <path className="chart-path" d={getChartData()} />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="circular-stats">
+                <h2>{t("Aylana Statistika")}</h2>
+                <div className="pie-container">
+                  <svg className="pie-chart" viewBox="0 0 100 100">
+                    <circle
+                      className="pie-bg"
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke="rgba(161, 161, 241, 0.1)"
+                      strokeWidth="10"
+                    />
+                    <circle
+                      className="pie-segment"
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke="#5656ff"
+                      strokeWidth="10"
+                      strokeDasharray={`${getCircularData().percent * 2.51} 251.2`}
+                      strokeDashoffset="0"
+                      strokeLinecap="round"
+                      transform="rotate(-90 50 50)"
+                    />
+                    <text x="50" y="55" className="pie-text">
+                      {getCircularData().percent}%
+                    </text>
+                  </svg>
+                  <div className="pie-legend">
+                    <div className="legend-item">
+                      <span className="dot paid"></span>
+                      <span>
+                        {t("To'langan")}: {getCircularData().paid}
+                      </span>
+                    </div>
+                    <div className="legend-item">
+                      <span className="dot unpaid"></span>
+                      <span>
+                        {t("Qolgan")}: {getCircularData().unpaid}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>) : (
+        </div>) : (
         <ProjectReport
           projectId={activeProjectId}
           onClose={() => setActiveProjectId(null)}
@@ -1709,6 +1752,48 @@ function OfficeXarajat() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {/* Premium Loading Overlay - ONLY if no local data AND still fetching */}
+      {showInitialLoader && !dataLoaded && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(10, 10, 26, 0.98)',
+          backdropFilter: 'blur(15px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+        }}>
+          <div className="premium-loader"></div>
+          <p style={{
+            marginTop: '20px',
+            color: 'rgb(161, 161, 241)',
+            letterSpacing: '2px',
+            fontSize: '14px',
+            fontWeight: '300'
+          }}>{t("Ma'lumotlar yuklanmoqda...")}</p>
+
+          <style>{`
+            .premium-loader {
+              width: 50px;
+              height: 50px;
+              border: 3px solid rgba(86, 86, 255, 0.1);
+              border-top: 3px solid rgb(86, 86, 255);
+              border-radius: 50%;
+              animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+              box-shadow: 0 0 30px rgba(86, 86, 255, 0.2);
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       )}
     </div>

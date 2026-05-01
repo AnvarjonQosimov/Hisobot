@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 function Home() {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
   return (
     <div className='Home'>
       <div className='background-icons'>

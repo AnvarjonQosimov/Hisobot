@@ -5,15 +5,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import ProjectReport from "./ProjectReport";
 import NewProject from "../images/new-project.png";
-import { db } from "../Firebase/Firebase";
+import { db, auth } from "../Firebase/Firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 
 function Hisobot() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
 
   // State Definitions
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(localStorage.getItem("username")?.toLowerCase() || "");
   const [logoutDialog, setLogoutDialog] = useState(false);
   const [addWorkerModal, setAddWorkerModal] = useState(false);
   const [balansQoshish, setBalansQoshish] = useState(false);
@@ -95,6 +96,23 @@ function Hisobot() {
   const [globalWorkerEmail, setGlobalWorkerEmail] = useState("");
   const [savedGlobalWorkerEmail, setSavedGlobalWorkerEmail] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [syncStatus, setSyncStatus] = useState("synced"); // synced, syncing, offline
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [showInitialLoader, setShowInitialLoader] = useState(false);
+
+  // Language State
+  const [age, setAge] = useState(i18n.language || "uz");
+  const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
+
+  useEffect(() => {
+    const handleStatus = () => setIsOffline(!window.navigator.onLine);
+    window.addEventListener("online", handleStatus);
+    window.addEventListener("offline", handleStatus);
+    return () => {
+      window.removeEventListener("online", handleStatus);
+      window.removeEventListener("offline", handleStatus);
+    };
+  }, []);
 
   const validateEmail = (email) => {
     return String(email)
@@ -115,136 +133,121 @@ function Hisobot() {
 
     setEmailError(false);
     try {
+      // 1. Save to the global lookup collection
       await setDoc(doc(db, "globalWorkerEmails", val.toLowerCase()), { bossEmail: username });
-      setSavedGlobalWorkerEmail(globalWorkerEmail);
+
+      // 2. Ensure it's in the state and trigger cabinet sync
+      setSavedGlobalWorkerEmail(val);
+      setGlobalWorkerEmail(val);
+
+      // Force immediate sync to cabinet for this field
+      await setDoc(doc(db, "cabinets", username), {
+        globalWorkerEmail: val
+      }, { merge: true });
+
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Load from localStorage and Sync from Cloud
+  // --- RELIABLE SYNC & LOAD LOGIC ---
   useEffect(() => {
     const storedUsername = localStorage.getItem("username");
-    if (!storedUsername) {
-      navigate("/login");
-      return;
-    }
+    if (!storedUsername) { navigate("/login"); return; }
     setUsername(storedUsername);
 
-    const storedWorkers = localStorage.getItem(`workers_${storedUsername}`);
-    if (storedWorkers) setWorkers(JSON.parse(storedWorkers));
+    // 1. Initial Load from Local
+    const sw = localStorage.getItem(`workers_${storedUsername}`);
+    if (sw) setWorkers(JSON.parse(sw));
+    const sb = localStorage.getItem(`totalBalance_${storedUsername}`);
+    if (sb) setTotalBalance(JSON.parse(sb));
+    const sib = localStorage.getItem(`initialBalance_${storedUsername}`);
+    if (sib) setInitialBalance(JSON.parse(sib));
+    const sp = localStorage.getItem(`projects_${storedUsername}`);
+    if (sp) setProjectFiles(JSON.parse(sp));
+    const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
+    if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
 
-    const storedBalance = localStorage.getItem(
-      `totalBalance_${storedUsername}`,
-    );
-    if (storedBalance) setTotalBalance(JSON.parse(storedBalance));
+    // 2. Determine if we should show a loader
+    const hasLocal = sw || sb || sib || sp || sge;
+    if (!hasLocal) setShowInitialLoader(true);
 
-    const storedInitialBalance = localStorage.getItem(
-      `initialBalance_${storedUsername}`,
-    );
-    if (storedInitialBalance)
-      setInitialBalance(JSON.parse(storedInitialBalance));
-
-    // Load Project Files
-    const storedProjects = localStorage.getItem(`projects_${storedUsername}`);
-    if (storedProjects) setProjectFiles(JSON.parse(storedProjects));
-
-    const storedGlobalEmail = localStorage.getItem(`globalEmail_${storedUsername}`);
-    if (storedGlobalEmail) {
-      setGlobalWorkerEmail(storedGlobalEmail);
-      setSavedGlobalWorkerEmail(storedGlobalEmail);
-    }
-
-    // Try to sync from Firestore to ensure cloud data represents the source of truth if it exists
-    const syncFromCloud = async () => {
+    // 3. Fetch from Cloud
+    const loadCloud = async () => {
       try {
-        const docRef = doc(db, "cabinets", storedUsername);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.workers) setWorkers(data.workers);
-          if (data.totalBalance) setTotalBalance(data.totalBalance);
-          if (data.initialBalance) setInitialBalance(data.initialBalance);
-          if (data.projectFiles) setProjectFiles(data.projectFiles);
-          if (data.globalWorkerEmail) {
-            setGlobalWorkerEmail(data.globalWorkerEmail);
-            setSavedGlobalWorkerEmail(data.globalWorkerEmail);
-          }
-
-          // Update localStorage with cloud data
-          if (data.workers) localStorage.setItem(`workers_${storedUsername}`, JSON.stringify(data.workers));
-          if (data.totalBalance) localStorage.setItem(`totalBalance_${storedUsername}`, JSON.stringify(data.totalBalance));
-          if (data.initialBalance) localStorage.setItem(`initialBalance_${storedUsername}`, JSON.stringify(data.initialBalance));
-          if (data.projectFiles) localStorage.setItem(`projects_${storedUsername}`, JSON.stringify(data.projectFiles));
-          if (data.globalWorkerEmail) localStorage.setItem(`globalEmail_${storedUsername}`, data.globalWorkerEmail);
+        const snap = await getDoc(doc(db, "cabinets", storedUsername));
+        if (snap.exists()) {
+          const d = snap.data();
+          if (d.workers?.length) setWorkers(d.workers);
+          if (d.totalBalance) setTotalBalance(d.totalBalance);
+          if (d.initialBalance) setInitialBalance(d.initialBalance);
+          if (d.projectFiles?.length) setProjectFiles(d.projectFiles);
+          if (d.globalWorkerEmail) { setGlobalWorkerEmail(d.globalWorkerEmail); setSavedGlobalWorkerEmail(d.globalWorkerEmail); }
         }
-      } catch (e) {
-        console.error("Failed to sync from cloud", e);
-      }
+      } catch (e) { console.log("Cloud load failed/offline"); }
+      setDataLoaded(true);
+      setShowInitialLoader(false);
     };
-    syncFromCloud();
+    loadCloud();
+    
+    // Safety timeout
+    const t = setTimeout(() => { setDataLoaded(true); setShowInitialLoader(false); }, 2500);
+    return () => clearTimeout(t);
   }, [navigate]);
 
-  // Sync back to Firestore when things change
+  // Unified Save Effect (Cloud + Local)
   useEffect(() => {
-    if (!username) return;
-    const syncToCloud = async () => {
-      try {
-        await setDoc(doc(db, "cabinets", username), {
-          workers,
-          totalBalance,
-          initialBalance,
-          projectFiles,
-          globalWorkerEmail
-        }, { merge: true });
-      } catch (e) {
-        console.error("Failed to sync to cloud", e);
-      }
-    };
+    // CRITICAL: Only save if data is actually loaded and we are NOT in the middle of initial sync
+    if (!username || !dataLoaded) return;
+    
+    // Safety: Don't save if everything is empty and we just started (prevents overwriting cloud with empty data)
+    const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0;
+    if (isTotallyEmpty) {
+       // Check if we have been loaded for a while (more than 5 seconds) before allowing an empty save
+       const loadedTime = window.sessionStorage.getItem('loaded_at') || Date.now();
+       if (Date.now() - loadedTime < 5000) {
+         console.log("Skipping potentially dangerous empty save...");
+         return;
+       }
+    }
 
-    const debounceSync = setTimeout(() => {
-      syncToCloud();
-    }, 1500); // 1.5s debounce to avoid spamming writes
-
-    return () => clearTimeout(debounceSync);
-  }, [workers, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail]);
-
-  // Save to localStorage (Account Scoped)
-  useEffect(() => {
-    if (!username) return;
+    // Local Save
     localStorage.setItem(`workers_${username}`, JSON.stringify(workers));
-  }, [workers, username]);
-
-  useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(
-      `totalBalance_${username}`,
-      JSON.stringify(totalBalance),
-    );
-  }, [totalBalance, username]);
-
-  useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(
-      `initialBalance_${username}`,
-      JSON.stringify(initialBalance),
-    );
-  }, [initialBalance, username]);
-
-  useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
-  }, [globalWorkerEmail, username]);
-
-  useEffect(() => {
-    if (!username) return;
+    localStorage.setItem(`totalBalance_${username}`, JSON.stringify(totalBalance));
+    localStorage.setItem(`initialBalance_${username}`, JSON.stringify(initialBalance));
     localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
-  }, [projectFiles, username]);
+    localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
 
-  const confirmLogout = () => {
-    localStorage.removeItem("username");
-    localStorage.removeItem("password");
-    navigate("/login");
+    // Cloud Save
+    const saveCloud = async () => {
+      try {
+        console.log("Syncing to cloud...");
+        await setDoc(doc(db, "cabinets", username), {
+          workers, totalBalance, initialBalance, projectFiles, globalWorkerEmail
+        }, { merge: true });
+      } catch (e) { console.error("Cloud save failed", e); }
+    };
+    saveCloud();
+  }, [workers, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail, dataLoaded]);
+
+  // Track mount time
+  useEffect(() => {
+    window.sessionStorage.setItem('loaded_at', Date.now().toString());
+  }, []);
+
+  // --- END SYNC LOGIC ---
+
+
+  const confirmLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.clear();
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+      localStorage.clear();
+      navigate("/login");
+    }
   };
 
   const handleLogoutCancel = () => {
@@ -360,11 +363,9 @@ function Hisobot() {
         ),
       );
       if (workerCode.trim()) {
-        try {
-          await setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: editingWorkerId });
-        } catch (e) {
-          console.error("Failed to save invite code:", e);
-        }
+        // Non-blocking write
+        setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: editingWorkerId })
+          .catch(e => console.error("Failed to save invite code:", e));
       }
     } else {
       saveForUndo();
@@ -389,11 +390,9 @@ function Hisobot() {
       };
       setWorkers([newWorker, ...workers]);
       if (workerCode.trim()) {
-        try {
-          await setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: newWorkerId });
-        } catch (e) {
-          console.error("Failed to save invite code:", e);
-        }
+        // Non-blocking write
+        setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: newWorkerId })
+          .catch(e => console.error("Failed to save invite code:", e));
       }
     }
     handleAddWorkerModalClose();
@@ -786,7 +785,6 @@ function Hisobot() {
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
   };
-  const [age, setAge] = React.useState(i18n.language || "uz");
   const handleAddProject = () => {
     if (!newFileName.trim()) return;
     const newProject = {
@@ -838,9 +836,14 @@ function Hisobot() {
           <div className="leftTop">
             <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
             <p>{username}</p>
-            <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
+            {isOffline && (
+              <div style={{ color: '#ffa500', fontSize: '10px', marginTop: '5px' }}>
+                ⚠️ {t("Working Offline")}
+              </div>
+            )}
+            {/* <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("profil")}</h3>
-            </Link>
+            </Link> */}
             <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("Kalkulator")}</h3>
             </Link>
@@ -2289,6 +2292,48 @@ function Hisobot() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Premium Loading Overlay - ONLY if no local data AND still fetching */}
+      {showInitialLoader && !dataLoaded && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(10, 10, 26, 0.98)',
+          backdropFilter: 'blur(15px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+        }}>
+          <div className="premium-loader"></div>
+          <p style={{
+            marginTop: '20px',
+            color: 'rgb(161, 161, 241)',
+            letterSpacing: '2px',
+            fontSize: '14px',
+            fontWeight: '300'
+          }}>{t("Ma'lumotlar yuklanmoqda...")}</p>
+
+          <style>{`
+            .premium-loader {
+              width: 50px;
+              height: 50px;
+              border: 3px solid rgba(86, 86, 255, 0.1);
+              border-top: 3px solid rgb(86, 86, 255);
+              border-radius: 50%;
+              animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+              box-shadow: 0 0 30px rgba(86, 86, 255, 0.2);
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       )}
     </div>
