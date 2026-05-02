@@ -46,8 +46,8 @@
   background: rgba(161, 161, 241, 0.1);
   border: 1px solid rgba(161, 161, 241, 0.3);
   color: rgb(204, 194, 255);
-  width: 35px;
-  height: 35px;
+  width: 30px;
+  height: 30px;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -55,7 +55,7 @@
   font-size: 24px;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-left: 80px;
+  margin-left: 50px;
 }
 
 .pr-back-btn:hover {
@@ -160,6 +160,7 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  margin-left: 20px;
 }
 
 .pr-tabs {

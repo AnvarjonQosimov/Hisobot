@@ -76,6 +76,37 @@ function OfficeXarajat() {
   const [showInitialLoader, setShowInitialLoader] = useState(false);
 
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
+  const [globalWorkerEmail, setGlobalWorkerEmail] = useState("");
+  const [savedGlobalWorkerEmail, setSavedGlobalWorkerEmail] = useState("");
+  const [emailError, setEmailError] = useState(false);
+
+  const validateEmail = (email) => {
+    return String(email)
+      .toLowerCase()
+      .match(
+        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+      );
+  };
+
+  const handleSaveGlobalEmail = async () => {
+    const val = globalWorkerEmail.trim();
+    if (!val) return;
+
+    if (!validateEmail(val)) {
+      setEmailError(true);
+      return;
+    }
+
+    setEmailError(false);
+    try {
+      await setDoc(doc(db, "globalWorkerEmails", val.toLowerCase()), { bossEmail: username });
+      setSavedGlobalWorkerEmail(val);
+      localStorage.setItem(`globalEmail_${username}`, val);
+      alert(t("email_saqlandi") || "Email muvaffaqiyatli saqlandi!");
+    } catch (e) {
+      console.error("Error saving global email:", e);
+    }
+  };
 
   useEffect(() => {
     const handleStatus = () => setIsOffline(!window.navigator.onLine);
@@ -102,10 +133,20 @@ function OfficeXarajat() {
     if (sib) setInitialBalance(JSON.parse(sib));
     const sp = localStorage.getItem(`projects_${storedUsername}`);
     if (sp) setProjectFiles(JSON.parse(sp));
+    const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
+    if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
 
-    // 2. Load Cloud
+    // 2. Conditional Loader
+    const hasLocal = se || sb || sib || sp;
+    if (!hasLocal) {
+      setShowInitialLoader(true);
+    }
+    setDataLoaded(false);
+
+    // 3. Load Cloud
     const loadCloud = async () => {
       try {
+        console.log("Fetching office data from cloud for:", storedUsername);
         const snap = await getDoc(doc(db, "cabinets", storedUsername));
         if (snap.exists()) {
           const d = snap.data();
@@ -113,16 +154,42 @@ function OfficeXarajat() {
           if (d.officeTotalBalance) setTotalBalance(d.officeTotalBalance);
           if (d.officeInitialBalance) setInitialBalance(d.officeInitialBalance);
           if (d.projectFiles?.length) setProjectFiles(d.projectFiles);
+          if (d.globalWorkerEmail) { 
+            setGlobalWorkerEmail(d.globalWorkerEmail); 
+            setSavedGlobalWorkerEmail(d.globalWorkerEmail); 
+          }
         }
-      } catch (e) { console.log("Office cloud load offline"); }
-      setDataLoaded(true);
-      setShowInitialLoader(false);
+      } catch (e) { 
+        console.log("Office cloud load failed/offline:", e); 
+      } finally {
+        setDataLoaded(true);
+        setShowInitialLoader(false);
+        console.log("Office data load sequence completed.");
+      }
     };
+    
     loadCloud();
-    const t = setTimeout(() => { setDataLoaded(true); setShowInitialLoader(false); }, 2500);
-    return () => clearTimeout(t);
+
+    // Safety fallback (60 seconds)
+    const safetyTimer = setTimeout(() => { 
+      setDataLoaded(true); 
+      setShowInitialLoader(false); 
+    }, 60000);
+
+    return () => clearTimeout(safetyTimer);
   }, [navigate]);
 
+  // 1. Local Save Effect (Immediate)
+  useEffect(() => {
+    if (!username) return;
+    localStorage.setItem(`office_expenses_${username}`, JSON.stringify(expenses));
+    localStorage.setItem(`office_balance_${username}`, JSON.stringify(totalBalance));
+    localStorage.setItem(`office_initial_balance_${username}`, JSON.stringify(initialBalance));
+    localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
+    localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
+  }, [expenses, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail]);
+
+  // 2. Cloud Save Effect (Synced)
   useEffect(() => {
     if (!username || !dataLoaded) return;
     
@@ -136,22 +203,17 @@ function OfficeXarajat() {
        }
     }
 
-    // Local Save
-    localStorage.setItem(`office_expenses_${username}`, JSON.stringify(expenses));
-    localStorage.setItem(`office_balance_${username}`, JSON.stringify(totalBalance));
-    localStorage.setItem(`office_initial_balance_${username}`, JSON.stringify(initialBalance));
-    localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
-
-    // Cloud Save
+    // Cloud Sync
     const save = async () => {
       try {
+        console.log("Syncing office data to cloud...");
         await setDoc(doc(db, "cabinets", username), {
-          officeExpenses: expenses, officeTotalBalance: totalBalance, officeInitialBalance: initialBalance, projectFiles: projectFiles
+          officeExpenses: expenses, officeTotalBalance: totalBalance, officeInitialBalance: initialBalance, projectFiles: projectFiles, globalWorkerEmail
         }, { merge: true });
-      } catch (e) { console.error("Office save failed", e); }
+      } catch (e) { console.error("Office sync failed", e); }
     };
     save();
-  }, [expenses, totalBalance, initialBalance, projectFiles, username, dataLoaded]);
+  }, [expenses, totalBalance, initialBalance, projectFiles, username, dataLoaded, globalWorkerEmail]);
 
   useEffect(() => {
     window.sessionStorage.setItem('office_loaded_at', Date.now().toString());
@@ -679,15 +741,77 @@ function OfficeXarajat() {
                 ⚠️ {t("Working Offline")}
               </div>
             )}
-            <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
+            {/* <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("profil")}</h3>
-            </Link>
+            </Link> */}
             <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("Kalkulator")}</h3>
             </Link>
             <Link to="/hisobot" onClick={() => setIsSidebarOpen(false)}>
-              <h3>{t("Ishchilar hisoboti")}</h3>
+              <h3>{t("ishchilarhisoboti")}</h3>
             </Link>
+
+            <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "10px" }}>
+              <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>{t("global_worker_email") || "Ishchilar uchun umumiy email"}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input
+                  type="email"
+                  placeholder={t("global_worker_email_placeholder") || "example@gmail.com"}
+                  value={globalWorkerEmail}
+                  onChange={(e) => {
+                    setGlobalWorkerEmail(e.target.value);
+                    if (emailError) setEmailError(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    border: emailError ? "1px solid #ff4d4d" : "1px solid rgba(255,255,255,0.2)",
+                    background: "rgba(255,255,255,0.1)",
+                    color: globalWorkerEmail ? "rgba(204, 194, 255, 0.5)" : "#fff",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    fontSize: "14px",
+                    fontWeight: globalWorkerEmail ? "500" : "400"
+                  }}
+                />
+                {emailError && (
+                  <p style={{ color: "#ff4d4d", fontSize: "12px", margin: "4px 0 0 0" }}>
+                    {t("email_xato") || "Email noto'g'ri kiritilgan"}
+                  </p>
+                )}
+                <button
+                  onClick={handleSaveGlobalEmail}
+                  disabled={globalWorkerEmail === savedGlobalWorkerEmail || !globalWorkerEmail.trim()}
+                  style={{
+                    width: "100%",
+                    padding: "10px 15px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: globalWorkerEmail === savedGlobalWorkerEmail ? "rgba(0, 0, 0, 0.3)" : "rgb(146, 151, 223)",
+                    color: globalWorkerEmail === savedGlobalWorkerEmail ? "rgba(255, 255, 255, 0.2)" : "#fff",
+                    cursor: globalWorkerEmail === savedGlobalWorkerEmail ? "default" : "pointer",
+                    fontWeight: "600",
+                    whiteSpace: "nowrap",
+                    fontSize: "13px",
+                    transition: "all 0.3s ease",
+                    border: globalWorkerEmail === savedGlobalWorkerEmail ? "1px solid rgba(255, 255, 255, 0.05)" : "none"
+                  }}
+                  onMouseOver={(e) => {
+                    if (globalWorkerEmail !== savedGlobalWorkerEmail && globalWorkerEmail.trim()) {
+                      e.target.style.opacity = "0.8";
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (globalWorkerEmail !== savedGlobalWorkerEmail && globalWorkerEmail.trim()) {
+                      e.target.style.opacity = "1";
+                    }
+                  }}
+                >
+                  {t("saqlash") || "Saqlash"}
+                </button>
+              </div>
+            </div>
             <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
               <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
                 {t("qurilishxarajatlari")} <span>{">"}</span>
@@ -1154,15 +1278,12 @@ function OfficeXarajat() {
               </div>
             </div>
           </div>
-        </div>) : (
+        </div>
+      ) : (
         <ProjectReport
           projectId={activeProjectId}
-          onClose={() => setActiveProjectId(null)}
-          projectName={
-            projectFiles.find((p) => p.id === activeProjectId)
-              ? projectFiles.find((p) => p.id === activeProjectId).name
-              : ""
-          }
+          projectName={projectFiles.find((p) => p.id === activeProjectId)?.name}
+          onBack={() => setActiveProjectId(null)}
         />
       )}
 

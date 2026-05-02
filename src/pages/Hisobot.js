@@ -168,13 +168,17 @@ function Hisobot() {
     const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
     if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
 
-    // 2. Determine if we should show a loader
+    // 2. Conditional Loader
     const hasLocal = sw || sb || sib || sp || sge;
-    if (!hasLocal) setShowInitialLoader(true);
+    if (!hasLocal) {
+      setShowInitialLoader(true);
+    }
+    setDataLoaded(false);
 
     // 3. Fetch from Cloud
     const loadCloud = async () => {
       try {
+        console.log("Fetching from cloud for:", storedUsername);
         const snap = await getDoc(doc(db, "cabinets", storedUsername));
         if (snap.exists()) {
           const d = snap.data();
@@ -182,22 +186,45 @@ function Hisobot() {
           if (d.totalBalance) setTotalBalance(d.totalBalance);
           if (d.initialBalance) setInitialBalance(d.initialBalance);
           if (d.projectFiles?.length) setProjectFiles(d.projectFiles);
-          if (d.globalWorkerEmail) { setGlobalWorkerEmail(d.globalWorkerEmail); setSavedGlobalWorkerEmail(d.globalWorkerEmail); }
+          if (d.globalWorkerEmail) { 
+            setGlobalWorkerEmail(d.globalWorkerEmail); 
+            setSavedGlobalWorkerEmail(d.globalWorkerEmail); 
+          }
         }
-      } catch (e) { console.log("Cloud load failed/offline"); }
-      setDataLoaded(true);
-      setShowInitialLoader(false);
+      } catch (e) { 
+        console.error("Cloud load failed/offline:", e); 
+      } finally {
+        setDataLoaded(true);
+        setShowInitialLoader(false);
+        console.log("Data load sequence completed.");
+      }
     };
+    
     loadCloud();
     
-    // Safety timeout
-    const t = setTimeout(() => { setDataLoaded(true); setShowInitialLoader(false); }, 2500);
-    return () => clearTimeout(t);
+    // Safety fallback (removed per user request to not have "special time")
+    // But we keep it very long (60s) just as an absolute emergency fallback for browser hangs
+    const safetyTimer = setTimeout(() => { 
+      setDataLoaded(true); 
+      setShowInitialLoader(false); 
+    }, 60000);
+
+    return () => clearTimeout(safetyTimer);
   }, [navigate]);
 
-  // Unified Save Effect (Cloud + Local)
+  // 1. Local Save Effect (Immediate)
   useEffect(() => {
-    // CRITICAL: Only save if data is actually loaded and we are NOT in the middle of initial sync
+    if (!username) return;
+    localStorage.setItem(`workers_${username}`, JSON.stringify(workers));
+    localStorage.setItem(`totalBalance_${username}`, JSON.stringify(totalBalance));
+    localStorage.setItem(`initialBalance_${username}`, JSON.stringify(initialBalance));
+    localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
+    localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
+  }, [workers, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail]);
+
+  // 2. Cloud Save Effect (Synced)
+  useEffect(() => {
+    // CRITICAL: Only sync to cloud if data is actually loaded and we are NOT in the middle of initial sync
     if (!username || !dataLoaded) return;
     
     // Safety: Don't save if everything is empty and we just started (prevents overwriting cloud with empty data)
@@ -211,14 +238,7 @@ function Hisobot() {
        }
     }
 
-    // Local Save
-    localStorage.setItem(`workers_${username}`, JSON.stringify(workers));
-    localStorage.setItem(`totalBalance_${username}`, JSON.stringify(totalBalance));
-    localStorage.setItem(`initialBalance_${username}`, JSON.stringify(initialBalance));
-    localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
-    localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
-
-    // Cloud Save
+    // Cloud Sync
     const saveCloud = async () => {
       try {
         console.log("Syncing to cloud...");
