@@ -4,10 +4,13 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import ProjectReport from "./ProjectReport";
+import BranchReport from "../components/BranchReport";
 import NewProject from "../images/new-project.png";
 import { db, auth } from "../Firebase/Firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
+import FloatingCalculator from "../components/FloatingCalculator";
+import { AnimatePresence } from "framer-motion";
 
 function Hisobot() {
   const navigate = useNavigate();
@@ -92,6 +95,17 @@ function Hisobot() {
   const [newFileName, setNewFileName] = useState("");
   const [deleteProjectId, setDeleteProjectId] = useState(null);
 
+  // New Categories State
+  const [showFloatingCalc, setShowFloatingCalc] = useState(false);
+  const [isOfficeExpanded, setIsOfficeExpanded] = useState(false);
+  const [isWorkersExpanded, setIsWorkersExpanded] = useState(false);
+  const [officeBranches, setOfficeBranches] = useState([]);
+  const [workerObjects, setWorkerObjects] = useState([]);
+  const [activeBranchId, setActiveBranchId] = useState(null);
+  const [activeWorkerObjectId, setActiveWorkerObjectId] = useState(null);
+  const [fileModalType, setFileModalType] = useState("project"); // "project", "branch", "object"
+  const [deleteItemId, setDeleteItemId] = useState(null); // reuse for branch/object deletion
+
   // Global Worker Email State
   const [globalWorkerEmail, setGlobalWorkerEmail] = useState("");
   const [savedGlobalWorkerEmail, setSavedGlobalWorkerEmail] = useState("");
@@ -165,6 +179,10 @@ function Hisobot() {
     if (sib) setInitialBalance(JSON.parse(sib));
     const sp = localStorage.getItem(`projects_${storedUsername}`);
     if (sp) setProjectFiles(JSON.parse(sp));
+    const sob = localStorage.getItem(`officeBranches_${storedUsername}`);
+    if (sob) setOfficeBranches(JSON.parse(sob));
+    const swo = localStorage.getItem(`workerObjects_${storedUsername}`);
+    if (swo) setWorkerObjects(JSON.parse(swo));
     const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
     if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
 
@@ -190,6 +208,8 @@ function Hisobot() {
             setGlobalWorkerEmail(d.globalWorkerEmail); 
             setSavedGlobalWorkerEmail(d.globalWorkerEmail); 
           }
+          if (d.officeBranches?.length) setOfficeBranches(d.officeBranches);
+          if (d.workerObjects?.length) setWorkerObjects(d.workerObjects);
         }
       } catch (e) { 
         console.error("Cloud load failed/offline:", e); 
@@ -219,6 +239,8 @@ function Hisobot() {
     localStorage.setItem(`totalBalance_${username}`, JSON.stringify(totalBalance));
     localStorage.setItem(`initialBalance_${username}`, JSON.stringify(initialBalance));
     localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
+    localStorage.setItem(`officeBranches_${username}`, JSON.stringify(officeBranches));
+    localStorage.setItem(`workerObjects_${username}`, JSON.stringify(workerObjects));
     localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
   }, [workers, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail]);
 
@@ -243,7 +265,7 @@ function Hisobot() {
       try {
         console.log("Syncing to cloud...");
         await setDoc(doc(db, "cabinets", username), {
-          workers, totalBalance, initialBalance, projectFiles, globalWorkerEmail
+          workers, totalBalance, initialBalance, projectFiles, globalWorkerEmail, officeBranches, workerObjects
         }, { merge: true });
       } catch (e) { console.error("Cloud save failed", e); }
     };
@@ -807,14 +829,30 @@ function Hisobot() {
   };
   const handleAddProject = () => {
     if (!newFileName.trim()) return;
-    const newProject = {
+    const newItem = {
       id: Date.now(),
       name: newFileName.trim(),
     };
-    setProjectFiles([...projectFiles, newProject]);
+
+    if (fileModalType === "project") {
+      setProjectFiles([...projectFiles, newItem]);
+      setActiveProjectId(newItem.id);
+      setActiveBranchId(null);
+      setActiveWorkerObjectId(null);
+    } else if (fileModalType === "branch") {
+      setOfficeBranches([...officeBranches, newItem]);
+      setActiveBranchId(newItem.id);
+      setActiveProjectId(null);
+      setActiveWorkerObjectId(null);
+    } else if (fileModalType === "object") {
+      setWorkerObjects([...workerObjects, newItem]);
+      setActiveWorkerObjectId(newItem.id);
+      setActiveProjectId(null);
+      setActiveBranchId(null);
+    }
+
     setNewFileName("");
     setIsFileModalOpen(false);
-    setActiveProjectId(newProject.id); // Open the new project immediately
   };
 
   const confirmDeleteProject = () => {
@@ -864,16 +902,93 @@ function Hisobot() {
             {/* <Link to="/profil" onClick={() => setIsSidebarOpen(false)}>
               <h3>{t("profil")}</h3>
             </Link> */}
-            <Link to="/calculator2" onClick={() => setIsSidebarOpen(false)}>
+            <div className="calc-sidebar-btn" onClick={() => { setShowFloatingCalc(!showFloatingCalc); setIsSidebarOpen(false); }}>
               <h3>{t("Kalkulator")}</h3>
-            </Link>
-            <Link to="/officexarajat" onClick={() => setIsSidebarOpen(false)}>
-              <h3>{t("o'fisxarajatlari")}</h3>
-            </Link>
+            </div>
+
+            <div className={`QurilishXarajatlari ${isWorkersExpanded ? "expanded" : ""}`}>
+              <h2 onClick={() => setIsWorkersExpanded(!isWorkersExpanded)}>
+                {t("Ishchilar hisoboti") || "Ishchilar hisoboti"} <span>{">"}</span>
+              </h2>
+              <div className="project-list-container">
+                <h4 onClick={() => { setFileModalType("object"); setIsFileModalOpen(true); }}>+ {t("ob'ekt") || "Ob'ekt"}</h4>
+                <div className="project-items">
+                  <div
+                    className={`project-sidebar-item ${activeProjectId === null && activeBranchId === null && activeWorkerObjectId === null ? "active" : ""}`}
+                    onClick={() => {
+                      setActiveProjectId(null);
+                      setActiveBranchId(null);
+                      setActiveWorkerObjectId(null);
+                      setIsSidebarOpen(false);
+                    }}
+                  >
+                    <span className="project-name">{t("barcha_ishchilar") || "Barcha ishchilar"}</span>
+                  </div>
+                  {workerObjects.map((obj) => (
+                    <div
+                      key={obj.id}
+                      className={`project-sidebar-item ${activeWorkerObjectId === obj.id ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveWorkerObjectId(activeWorkerObjectId === obj.id ? null : obj.id);
+                        setActiveProjectId(null);
+                        setActiveBranchId(null);
+                        setIsSidebarOpen(false);
+                      }}
+                    >
+                      <span className="project-name">{obj.name}</span>
+                      <button
+                        className="delete-project-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteItemId({ type: 'object', id: obj.id });
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={`QurilishXarajatlari ${isOfficeExpanded ? "expanded" : ""}`}>
+              <h2 onClick={() => setIsOfficeExpanded(!isOfficeExpanded)}>
+                {t("o'fisxarajatlari")} <span>{">"}</span>
+              </h2>
+              <div className="project-list-container">
+                <h4 onClick={() => { setFileModalType("branch"); setIsFileModalOpen(true); }}>+ {t("filial") || "Filial"}</h4>
+                <div className="project-items">
+                  {officeBranches.map((branch) => (
+                    <div
+                      key={branch.id}
+                      className={`project-sidebar-item ${activeBranchId === branch.id ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveBranchId(activeBranchId === branch.id ? null : branch.id);
+                        setActiveProjectId(null);
+                        setActiveWorkerObjectId(null);
+                        setIsSidebarOpen(false);
+                      }}
+                    >
+                      <span className="project-name">{branch.name}</span>
+                      <button
+                        className="delete-project-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteItemId({ type: 'branch', id: branch.id });
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
 
             <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "10px" }}>
               <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>{t("global_worker_email") || "Ishchilar uchun umumiy email"}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                
                 <input
                   type="email"
                   placeholder={t("global_worker_email_placeholder") || "example@gmail.com"}
@@ -937,7 +1052,7 @@ function Hisobot() {
                 {t("qurilishxarajatlari")} <span>{">"}</span>
               </h2>
               <div className="project-list-container">
-                <h4 onClick={() => setIsFileModalOpen(true)}>+ Fayl</h4>
+                <h4 onClick={() => { setFileModalType("project"); setIsFileModalOpen(true); }}>+ Fayl</h4>
                 <div className="project-items">
                   {projectFiles.map((project) => (
                     <div
@@ -1004,7 +1119,19 @@ function Hisobot() {
         ></div>
       )}
 
-      {activeProjectId === null ? (
+      {activeProjectId !== null ? (
+        <ProjectReport
+          projectId={activeProjectId}
+          projectName={projectFiles.find(p => p.id === activeProjectId)?.name}
+          onBack={() => setActiveProjectId(null)}
+        />
+      ) : activeBranchId !== null ? (
+        <BranchReport
+          branchId={activeBranchId}
+          branchName={officeBranches.find(b => b.id === activeBranchId)?.name}
+          onBack={() => setActiveBranchId(null)}
+        />
+      ) : (
         <div className="HisobotRight">
           <div className="rightTop">
             <h3 className="addH3" onClick={handleAddWorkerClick}>
@@ -1110,19 +1237,23 @@ function Hisobot() {
                     >
                       <div className="worker-item-main">
                         <div className="worker-info">
-                          <input
-                            type="checkbox"
-                            className="paid-checkbox"
-                            checked={worker.isPaid}
-                            onChange={() => handleTogglePaid(worker.id)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
+                          {!activeWorkerObjectId && (
+                            <input
+                              type="checkbox"
+                              className="paid-checkbox"
+                              checked={worker.isPaid}
+                              onChange={() => handleTogglePaid(worker.id)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
                           <div className="name-date">
                             <h3 style={{ display: 'flex', alignItems: 'center' }}>
                               {worker.workerName}
-                              <span style={{ fontSize: "14px", marginLeft: "10px", lineHeight: 1 }} title={worker.workerCode ? "Has Access Code" : "No Access Code"}>
-                                {worker.workerCode ? "🟢" : "🔴"}
-                              </span>
+                              {!activeWorkerObjectId && (
+                                <span style={{ fontSize: "14px", marginLeft: "10px", lineHeight: 1 }} title={worker.workerCode ? "Has Access Code" : "No Access Code"}>
+                                  {worker.workerCode ? "🟢" : "🔴"}
+                                </span>
+                              )}
                             </h3>
                             <span>
                               {new Date(worker.createdAt).toLocaleDateString()}
@@ -1130,67 +1261,77 @@ function Hisobot() {
                           </div>
                         </div>
 
-                        <div className="worker-values">
-                          <div className="val-group-procent">
-                            <p>{t("qilayotganishi")}</p>
-                            <strong>
-                              {worker.currentWork || t("yo'q")} ({worker.workPercent || "0%"})
-                            </strong>
+                        {!activeWorkerObjectId ? (
+                          <div className="worker-values">
+                            <div className="val-group-procent">
+                              <p>{t("qilayotganishi")}</p>
+                              <strong>
+                                {worker.currentWork || t("yo'q")} ({worker.workPercent || "0%"})
+                              </strong>
+                            </div>
+                            <div className="val-group">
+                              <p>{t("olishikerak")}:</p>
+                              <strong className="to-receive">
+                                {worker.amountToReceive}{" "}
+                                {worker.currencyToReceive === "sum" ? "so'm" : "$"}
+                              </strong>
+                              <span className="small-date">
+                                {t("sana")}: {worker.dateToGive}
+                              </span>
+                            </div>
+                            <div className="val-group">
+                              <p>{t("olgansumma")}:</p>
+                              <strong className="received">
+                                {worker.amountAlreadyReceived}{" "}
+                                {worker.currencyAlreadyReceived === "sum"
+                                  ? "so'm"
+                                  : "$"}
+                              </strong>
+                              <span className="small-date">
+                                {t("olgan")}: {worker.dateAlreadyReceived}
+                              </span>
+                            </div>
                           </div>
-                          <div className="val-group">
-                            <p>{t("olishikerak")}:</p>
-                            <strong className="to-receive">
-                              {worker.amountToReceive}{" "}
-                              {worker.currencyToReceive === "sum" ? "so'm" : "$"}
-                            </strong>
-                            <span className="small-date">
-                              {t("sana")}: {worker.dateToGive}
-                            </span>
+                        ) : (
+                          <div className="worker-values simple-worker-values">
+                             {/* Only basic info here if needed */}
                           </div>
-                          <div className="val-group">
-                            <p>{t("olgansumma")}:</p>
-                            <strong className="received">
-                              {worker.amountAlreadyReceived}{" "}
-                              {worker.currencyAlreadyReceived === "sum"
-                                ? "so'm"
-                                : "$"}
-                            </strong>
-                            <span className="small-date">
-                              {t("olgan")}: {worker.dateAlreadyReceived}
-                            </span>
-                          </div>
-                        </div>
+                        )}
 
                         <div className="worker-actions">
-                          <button
-                            className="month-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleNextMonth(worker.id);
-                            }}
-                            title={t("yangi_oy_sikl") || "Yangi oy/Sikl"}
-                          >
-                            🔄
-                          </button>
+                          {!activeWorkerObjectId ? (
+                            <>
+                              <button
+                                className="month-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNextMonth(worker.id);
+                                }}
+                                title={t("yangi_oy_sikl") || "Yangi oy/Sikl"}
+                              >
+                                🔄
+                              </button>
 
-                          <button
-                            className="addnewproject"
-                            onClick={(e) => handleNewProject(e, worker.id)}
-                            title={t("yangi_loyiha")}
-                          >
-                            <img src={NewProject} alt="NewProject" />
-                          </button>
+                              <button
+                                className="addnewproject"
+                                onClick={(e) => handleNewProject(e, worker.id)}
+                                title={t("yangi_loyiha")}
+                              >
+                                <img src={NewProject} alt="NewProject" />
+                              </button>
 
-                          <button
-                            className="history-toggle-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleHistory(worker.id);
-                            }}
-                            title={t("tarixni_korish") || "Tarixni ko'rish"}
-                          >
-                            📜
-                          </button>
+                              <button
+                                className="history-toggle-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleHistory(worker.id);
+                                }}
+                                title={t("tarixni_korish") || "Tarixni ko'rish"}
+                              >
+                                📜
+                              </button>
+                            </>
+                          ) : null}
                           <button
                             className="edit-btn"
                             onClick={(e) => {
@@ -1531,12 +1672,44 @@ function Hisobot() {
             </div>
           </div>
         </div>
-      ) : (
-        <ProjectReport
-          projectId={activeProjectId}
-          projectName={projectFiles.find(p => p.id === activeProjectId)?.name}
-          onBack={() => setActiveProjectId(null)}
-        />
+      )}
+
+      {/* Floating Calculator */}
+      <AnimatePresence>
+        {showFloatingCalc && (
+          <FloatingCalculator 
+            isOpen={showFloatingCalc} 
+            onClose={() => setShowFloatingCalc(false)} 
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Item Delete Confirmation Modal (Branch/Object) */}
+      {deleteItemId && (
+        <div className="confirm-overlay" onClick={() => setDeleteItemId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-message">
+              {t("Haqiqatdan ham o'chirishni xohlaysizmi?")}
+            </div>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setDeleteItemId(null)}>
+                {t("bekorqilish")}
+              </button>
+              <button className="confirm-btn confirm-delete" onClick={() => {
+                if (deleteItemId.type === 'branch') {
+                  setOfficeBranches(officeBranches.filter(b => b.id !== deleteItemId.id));
+                  if (activeBranchId === deleteItemId.id) setActiveBranchId(null);
+                } else if (deleteItemId.type === 'object') {
+                  setWorkerObjects(workerObjects.filter(o => o.id !== deleteItemId.id));
+                  if (activeWorkerObjectId === deleteItemId.id) setActiveWorkerObjectId(null);
+                }
+                setDeleteItemId(null);
+              }}>
+                {t("o'chirish")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Logout Dialog */}
@@ -2136,11 +2309,17 @@ function Hisobot() {
       {isFileModalOpen && (
         <div className="confirm-overlay" onClick={() => setIsFileModalOpen(false)}>
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="confirm-message">{t("Yangi fayl qo'shish")}</h2>
+            <h2 className="confirm-message">
+              {fileModalType === "project" ? t("Yangi fayl qo'shish") : 
+               fileModalType === "branch" ? t("Yangi filial qo'shish") : 
+               t("Yangi ob'ekt qo'shish")}
+            </h2>
             <input
               className="modal-input"
               type="text"
-              placeholder={t("Fayl nomi...")}
+              placeholder={fileModalType === "project" ? t("Fayl nomi...") : 
+                           fileModalType === "branch" ? t("Filial nomi...") : 
+                           t("Ob'ekt nomi...")}
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
               autoFocus

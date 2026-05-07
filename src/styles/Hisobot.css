@@ -64,7 +64,7 @@
     border: 1px solid rgba(161, 161, 241, 0.5);
     box-shadow: 0 0 10px 10px rgba(161, 161, 241, 0.2);
     transition: 0.1s;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .leftTop h3:hover{
@@ -75,6 +75,10 @@
 .leftTop a{
     text-decoration: none;
     color: rgb(204, 194, 255);
+}
+
+.calc-sidebar-btn {
+    width: 100%;
 }
 
 .logout-btn {
@@ -115,7 +119,7 @@
     margin: 0;
     color: rgb(204, 194, 255);
     pointer-events: none; /* Let the container handle clicks */
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .logout-btn-container:hover h3 {
@@ -601,6 +605,16 @@
 .val-group strong {
     font-size: 1.05rem;
     margin-bottom: 2px;
+}
+
+.simple-worker-values {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .simple-worker-values {
+        display: none !important;
+    }
 }
 
 .small-date {

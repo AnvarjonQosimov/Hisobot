@@ -191,5 +191,12 @@
     "enter_new_username": "Yangi foydalanuvchi nomini kiriting",
     "enter_new_password": "Yangi parolni kiriting",
     "global_worker_email": "Ishchilar uchun umumiy email",
-    "global_worker_email_placeholder": "example@gmail.com"
+    "global_worker_email_placeholder": "example@gmail.com",
+    "ob'ekt": "Ob'ekt",
+    "filial": "Filial",
+    "barcha_ishchilar": "Barcha ishchilar",
+    "Yangi filial qo'shish": "Yangi filial qo'shish",
+    "Yangi ob'ekt qo'shish": "Yangi ob'ekt qo'shish",
+    "Filial nomi...": "Filial nomi...",
+    "Ob'ekt nomi...": "Ob'ekt nomi..."
 }
