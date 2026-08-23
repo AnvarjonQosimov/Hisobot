@@ -1,108 +1,152 @@
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import "../styles/Header.css";
-import FormControl from "@mui/material/FormControl";
 import { TbReportSearch } from "react-icons/tb";
 import { useTranslation } from "react-i18next";
-import InputLabel from "@mui/material/InputLabel";
-import Select from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
-import { Link, NavLink } from "react-router-dom";
-import { useRef, useState, useEffect } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { FiMenu, FiX, FiGlobe } from "react-icons/fi";
 
 function Header() {
-  const [age, setAge] = React.useState("uz");
   const { t, i18n } = useTranslation();
-
-  const handleChange = (event) => {
-    const lang = String(event.target.value);
-    setAge(lang);
-    i18n.changeLanguage(lang);
-  };
-
-  const menuRef = useRef(null);
+  const location = useLocation();
   const [burgerOpen, setBurgerOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const menuRef = useRef(null);
+
+  const dashboardPaths = ["/hisobot", "/officexarajat", "/workerdashboard", "/profil", "/worker-auth"];
+  const isDashboard = dashboardPaths.includes(location.pathname);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setBurgerOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  if (isDashboard) return null;
+
+  const changeLanguage = (lang) => {
+    i18n.changeLanguage(lang);
+    setBurgerOpen(false);
+  };
+
   return (
-    <div className="Header">
-      <div className="logo">
-        <div className="imgLogo">
-          <i>
+    <header className={`Header ${scrolled ? "scrolled" : ""}`}>
+      <div className="header-container">
+        <Link to="/" className="logo">
+          <div className="logo-icon">
             <TbReportSearch />
-          </i>
-        </div>
-        <div className="textLogo">
-          <h1>OfficeReport</h1>
-        </div>
-      </div>
+          </div>
+          <div className="logo-text">
+            <h1>Office<span>Report</span></h1>
+          </div>
+        </Link>
 
-      <div className="menu">
-        <ul>
-          <Link to="/">
-            <li>{t("Home")}</li>
-          </Link>
-          <Link to="/calculator">
-            <li>{t("Kalkulator")}</li>
-          </Link>
-        </ul>
-      </div>
-
-      <div className="burger-wrapper" ref={menuRef}>
-        <button
-          className={`burger ${burgerOpen ? "active" : ""}`}
-          onClick={() => setBurgerOpen(!burgerOpen)}
-          aria-label="Menu"
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-
-        <div className={`burger-dropdown ${burgerOpen ? "show" : ""}`}>
-          <NavLink
-            to="/"
-            onClick={() => setBurgerOpen(false)}
-            className="menu-link"
-          >
+        <nav className="nav-menu">
+          <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
             {t("Home")}
           </NavLink>
-
-          <NavLink
-            to="/calculator"
-            onClick={() => setBurgerOpen(false)}
-            className="menu-link"
-          >
+          <NavLink to="/calculator" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
             {t("Kalkulator")}
           </NavLink>
+          <Link to="/login" className="login-btn-header">
+            {t("Login")}
+          </Link>
+        </nav>
+
+        <div className="header-actions">
+          <div className="lang-switcher">
+            <FiGlobe className="globe-icon" />
+            <select value={i18n.language} onChange={(e) => changeLanguage(e.target.value)}>
+              <option value="uz">UZ</option>
+              <option value="ru">RU</option>
+              <option value="en">EN</option>
+            </select>
+          </div>
+
+          <button className="mobile-toggle" onClick={() => setBurgerOpen(!burgerOpen)}>
+            {burgerOpen ? <FiX /> : <FiMenu />}
+          </button>
         </div>
       </div>
 
-      <div className="translator">
-        <FormControl sx={{ m: 1, minWidth: 80 }} size="small">
-          <InputLabel id="demo-select-small-label">{t("lang")}</InputLabel>
-          <Select
-            id="demo-select-small"
-            value={age}
-            label="Age"
-            onChange={handleChange}
+      {/* Mobile Menu */}
+      <div className={`mobile-nav ${burgerOpen ? "open" : ""}`} ref={menuRef}>
+        <button className="mobile-nav-close" onClick={() => setBurgerOpen(false)}>
+          <FiX />
+        </button>
+        <NavLink to="/" onClick={() => setBurgerOpen(false)}>{t("Home")}</NavLink>
+        <NavLink to="/calculator" onClick={() => setBurgerOpen(false)}>{t("Kalkulator")}</NavLink>
+        <Link to="/login" onClick={() => setBurgerOpen(false)} className="mobile-login">{t("Login")}</Link>
+        
+        <div className="mobile-lang">
+          <button 
+            type="button"
+            onClick={() => changeLanguage("uz")} 
+            className={i18n.language === "uz" ? "active" : ""}
+            style={{
+              background: i18n.language === "uz" ? "linear-gradient(135deg, rgba(99, 102, 241, 0.8) 0%, rgba(139, 92, 246, 0.8) 100%)" : "rgba(255, 255, 255, 0.08)",
+              border: i18n.language === "uz" ? "1.5px solid rgba(99, 102, 241, 0.6)" : "1.5px solid rgba(255, 255, 255, 0.15)",
+              color: i18n.language === "uz" ? "white" : "rgba(204, 194, 255, 0.6)",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600",
+              fontSize: "14px",
+              transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
+              flex: "1",
+              minWidth: "60px",
+              boxSizing: "border-box",
+              boxShadow: i18n.language === "uz" ? "0 4px 15px rgba(99, 102, 241, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2)" : "none"
+            }}
           >
-            <MenuItem value={"uz"}>UZ</MenuItem>
-            <MenuItem value={"en"}>EN</MenuItem>
-            <MenuItem value={"ru"}>РУ</MenuItem>
-          </Select>
-        </FormControl>
+            UZ
+          </button>
+          <button 
+            type="button"
+            onClick={() => changeLanguage("ru")} 
+            className={i18n.language === "ru" ? "active" : ""}
+            style={{
+              background: i18n.language === "ru" ? "linear-gradient(135deg, rgba(99, 102, 241, 0.8) 0%, rgba(139, 92, 246, 0.8) 100%)" : "rgba(255, 255, 255, 0.08)",
+              border: i18n.language === "ru" ? "1.5px solid rgba(99, 102, 241, 0.6)" : "1.5px solid rgba(255, 255, 255, 0.15)",
+              color: i18n.language === "ru" ? "white" : "rgba(204, 194, 255, 0.6)",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600",
+              fontSize: "14px",
+              transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
+              flex: "1",
+              minWidth: "60px",
+              boxSizing: "border-box",
+              boxShadow: i18n.language === "ru" ? "0 4px 15px rgba(99, 102, 241, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2)" : "none"
+            }}
+          >
+            RU
+          </button>
+          <button 
+            type="button"
+            onClick={() => changeLanguage("en")} 
+            className={i18n.language === "en" ? "active" : ""}
+            style={{
+              background: i18n.language === "en" ? "linear-gradient(135deg, rgba(99, 102, 241, 0.8) 0%, rgba(139, 92, 246, 0.8) 100%)" : "rgba(255, 255, 255, 0.08)",
+              border: i18n.language === "en" ? "1.5px solid rgba(99, 102, 241, 0.6)" : "1.5px solid rgba(255, 255, 255, 0.15)",
+              color: i18n.language === "en" ? "white" : "rgba(204, 194, 255, 0.6)",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600",
+              fontSize: "14px",
+              transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
+              flex: "1",
+              minWidth: "60px",
+              boxSizing: "border-box",
+              boxShadow: i18n.language === "en" ? "0 4px 15px rgba(99, 102, 241, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2)" : "none"
+            }}
+          >
+            EN
+          </button>
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
 

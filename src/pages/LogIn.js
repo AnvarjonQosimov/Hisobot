@@ -43,7 +43,7 @@ function LogIn() {
   useEffect(() => {
     const cachedEmail = localStorage.getItem("userEmail");
     const cachedRole = localStorage.getItem("role");
-    
+
     if (cachedEmail && cachedRole) {
       console.log("Optimistic redirect to:", cachedRole);
       navigate(cachedRole === "worker" ? "/workerdashboard" : "/hisobot", { replace: true });
@@ -57,7 +57,7 @@ function LogIn() {
         const email = currentUser.email.toLowerCase();
         localStorage.setItem("userEmail", email);
         localStorage.setItem("username", email);
-        
+
         // Background sync, no 'await'
         checkAndAddUserToFirestore(currentUser);
 
@@ -72,7 +72,7 @@ function LogIn() {
               }
               throw err;
             });
-            
+
             const userRole = workerSnap.exists() ? "worker" : "boss";
             localStorage.setItem("role", userRole);
             navigate(userRole === "worker" ? "/workerdashboard" : "/hisobot", { replace: true });
@@ -109,14 +109,14 @@ function LogIn() {
       // Determine role with a FAST timeout (1 second)
       console.log("Fetching role from Firestore (fast check)...");
       const workerRef = doc(db, "globalWorkerEmails", email);
-      
+
       try {
         const workerSnap = await Promise.race([
           getDoc(workerRef),
           new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2000))
         ]).catch(err => {
           console.warn("Role check timed out or offline, defaulting to boss for speed.");
-          return { exists: () => false }; 
+          return { exists: () => false };
         });
 
 

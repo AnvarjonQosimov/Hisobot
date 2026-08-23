@@ -32,6 +32,13 @@ function Hisobot() {
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
 
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all"); // all, recent, high
+  const [currencyDisplayMode, setCurrencyDisplayMode] = useState("combined"); // combined, sum, dollar
+  const [dollarRate, setDollarRate] = useState(12000);
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
+
   // New Work Fields States
   const [currentWork, setCurrentWork] = useState("");
   const [workPercent, setWorkPercent] = useState("");
@@ -62,10 +69,6 @@ function Hisobot() {
   const [undoState, setUndoState] = useState(null);
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
   const [showPerformUndoConfirm, setShowPerformUndoConfirm] = useState(false);
-
-  // Search & Filter State
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all"); // all, recent, high
 
   // Custom Delete Modal State
   const [deleteWorkerId, setDeleteWorkerId] = useState(null);
@@ -111,8 +114,7 @@ function Hisobot() {
   const [savedGlobalWorkerEmail, setSavedGlobalWorkerEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [syncStatus, setSyncStatus] = useState("synced"); // synced, syncing, offline
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [showInitialLoader, setShowInitialLoader] = useState(false);
+  const [cloudLoadComplete, setCloudLoadComplete] = useState(false);
 
   // Language State
   const [age, setAge] = useState(i18n.language || "uz");
@@ -134,6 +136,185 @@ function Hisobot() {
       .match(
         /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
       );
+  };
+
+  const parseAmount = (value) => parseFloat(value) || 0;
+  const convertToSum = (amount, currency) =>
+    currency === "sum" ? amount : amount * dollarRate;
+  const convertToDollar = (amount, currency) =>
+    currency === "dollar" ? amount : dollarRate > 0 ? amount / dollarRate : 0;
+
+  const getTotalInMode = (sumValue, dollarValue) => {
+    if (currencyDisplayMode === "sum") {
+      return sumValue + dollarValue * dollarRate;
+    }
+    if (currencyDisplayMode === "dollar") {
+      return dollarValue + (dollarRate > 0 ? sumValue / dollarRate : 0);
+    }
+    return null;
+  };
+
+  const formatModeAmount = (value, mode) =>
+    `${value.toLocaleString()} ${mode === "sum" ? t("som") : "$"}`;
+
+  const getInitialBalanceDisplay = () => {
+    if (currencyDisplayMode === "combined") {
+      return `${initialBalance.sum.toLocaleString()} ${t("som")} / ${initialBalance.dollar.toLocaleString()} $`;
+    }
+    return formatModeAmount(getTotalInMode(initialBalance.sum, initialBalance.dollar), currencyDisplayMode);
+  };
+
+  const getTotalBalanceDisplay = () => {
+    if (currencyDisplayMode === "combined") {
+      return `${totalBalance.sum.toLocaleString()} ${t("som")} / ${totalBalance.dollar.toLocaleString()} $`;
+    }
+    return formatModeAmount(getTotalInMode(totalBalance.sum, totalBalance.dollar), currencyDisplayMode);
+  };
+
+  const getHighestSalaryDisplay = () => {
+    if (currencyDisplayMode === "combined") {
+      const sumHigh = workers
+        .filter((w) => w.currencyToReceive === "sum")
+        .sort(
+          (a, b) =>
+            (parseFloat(b.amountToReceive) || 0) -
+            (parseFloat(a.amountToReceive) || 0),
+        )[0];
+      const dolHigh = workers
+        .filter((w) => w.currencyToReceive === "dollar")
+        .sort(
+          (a, b) =>
+            (parseFloat(b.amountToReceive) || 0) -
+            (parseFloat(a.amountToReceive) || 0),
+        )[0];
+
+      const sumText = sumHigh
+        ? `${sumHigh.workerName}: ${parseFloat(sumHigh.amountToReceive).toLocaleString()} ${t("som")}`
+        : t("yo'q");
+      const dolText = dolHigh
+        ? `${dolHigh.workerName}: ${parseFloat(dolHigh.amountToReceive).toLocaleString()} $`
+        : t("yo'q");
+
+      return `${sumText} / ${dolText}`;
+    }
+
+    const converted = workers
+      .map((w) => {
+        const amount = parseAmount(w.amountToReceive);
+        const value =
+          currencyDisplayMode === "sum"
+            ? convertToSum(amount, w.currencyToReceive)
+            : convertToDollar(amount, w.currencyToReceive);
+        return { workerName: w.workerName, value };
+      })
+      .sort((a, b) => b.value - a.value)[0];
+
+    return converted
+      ? `${converted.workerName}: ${formatModeAmount(converted.value, currencyDisplayMode)}`
+      : t("yo'q");
+  };
+
+  const getTotalExpensesDisplay = () => {
+    if (currencyDisplayMode === "combined") {
+      const totalSum = workers
+        .reduce((acc, curr) => {
+          const currentCost =
+            curr.currencyToReceive === "sum"
+              ? parseAmount(curr.amountToReceive)
+              : 0;
+          const historyCost = (curr.history || []).reduce(
+            (hAcc, hCurr) =>
+              hCurr.currency === "sum"
+                ? hAcc + (parseAmount(hCurr.amount) || 0)
+                : hAcc,
+            0,
+          );
+          const lastMonthPaid =
+            curr.currencyAlreadyReceived === "sum"
+              ? parseAmount(curr.amountAlreadyReceived)
+              : 0;
+          return acc + currentCost + historyCost + lastMonthPaid;
+        }, 0)
+        .toLocaleString();
+
+      const totalDollar = workers
+        .reduce((acc, curr) => {
+          const currentCost =
+            curr.currencyToReceive === "dollar"
+              ? parseAmount(curr.amountToReceive)
+              : 0;
+          const historyCost = (curr.history || []).reduce(
+            (hAcc, hCurr) =>
+              hCurr.currency === "dollar"
+                ? hAcc + (parseAmount(hCurr.amount) || 0)
+                : hAcc,
+            0,
+          );
+          const lastMonthPaid =
+            curr.currencyAlreadyReceived === "dollar"
+              ? parseAmount(curr.amountAlreadyReceived)
+              : 0;
+          return acc + currentCost + historyCost + lastMonthPaid;
+        }, 0)
+        .toLocaleString();
+
+      return `${totalSum} ${t("som")} / ${totalDollar} $`;
+    }
+
+    const total = workers.reduce((acc, curr) => {
+      const currentCost = parseAmount(curr.amountToReceive);
+      const historyCost = (curr.history || []).reduce((hAcc, hCurr) => {
+        const amount = parseAmount(hCurr.amount);
+        return hAcc +
+          (currencyDisplayMode === "sum"
+            ? convertToSum(amount, hCurr.currency)
+            : convertToDollar(amount, hCurr.currency));
+      }, 0);
+      const lastMonthPaid = parseAmount(curr.amountAlreadyReceived);
+      const convertedCurrent =
+        currencyDisplayMode === "sum"
+          ? convertToSum(currentCost, curr.currencyToReceive)
+          : convertToDollar(currentCost, curr.currencyToReceive);
+      const convertedPaid =
+        currencyDisplayMode === "sum"
+          ? convertToSum(lastMonthPaid, curr.currencyAlreadyReceived)
+          : convertToDollar(lastMonthPaid, curr.currencyAlreadyReceived);
+      return acc + convertedCurrent + historyCost + convertedPaid;
+    }, 0);
+
+    return formatModeAmount(total, currencyDisplayMode);
+  };
+
+  const getRemainingUnpaidDisplay = () => {
+    if (currencyDisplayMode === "combined") {
+      const unpaidSum = workers
+        .filter((w) => !w.isPaid)
+        .reduce((acc, curr) =>
+          acc + (curr.currencyToReceive === "sum" ? parseAmount(curr.amountToReceive) : 0),
+          0,
+        )
+        .toLocaleString();
+      const unpaidDollar = workers
+        .filter((w) => !w.isPaid)
+        .reduce((acc, curr) =>
+          acc + (curr.currencyToReceive === "dollar" ? parseAmount(curr.amountToReceive) : 0),
+          0,
+        )
+        .toLocaleString();
+      return `${unpaidSum} ${t("som")} / ${unpaidDollar} $`;
+    }
+
+    const total = workers
+      .filter((w) => !w.isPaid)
+      .reduce((acc, curr) => {
+        const amount = parseAmount(curr.amountToReceive);
+        return acc +
+          (currencyDisplayMode === "sum"
+            ? convertToSum(amount, curr.currencyToReceive)
+            : convertToDollar(amount, curr.currencyToReceive));
+      }, 0);
+
+    return formatModeAmount(total, currencyDisplayMode);
   };
 
   const handleSaveGlobalEmail = async () => {
@@ -186,13 +367,6 @@ function Hisobot() {
     const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
     if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
 
-    // 2. Conditional Loader
-    const hasLocal = sw || sb || sib || sp || sge;
-    if (!hasLocal) {
-      setShowInitialLoader(true);
-    }
-    setDataLoaded(false);
-
     // 3. Fetch from Cloud
     const loadCloud = async () => {
       try {
@@ -214,27 +388,17 @@ function Hisobot() {
       } catch (e) { 
         console.error("Cloud load failed/offline:", e); 
       } finally {
-        setDataLoaded(true);
-        setShowInitialLoader(false);
         console.log("Data load sequence completed.");
+        setCloudLoadComplete(true);
       }
     };
     
     loadCloud();
-    
-    // Safety fallback (removed per user request to not have "special time")
-    // But we keep it very long (60s) just as an absolute emergency fallback for browser hangs
-    const safetyTimer = setTimeout(() => { 
-      setDataLoaded(true); 
-      setShowInitialLoader(false); 
-    }, 60000);
-
-    return () => clearTimeout(safetyTimer);
   }, [navigate]);
 
   // 1. Local Save Effect (Immediate)
   useEffect(() => {
-    if (!username) return;
+    if (!username || !cloudLoadComplete) return;
     localStorage.setItem(`workers_${username}`, JSON.stringify(workers));
     localStorage.setItem(`totalBalance_${username}`, JSON.stringify(totalBalance));
     localStorage.setItem(`initialBalance_${username}`, JSON.stringify(initialBalance));
@@ -242,22 +406,17 @@ function Hisobot() {
     localStorage.setItem(`officeBranches_${username}`, JSON.stringify(officeBranches));
     localStorage.setItem(`workerObjects_${username}`, JSON.stringify(workerObjects));
     localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
-  }, [workers, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail]);
+  }, [workers, totalBalance, initialBalance, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, cloudLoadComplete]);
 
   // 2. Cloud Save Effect (Synced)
   useEffect(() => {
-    // CRITICAL: Only sync to cloud if data is actually loaded and we are NOT in the middle of initial sync
-    if (!username || !dataLoaded) return;
+    if (!username || !cloudLoadComplete) return;
     
-    // Safety: Don't save if everything is empty and we just started (prevents overwriting cloud with empty data)
+    // Safety: Don't save if everything is empty and we just started
     const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0;
     if (isTotallyEmpty) {
-       // Check if we have been loaded for a while (more than 5 seconds) before allowing an empty save
-       const loadedTime = window.sessionStorage.getItem('loaded_at') || Date.now();
-       if (Date.now() - loadedTime < 5000) {
-         console.log("Skipping potentially dangerous empty save...");
-         return;
-       }
+       console.log("Skipping potentially dangerous empty save...");
+       return;
     }
 
     // Cloud Sync
@@ -270,12 +429,7 @@ function Hisobot() {
       } catch (e) { console.error("Cloud save failed", e); }
     };
     saveCloud();
-  }, [workers, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail, dataLoaded]);
-
-  // Track mount time
-  useEffect(() => {
-    window.sessionStorage.setItem('loaded_at', Date.now().toString());
-  }, []);
+  }, [workers, totalBalance, initialBalance, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, cloudLoadComplete]);
 
   // --- END SYNC LOGIC ---
 
@@ -929,9 +1083,11 @@ function Hisobot() {
                       key={obj.id}
                       className={`project-sidebar-item ${activeWorkerObjectId === obj.id ? "active" : ""}`}
                       onClick={() => {
-                        setActiveWorkerObjectId(activeWorkerObjectId === obj.id ? null : obj.id);
-                        setActiveProjectId(null);
-                        setActiveBranchId(null);
+                        if (activeWorkerObjectId !== obj.id) {
+                          setActiveWorkerObjectId(obj.id);
+                          setActiveProjectId(null);
+                          setActiveBranchId(null);
+                        }
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -963,9 +1119,11 @@ function Hisobot() {
                       key={branch.id}
                       className={`project-sidebar-item ${activeBranchId === branch.id ? "active" : ""}`}
                       onClick={() => {
-                        setActiveBranchId(activeBranchId === branch.id ? null : branch.id);
-                        setActiveProjectId(null);
-                        setActiveWorkerObjectId(null);
+                        if (activeBranchId !== branch.id) {
+                          setActiveBranchId(branch.id);
+                          setActiveProjectId(null);
+                          setActiveWorkerObjectId(null);
+                        }
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -985,7 +1143,39 @@ function Hisobot() {
               </div>
             </div>
 
-            <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "10px" }}>
+            <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
+              <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
+                {t("qurilishxarajatlari")} <span>{">"}</span>
+              </h2>
+              <div className="project-list-container">
+                <h4 onClick={() => { setFileModalType("project"); setIsFileModalOpen(true); }}>+ Fayl</h4>
+                <div className="project-items">
+                  {projectFiles.map((project) => (
+                    <div
+                      key={project.id}
+                      className={`project-sidebar-item ${activeProjectId === project.id ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveProjectId(activeProjectId === project.id ? null : project.id);
+                        setIsSidebarOpen(false);
+                      }}
+                    >
+                      <span className="project-name">{project.name}</span>
+                      <button
+                        className="delete-project-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteProjectId(project.id);
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "25px" }}>
               <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>{t("global_worker_email") || "Ishchilar uchun umumiy email"}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 
@@ -1045,37 +1235,6 @@ function Hisobot() {
                 >
                   {t("saqlash") || "Saqlash"}
                 </button>
-              </div>
-            </div>
-            <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
-              <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
-                {t("qurilishxarajatlari")} <span>{">"}</span>
-              </h2>
-              <div className="project-list-container">
-                <h4 onClick={() => { setFileModalType("project"); setIsFileModalOpen(true); }}>+ Fayl</h4>
-                <div className="project-items">
-                  {projectFiles.map((project) => (
-                    <div
-                      key={project.id}
-                      className={`project-sidebar-item ${activeProjectId === project.id ? "active" : ""}`}
-                      onClick={() => {
-                        setActiveProjectId(activeProjectId === project.id ? null : project.id);
-                        setIsSidebarOpen(false);
-                      }}
-                    >
-                      <span className="project-name">{project.name}</span>
-                      <button
-                        className="delete-project-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteProjectId(project.id);
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
@@ -1168,6 +1327,12 @@ function Hisobot() {
                 {t("yuqorimaosh")}
               </h3>
             </div>
+            <button
+              className="currency-open-btn desktop-only-filter"
+              onClick={() => setIsCurrencyModalOpen(true)}
+            >
+              {t("valyuta")}
+            </button>
 
             <button
               className="mobile-filter-btn"
@@ -1229,7 +1394,23 @@ function Hisobot() {
 
               return (
                 <div className="worker-list">
-                  {filtered.map((worker) => (
+                  {filtered.map((worker) => {
+                    const toReceiveAmount = parseAmount(worker.amountToReceive);
+                    const receivedAmount = parseAmount(worker.amountAlreadyReceived);
+                    const toReceiveDisplay =
+                      currencyDisplayMode === "sum"
+                        ? `${convertToSum(toReceiveAmount, worker.currencyToReceive).toLocaleString()} ${t("som")}`
+                        : currencyDisplayMode === "dollar"
+                        ? `${convertToDollar(toReceiveAmount, worker.currencyToReceive).toLocaleString()} $`
+                        : `${toReceiveAmount.toLocaleString()} ${worker.currencyToReceive === "sum" ? t("som") : "$"}`;
+                    const receivedDisplay =
+                      currencyDisplayMode === "sum"
+                        ? `${convertToSum(receivedAmount, worker.currencyAlreadyReceived).toLocaleString()} ${t("som")}`
+                        : currencyDisplayMode === "dollar"
+                        ? `${convertToDollar(receivedAmount, worker.currencyAlreadyReceived).toLocaleString()} $`
+                        : `${receivedAmount.toLocaleString()} ${worker.currencyAlreadyReceived === "sum" ? t("som") : "$"}`;
+
+                    return (
                     <div
                       key={worker.id}
                       className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}
@@ -1271,22 +1452,14 @@ function Hisobot() {
                             </div>
                             <div className="val-group">
                               <p>{t("olishikerak")}:</p>
-                              <strong className="to-receive">
-                                {worker.amountToReceive}{" "}
-                                {worker.currencyToReceive === "sum" ? "so'm" : "$"}
-                              </strong>
+                              <strong className="to-receive">{toReceiveDisplay}</strong>
                               <span className="small-date">
                                 {t("sana")}: {worker.dateToGive}
                               </span>
                             </div>
                             <div className="val-group">
                               <p>{t("olgansumma")}:</p>
-                              <strong className="received">
-                                {worker.amountAlreadyReceived}{" "}
-                                {worker.currencyAlreadyReceived === "sum"
-                                  ? "so'm"
-                                  : "$"}
-                              </strong>
+                              <strong className="received">{receivedDisplay}</strong>
                               <span className="small-date">
                                 {t("olgan")}: {worker.dateAlreadyReceived}
                               </span>
@@ -1429,7 +1602,8 @@ function Hisobot() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
               );
             })()}
@@ -1447,10 +1621,7 @@ function Hisobot() {
               <h2>{t("statistika")}</h2>
               <div className="statistic1">
                 <h3>{t("boshlang'ichbalans")}:</h3>
-                <p>
-                  {initialBalance.sum.toLocaleString()} so'm /{" "}
-                  {initialBalance.dollar.toLocaleString()} $
-                </p>
+                <p>{getInitialBalanceDisplay()}</p>
               </div>
               <div className="statistic2">
                 <h3>{t("jamiishchilar")}:</h3>
@@ -1458,114 +1629,19 @@ function Hisobot() {
               </div>
               <div className="statistic3">
                 <h3>{t("engbalandmaosh")}:</h3>
-                <p>
-                  {(() => {
-                    const sumHigh = workers
-                      .filter((w) => w.currencyToReceive === "sum")
-                      .sort(
-                        (a, b) =>
-                          (parseFloat(b.amountToReceive) || 0) -
-                          (parseFloat(a.amountToReceive) || 0),
-                      )[0];
-                    const dolHigh = workers
-                      .filter((w) => w.currencyToReceive === "dollar")
-                      .sort(
-                        (a, b) =>
-                          (parseFloat(b.amountToReceive) || 0) -
-                          (parseFloat(a.amountToReceive) || 0),
-                      )[0];
-
-                    const sumText = sumHigh
-                      ? `${sumHigh.workerName}: ${parseFloat(sumHigh.amountToReceive).toLocaleString()} ${t("som")}`
-                      : t("yo'q");
-                    const dolText = dolHigh
-                      ? `${dolHigh.workerName}: ${parseFloat(dolHigh.amountToReceive).toLocaleString()} $`
-                      : t("yo'q");
-
-                    return `${sumText} / ${dolText}`;
-                  })()}
-                </p>
+                <p>{getHighestSalaryDisplay()}</p>
               </div>
               <div className="statistic4">
                 <h3>{t("jamimaoshlaruchunxarajat")}:</h3>
-                <p>
-                  {workers
-                    .reduce((acc, curr) => {
-                      const currentCost =
-                        curr.currencyToReceive === "sum"
-                          ? parseFloat(curr.amountToReceive) || 0
-                          : 0;
-                      const historyCost = (curr.history || []).reduce(
-                        (hAcc, hCurr) =>
-                          hCurr.currency === "sum"
-                            ? hAcc + (parseFloat(hCurr.amount) || 0)
-                            : hAcc,
-                        0,
-                      );
-                      const lastMonthPaid =
-                        curr.currencyAlreadyReceived === "sum"
-                          ? parseFloat(curr.amountAlreadyReceived) || 0
-                          : 0;
-                      return acc + currentCost + historyCost + lastMonthPaid;
-                    }, 0)
-                    .toLocaleString()}{" "}
-                  {t("som")} /
-                  {workers
-                    .reduce((acc, curr) => {
-                      const currentCost =
-                        curr.currencyToReceive === "dollar"
-                          ? parseFloat(curr.amountToReceive) || 0
-                          : 0;
-                      const historyCost = (curr.history || []).reduce(
-                        (hAcc, hCurr) =>
-                          hCurr.currency === "dollar"
-                            ? hAcc + (parseFloat(hCurr.amount) || 0)
-                            : hAcc,
-                        0,
-                      );
-                      const lastMonthPaid =
-                        curr.currencyAlreadyReceived === "dollar"
-                          ? parseFloat(curr.amountAlreadyReceived) || 0
-                          : 0;
-                      return acc + currentCost + historyCost + lastMonthPaid;
-                    }, 0)
-                    .toLocaleString()}{" "}
-                  $
-                </p>
+                <p>{getTotalExpensesDisplay()}</p>
               </div>
               <div className="statistic5">
                 <h3>{t("to'lanishikerakbo'lganqoldiq")}:</h3>
-                <p>
-                  {workers
-                    .filter((w) => !w.isPaid)
-                    .reduce(
-                      (acc, curr) =>
-                        curr.currencyToReceive === "sum"
-                          ? acc + (parseFloat(curr.amountToReceive) || 0)
-                          : acc,
-                      0,
-                    )
-                    .toLocaleString()}{" "}
-                  {t("som")} /
-                  {workers
-                    .filter((w) => !w.isPaid)
-                    .reduce(
-                      (acc, curr) =>
-                        curr.currencyToReceive === "dollar"
-                          ? acc + (parseFloat(curr.amountToReceive) || 0)
-                          : acc,
-                      0,
-                    )
-                    .toLocaleString()}{" "}
-                  $
-                </p>
+                <p>{getRemainingUnpaidDisplay()}</p>
               </div>
               <div className="statistic6">
                 <h3>{t("qolganbalans")}:</h3>
-                <p>
-                  {totalBalance.sum.toLocaleString()} {t("som")} /{" "}
-                  {totalBalance.dollar.toLocaleString()} $
-                </p>
+                <p>{getTotalBalanceDisplay()}</p>
               </div>
 
               <div className="linear-stats">
@@ -2300,6 +2376,106 @@ function Hisobot() {
                   {t("Katta oylikli ishchilar")}
                 </button>
               </div>
+              <div className="filter-options currency-filter-options">
+                <label>{t("valyuta")}</label>
+                <button
+                  className={`filter-btn ${currencyDisplayMode === "sum" ? "active" : ""}`}
+                  onClick={() => setCurrencyDisplayMode("sum")}
+                >
+                  {t("currency_mode_sum_short")}
+                </button>
+                <button
+                  className={`filter-btn ${currencyDisplayMode === "dollar" ? "active" : ""}`}
+                  onClick={() => setCurrencyDisplayMode("dollar")}
+                >
+                  {t("currency_mode_dollar_short")}
+                </button>
+                <button
+                  className={`filter-btn ${currencyDisplayMode === "combined" ? "active" : ""}`}
+                  onClick={() => setCurrencyDisplayMode("combined")}
+                >
+                  {t("currency_mode_combined_short")}
+                </button>
+                {currencyDisplayMode !== "combined" && (
+                  <div className="rate-row mobile-rate-row">
+                    <label>{t("dollar_rate_short")}</label>
+                    <input
+                      type="number"
+                      className="rate-input"
+                      value={dollarRate}
+                      onChange={(e) => setDollarRate(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCurrencyModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsCurrencyModalOpen(false)}>
+          <div className="modal-container currency-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{t("valyuta")}</h2>
+                <p className="modal-description">{t("currency_popup_description")}</p>
+              </div>
+              <button
+                className="close-btn"
+                onClick={() => setIsCurrencyModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body filter-modal-body">
+              <div className="currency-modal-body">
+                <div className="rate-row">
+                  <button
+                    className={`filter-btn ${currencyDisplayMode === "sum" ? "active" : ""}`}
+                    onClick={() => setCurrencyDisplayMode("sum")}
+                  >
+                    {t("currency_mode_sum_short")}
+                  </button>
+                  <button
+                    className={`filter-btn ${currencyDisplayMode === "dollar" ? "active" : ""}`}
+                    onClick={() => setCurrencyDisplayMode("dollar")}
+                  >
+                    {t("currency_mode_dollar_short")}
+                  </button>
+                  <button
+                    className={`filter-btn ${currencyDisplayMode === "combined" ? "active" : ""}`}
+                    onClick={() => setCurrencyDisplayMode("combined")}
+                  >
+                    {t("currency_mode_combined_short")}
+                  </button>
+                </div>
+                {currencyDisplayMode !== "combined" && (
+                  <div className="rate-row">
+                    <label>{t("dollar_rate_short")}</label>
+                    <input
+                      type="number"
+                      className="rate-input"
+                      value={dollarRate}
+                      onChange={(e) => setDollarRate(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn cancel"
+                onClick={() => setIsCurrencyModalOpen(false)}
+              >
+                {t("bekor_qilish_btn")}
+              </button>
+              <button
+                className="btn add"
+                onClick={() => setIsCurrencyModalOpen(false)}
+              >
+                {t("saqlash_btn")}
+              </button>
             </div>
           </div>
         </div>
@@ -2491,48 +2667,6 @@ function Hisobot() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-      {/* Premium Loading Overlay - ONLY if no local data AND still fetching */}
-      {showInitialLoader && !dataLoaded && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(10, 10, 26, 0.98)',
-          backdropFilter: 'blur(15px)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-        }}>
-          <div className="premium-loader"></div>
-          <p style={{
-            marginTop: '20px',
-            color: 'rgb(161, 161, 241)',
-            letterSpacing: '2px',
-            fontSize: '14px',
-            fontWeight: '300'
-          }}>{t("Ma'lumotlar yuklanmoqda...")}</p>
-
-          <style>{`
-            .premium-loader {
-              width: 50px;
-              height: 50px;
-              border: 3px solid rgba(86, 86, 255, 0.1);
-              border-top: 3px solid rgb(86, 86, 255);
-              border-radius: 50%;
-              animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-              box-shadow: 0 0 30px rgba(86, 86, 255, 0.2);
-            }
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
         </div>
       )}
     </div>

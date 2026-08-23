@@ -91,8 +91,26 @@
     font-weight: 700;
     color: #fff;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.main-val::-webkit-scrollbar {
+    height: 4px;
+}
+
+.main-val::-webkit-scrollbar-track {
+    background: rgba(161, 161, 241, 0.1);
+    border-radius: 4px;
+}
+
+.main-val::-webkit-scrollbar-thumb {
+    background: rgba(161, 161, 241, 0.5);
+    border-radius: 4px;
+}
+
+.main-val::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 161, 241, 0.8);
 }
 
 .calc-buttons {

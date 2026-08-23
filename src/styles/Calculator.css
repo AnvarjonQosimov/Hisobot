@@ -1,5 +1,4 @@
 .Calculator {
-    background-color: rgb(1, 3, 44);
     min-height: 100vh;
     width: 100%;
     display: flex;
@@ -9,6 +8,9 @@
     color: rgb(255, 255, 255);
     padding: 200px 20px;
     position: relative;
+    background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.25), transparent 30%),
+        linear-gradient(135deg, #020617 0%, #111827 45%, #0f172a 100%);
 }
 
 .modal-overlay {
@@ -230,14 +232,14 @@
 
 .btn-show-history {
     width: 100%;
-    background: linear-gradient(135deg, rgba(146, 151, 223, 0.25) 0%, rgba(99, 70, 204, 0.15) 100%);
-    border: 1px solid rgba(146, 151, 223, 0.4);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     color: rgb(204, 194, 255);
     padding: 14px;
     font-size: 16px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    border-radius: 12px;
+    border-radius: 999px;
     transition: all 0.3s ease;
     margin-top: 20px;
 }
@@ -250,12 +252,12 @@
 }
 
 .calculator-box {
-    background: linear-gradient(135deg, rgba(99, 70, 204, 0.2) 0%, rgba(173, 167, 225, 0.1) 100%);
-    border: 1px solid rgba(191, 170, 233, 0.5);
-    border-radius: 20px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(15, 23, 42, 0.4));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
     padding: 30px;
-    box-shadow: 0 0 30px rgba(146, 151, 223, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
+    box-shadow: 0 20px 60px rgba(2, 8, 23, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
     width: 100%;
 }
 

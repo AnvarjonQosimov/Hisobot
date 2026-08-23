@@ -7,6 +7,7 @@ import ProjectReport from "./ProjectReport";
 import { db, auth } from "../Firebase/Firebase";
 import { signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import Loading from "../components/Loading";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
@@ -72,13 +73,13 @@ function OfficeXarajat() {
   const [calcPosition, setCalcPosition] = useState({ x: 100, y: 100 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [syncStatus, setSyncStatus] = useState("synced");
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [showInitialLoader, setShowInitialLoader] = useState(false);
 
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
+  const [cloudLoadComplete, setCloudLoadComplete] = useState(false);
   const [globalWorkerEmail, setGlobalWorkerEmail] = useState("");
   const [savedGlobalWorkerEmail, setSavedGlobalWorkerEmail] = useState("");
   const [emailError, setEmailError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const validateEmail = (email) => {
     return String(email)
@@ -122,38 +123,33 @@ function OfficeXarajat() {
   useEffect(() => {
     const storedUsername = localStorage.getItem("username");
     if (!storedUsername) { navigate("/login"); return; }
-    setUsername(storedUsername);
+    const normalizedUsername = storedUsername.toLowerCase();
+    setUsername(normalizedUsername);
 
     // 1. Load Local
-    const se = localStorage.getItem(`office_expenses_${storedUsername}`);
+    const se = localStorage.getItem(`office_expenses_${normalizedUsername}`);
     if (se) setExpenses(JSON.parse(se));
-    const sb = localStorage.getItem(`office_balance_${storedUsername}`);
+    const sb = localStorage.getItem(`office_balance_${normalizedUsername}`);
     if (sb) setTotalBalance(JSON.parse(sb));
-    const sib = localStorage.getItem(`office_initial_balance_${storedUsername}`);
+    const sib = localStorage.getItem(`office_initial_balance_${normalizedUsername}`);
     if (sib) setInitialBalance(JSON.parse(sib));
-    const sp = localStorage.getItem(`projects_${storedUsername}`);
+    const sp = localStorage.getItem(`projects_${normalizedUsername}`);
     if (sp) setProjectFiles(JSON.parse(sp));
-    const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
+    const sge = localStorage.getItem(`globalEmail_${normalizedUsername}`);
     if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
-
-    // 2. Conditional Loader
-    const hasLocal = se || sb || sib || sp;
-    if (!hasLocal) {
-      setShowInitialLoader(true);
-    }
-    setDataLoaded(false);
 
     // 3. Load Cloud
     const loadCloud = async () => {
       try {
+        setLoading(true);
         console.log("Fetching office data from cloud for:", storedUsername);
-        const snap = await getDoc(doc(db, "cabinets", storedUsername));
+        const snap = await getDoc(doc(db, "cabinets", normalizedUsername));
         if (snap.exists()) {
           const d = snap.data();
-          if (d.officeExpenses?.length) setExpenses(d.officeExpenses);
+          if (Array.isArray(d.officeExpenses)) setExpenses(d.officeExpenses);
           if (d.officeTotalBalance) setTotalBalance(d.officeTotalBalance);
           if (d.officeInitialBalance) setInitialBalance(d.officeInitialBalance);
-          if (d.projectFiles?.length) setProjectFiles(d.projectFiles);
+          if (Array.isArray(d.projectFiles)) setProjectFiles(d.projectFiles);
           if (d.globalWorkerEmail) { 
             setGlobalWorkerEmail(d.globalWorkerEmail); 
             setSavedGlobalWorkerEmail(d.globalWorkerEmail); 
@@ -162,45 +158,34 @@ function OfficeXarajat() {
       } catch (e) { 
         console.log("Office cloud load failed/offline:", e); 
       } finally {
-        setDataLoaded(true);
-        setShowInitialLoader(false);
+        setLoading(false);
         console.log("Office data load sequence completed.");
+        setCloudLoadComplete(true);
       }
     };
     
     loadCloud();
-
-    // Safety fallback (60 seconds)
-    const safetyTimer = setTimeout(() => { 
-      setDataLoaded(true); 
-      setShowInitialLoader(false); 
-    }, 60000);
-
-    return () => clearTimeout(safetyTimer);
   }, [navigate]);
 
   // 1. Local Save Effect (Immediate)
   useEffect(() => {
-    if (!username) return;
+    if (!username || !cloudLoadComplete) return;
     localStorage.setItem(`office_expenses_${username}`, JSON.stringify(expenses));
     localStorage.setItem(`office_balance_${username}`, JSON.stringify(totalBalance));
     localStorage.setItem(`office_initial_balance_${username}`, JSON.stringify(initialBalance));
     localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
     localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
-  }, [expenses, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail]);
+  }, [expenses, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail, cloudLoadComplete]);
 
   // 2. Cloud Save Effect (Synced)
   useEffect(() => {
-    if (!username || !dataLoaded) return;
+    if (!username || !cloudLoadComplete) return;
     
     // Safety: Don't save if everything is empty and we just started
     const isTotallyEmpty = expenses.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0;
     if (isTotallyEmpty) {
-       const loadedTime = window.sessionStorage.getItem('office_loaded_at') || Date.now();
-       if (Date.now() - loadedTime < 5000) {
-         console.log("Skipping empty office save...");
-         return;
-       }
+       console.log("Skipping empty office save...");
+       return;
     }
 
     // Cloud Sync
@@ -213,17 +198,39 @@ function OfficeXarajat() {
       } catch (e) { console.error("Office sync failed", e); }
     };
     save();
-  }, [expenses, totalBalance, initialBalance, projectFiles, username, dataLoaded, globalWorkerEmail]);
-
-  useEffect(() => {
-    window.sessionStorage.setItem('office_loaded_at', Date.now().toString());
-  }, []);
+  }, [expenses, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail, cloudLoadComplete]);
 
   // --- END SYNC LOGIC ---
 
 
+  const saveAllDataToCloud = async () => {
+    if (!username) return;
+    try {
+      setSyncStatus("syncing");
+      await setDoc(doc(db, "cabinets", username), {
+        officeExpenses: expenses,
+        officeTotalBalance: totalBalance,
+        officeInitialBalance: initialBalance,
+        projectFiles,
+        globalWorkerEmail,
+      }, { merge: true });
+    } catch (e) {
+      console.error("Logout save failed:", e);
+    } finally {
+      setSyncStatus("synced");
+    }
+  };
+
   const confirmLogout = async () => {
     try {
+      if (username) {
+        localStorage.setItem(`office_expenses_${username}`, JSON.stringify(expenses));
+        localStorage.setItem(`office_balance_${username}`, JSON.stringify(totalBalance));
+        localStorage.setItem(`office_initial_balance_${username}`, JSON.stringify(initialBalance));
+        localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
+        localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
+        await saveAllDataToCloud();
+      }
       await signOut(auth);
       localStorage.clear();
       navigate("/login");
@@ -751,7 +758,7 @@ function OfficeXarajat() {
               <h3>{t("ishchilarhisoboti")}</h3>
             </Link>
 
-            <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "10px" }}>
+            <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "25px" }}>
               <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>{t("global_worker_email") || "Ishchilar uchun umumiy email"}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <input
@@ -824,7 +831,9 @@ function OfficeXarajat() {
                       key={project.id}
                       className={`project-sidebar-item ${activeProjectId === project.id ? "active" : ""}`}
                       onClick={() => {
-                        setActiveProjectId(activeProjectId === project.id ? null : project.id);
+                        if (activeProjectId !== project.id) {
+                          setActiveProjectId(project.id);
+                        }
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -957,7 +966,7 @@ function OfficeXarajat() {
           </div>
 
           <div className="rightBottom">
-            {(() => {
+            {setLoading ? (<Loading />) : ((() => {
               let filtered = expenses.filter((e) =>
                 e.expenseName.toLowerCase().includes(searchTerm.toLowerCase()),
               );
@@ -1132,7 +1141,8 @@ function OfficeXarajat() {
                   ))}
                 </div>
               );
-            })()}
+            })())}
+            
           </div>
 
           <div className={`rightRight ${isRightPanelOpen ? "open" : ""}`}>
@@ -1301,12 +1311,14 @@ function OfficeXarajat() {
               >
                 {t("bekorqilish")}
               </button>
+              <Link to="/login">
               <button
                 className="confirm-btn confirm-logout"
-                onClick={confirmLogout}
+                // onClick={confirmLogout}
               >
                 {t("chiqish")}
               </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -1873,48 +1885,6 @@ function OfficeXarajat() {
               </div>
             </div>
           </div>
-        </div>
-      )}
-      {/* Premium Loading Overlay - ONLY if no local data AND still fetching */}
-      {showInitialLoader && !dataLoaded && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(10, 10, 26, 0.98)',
-          backdropFilter: 'blur(15px)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-        }}>
-          <div className="premium-loader"></div>
-          <p style={{
-            marginTop: '20px',
-            color: 'rgb(161, 161, 241)',
-            letterSpacing: '2px',
-            fontSize: '14px',
-            fontWeight: '300'
-          }}>{t("Ma'lumotlar yuklanmoqda...")}</p>
-
-          <style>{`
-            .premium-loader {
-              width: 50px;
-              height: 50px;
-              border: 3px solid rgba(86, 86, 255, 0.1);
-              border-top: 3px solid rgb(86, 86, 255);
-              border-radius: 50%;
-              animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-              box-shadow: 0 0 30px rgba(86, 86, 255, 0.2);
-            }
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
         </div>
       )}
     </div>

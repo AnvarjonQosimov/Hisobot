@@ -13,6 +13,9 @@
   margin-left: 280px;
   color: rgb(204, 194, 255);
   transition: all 0.3s ease;
+  background:
+    radial-gradient(circle at top right, rgba(16, 185, 129, 0.16), transparent 30%),
+    linear-gradient(135deg, #020617 0%, #111827 45%, #0f172a 100%);
 }
 
 /* ---- Main content area (left/center) ---- */
@@ -23,8 +26,9 @@
   gap: 14px;
   padding: 20px 24px 20px 30px;
   overflow-y: auto;
-  /* leave room for rightRight panel */
   margin-right: 285px;
+  background: rgba(2, 6, 23, 0.18);
+  backdrop-filter: blur(8px);
 }
 
 /* ---- Header ---- */
@@ -34,6 +38,11 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .pr-title-area {

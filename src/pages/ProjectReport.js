@@ -20,6 +20,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
   const [budgetModal, setBudgetModal] = useState(false);
   const [deleteItem, setDeleteItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
+  const [chartPeriod, setChartPeriod] = useState("week");
 
   // Form state
   const [form, setForm] = useState({
@@ -52,10 +53,18 @@ function ProjectReport({ projectId, projectName, onBack }) {
     if (!u) return;
     const storedExp = localStorage.getItem(expKey(u));
     if (storedExp) setExpenses(JSON.parse(storedExp));
+    else setExpenses([]);
+    
     const storedBudget = localStorage.getItem(budgetKey(u));
     if (storedBudget) setBudget(JSON.parse(storedBudget));
+    else setBudget({ sum: 0, dollar: 0 });
+    
     const storedInit = localStorage.getItem(initBudgetKey(u));
     if (storedInit) setInitialBudget(JSON.parse(storedInit));
+    else setInitialBudget({ sum: 0, dollar: 0 });
+
+    setUndoStack([]);
+    setChartPeriod("week");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -113,6 +122,86 @@ function ProjectReport({ projectId, projectName, onBack }) {
   const catIcon = (cat) => ({ material: "🧱", ishchi: "👷", texnika: "🚜", boshqa: "📋" }[cat] || "📦");
 
   const unitOptions = ["dona", "kg", "t", "m", "m²", "m³", "l", "kun", "soat"];
+
+  const getChartData = () => {
+    const now = new Date();
+    let data = [];
+    let allPayments = [];
+
+    expenses.forEach((e) => {
+      if (e.isPaid) {
+        allPayments.push({
+          date: new Date(e.date),
+          amount: parseFloat(e.amountPerUnit || 0) * parseFloat(e.quantity || 1),
+          currency: e.currency,
+        });
+      }
+    });
+
+    if (chartPeriod === "day") {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 2 * 60 * 60 * 1000);
+        const sum = allPayments
+          .filter(
+            (p) =>
+              p.date.getHours() === d.getHours() &&
+              p.date.getDate() === d.getDate(),
+          )
+          .reduce((acc, curr) => acc + curr.amount, 0);
+        data.push(sum);
+      }
+    } else if (chartPeriod === "week") {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const sum = allPayments
+          .filter((p) => p.date.toLocaleDateString() === d.toLocaleDateString())
+          .reduce((acc, curr) => acc + curr.amount, 0);
+        data.push(sum);
+      }
+    } else if (chartPeriod === "month") {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const sum = allPayments
+          .filter((p) => p.date.toLocaleDateString() === d.toLocaleDateString())
+          .reduce((acc, curr) => acc + curr.amount, 0);
+        data.push(sum);
+      }
+    } else {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const sum = allPayments
+          .filter(
+            (p) =>
+              p.date.getMonth() === d.getMonth() &&
+              p.date.getFullYear() === d.getFullYear(),
+          )
+          .reduce((acc, curr) => acc + curr.amount, 0);
+        data.push(sum);
+      }
+    }
+
+    const max = Math.max(...data, 1);
+    const height = 150;
+    const width = 300;
+
+    let path = data
+      .map((val, i) => {
+        const x = (i / (data.length - 1 || 1)) * width;
+        const y = height - (val / max) * height;
+        return (i === 0 ? "M " : "L ") + `${x},${y}`;
+      })
+      .join(" ");
+
+    return path;
+  };
+
+  const getCircularData = () => {
+    const totalCount = expenses.length;
+    if (totalCount === 0) return { paid: 0, unpaid: 0, percent: 0 };
+    const paidCount = expenses.filter((e) => e.isPaid).length;
+    const percent = Math.round((paidCount / totalCount) * 100);
+    return { paid: paidCount, unpaid: totalCount - paidCount, percent };
+  };
 
   const openAdd = () => {
     setEditItem(null);
@@ -366,16 +455,103 @@ function ProjectReport({ projectId, projectName, onBack }) {
             </div>
 
             {/* Category breakdown */}
-            <div className="linear-stats">
+            <div className="linear-stats" style={{ width: "80%" }}>
               <h2>{t("pr_kategoriya")}</h2>
               {catStats.map(({ cat, count, sumTotal, dolTotal }) => (
-                <div key={cat} className="statistic-item" style={{ marginBottom: "8px" }}>
+                <div key={cat} className="statistic1" style={{ width: "100%" }}>
                   <h3>{catIcon(cat)} {catLabel(cat)} <span style={{ color: "rgba(180,170,255,0.5)", fontSize: "12px" }}>({count})</span></h3>
-                  {sumTotal > 0 && <p>{sumTotal.toLocaleString()} {t("som")}</p>}
-                  {dolTotal > 0 && <p>{dolTotal.toLocaleString()} $</p>}
-                  {sumTotal === 0 && dolTotal === 0 && <p style={{ color: "rgba(200,190,255,0.3)", fontSize: "12px" }}>—</p>}
+                  <p style={{ flexDirection: "column", height: "auto", padding: "10px", width: "100%", boxSizing: "border-box" }}>
+                    {sumTotal > 0 && <span style={{ margin: "5px 0" }}>{sumTotal.toLocaleString()} {t("som")}</span>}
+                    {dolTotal > 0 && <span style={{ margin: "5px 0" }}>{dolTotal.toLocaleString()} $</span>}
+                    {sumTotal === 0 && dolTotal === 0 && <span style={{ color: "rgba(200,190,255,0.3)", fontSize: "12px" }}>—</span>}
+                  </p>
                 </div>
               ))}
+            </div>
+
+            <div className="linear-stats">
+              <h2>{t("Xarajatlar o'zgarishi")}</h2>
+              <div className="chart-controls">
+                {["day", "week", "month", "year"].map((p) => (
+                  <button
+                    key={p}
+                    className={chartPeriod === p ? "active" : ""}
+                    onClick={() => setChartPeriod(p)}
+                  >
+                    {p === "day"
+                      ? t("kun")
+                      : p === "week"
+                        ? t("hafta")
+                        : p === "month"
+                          ? t("oy")
+                          : t("yil")}
+                  </button>
+                ))}
+              </div>
+              <div className="chart-container">
+                <svg className="chart-svg" viewBox="0 0 300 150">
+                  <defs>
+                    <linearGradient
+                      id="chartGradient"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="0%"
+                    >
+                      <stop offset="0%" stopColor="#5656ff" />
+                      <stop offset="100%" stopColor="#28ec70" />
+                    </linearGradient>
+                  </defs>
+                  <path className="chart-path" d={getChartData()} />
+                </svg>
+              </div>
+            </div>
+
+            <div className="circular-stats">
+              <h2>{t("Aylana Statistika")}</h2>
+              <div className="pie-container">
+                <svg className="pie-chart" viewBox="0 0 100 100">
+                  <circle
+                    className="pie-bg"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke="rgba(161, 161, 241, 0.1)"
+                    strokeWidth="10"
+                  />
+                  <circle
+                    className="pie-segment"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke="#5656ff"
+                    strokeWidth="10"
+                    strokeDasharray={`${getCircularData().percent * 2.51} 251.2`}
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    transform="rotate(-90 50 50)"
+                  />
+                  <text x="50" y="55" className="pie-text">
+                    {getCircularData().percent}%
+                  </text>
+                </svg>
+                <div className="pie-legend">
+                  <div className="legend-item">
+                    <span className="dot paid"></span>
+                    <span>
+                      {t("To'langan")}: {getCircularData().paid}
+                    </span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="dot unpaid"></span>
+                    <span>
+                      {t("Qolgan")}: {getCircularData().unpaid}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
       </div>

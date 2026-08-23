@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { initializeFirestore } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAxp5nDt3zA0df6_GpKPa3UpICAg46OLng",
@@ -16,11 +16,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
-// Group all initializations together at the top
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = initializeFirestore(app, {
-  localCache: persistentLocalCache(),
   experimentalForceLongPolling: true,
 });
 
