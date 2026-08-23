@@ -10,6 +10,7 @@ import { db, auth } from "../Firebase/Firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import FloatingCalculator from "../components/FloatingCalculator";
+import Loading from "../components/Loading";
 import { AnimatePresence } from "framer-motion";
 
 function Hisobot() {
@@ -1362,7 +1363,7 @@ function Hisobot() {
           </div>
 
           <div className="rightBottom">
-            {(() => {
+            {!cloudLoadComplete ? <Loading /> : (() => {
               let filtered = workers.filter((w) =>
                 w.workerName.toLowerCase().includes(searchTerm.toLowerCase()),
               );

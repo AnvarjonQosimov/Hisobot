@@ -966,7 +966,7 @@ function OfficeXarajat() {
           </div>
 
           <div className="rightBottom">
-            {setLoading ? (<Loading />) : ((() => {
+            {loading ? (<Loading />) : ((() => {
               let filtered = expenses.filter((e) =>
                 e.expenseName.toLowerCase().includes(searchTerm.toLowerCase()),
               );
