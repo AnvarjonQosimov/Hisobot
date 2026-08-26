@@ -1,4 +1,5 @@
-.Hisobot{
+.Hisobot,
+.OfficeXarajat{
     min-height: 100vh;
     width: 100%;
     display: flex;
@@ -11,7 +12,8 @@
         linear-gradient(135deg, #020617 0%, #111827 45%, #0f172a 100%);
 }
 
-.HisobotLeft{
+.HisobotLeft,
+.OfficeXarajatLeft{
     display: flex;
     align-items: center;
     justify-content: start;
@@ -312,7 +314,8 @@
     }
 }
 
-.HisobotRight{
+.HisobotRight,
+.OfficeXarajatRight{
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -791,7 +794,8 @@
     transform: none;
 }
 
-.lrLine{
+    .Hisobot,
+    .OfficeXarajat{
     height: 100%;
     width: 3px;
     background-color: rgb(7, 12, 64);
@@ -1389,7 +1393,8 @@
     }
 
     /* ── Left sidebar — hidden by default, slides in when .open ── */
-    .HisobotLeft {
+    .HisobotLeft,
+    .OfficeXarajatLeft {
         transform: translateX(-100%);
         z-index: 1002;
         box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
@@ -1397,7 +1402,8 @@
         left: 0;
     }
 
-    .HisobotLeft.open {
+    .HisobotLeft.open,
+    .OfficeXarajatLeft.open {
         transform: translateX(0);
     }
 
@@ -1414,7 +1420,8 @@
     }
 
     /* ── Main content fills full width ── */
-    .HisobotRight {
+    .HisobotRight,
+    .OfficeXarajatRight {
         width: 100% !important;
         margin-left: 0 !important;
     }
@@ -1440,7 +1447,8 @@
         align-items: flex-start;
     }
 
-    .worker-values {
+    .HisobotLeft.open,
+    .OfficeXarajatLeft.open {
         width: 100%;
         justify-content: flex-start;
         flex-wrap: wrap;

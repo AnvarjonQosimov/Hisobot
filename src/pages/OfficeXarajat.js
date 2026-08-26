@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "../styles/OfficeXarajat.css";
+import "../styles/ProjectReport.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
@@ -894,7 +895,7 @@ function OfficeXarajat() {
       )}
 
       {activeProjectId === null ? (
-        <div className="OfficeXarajatRight">
+        <div className="OfficeXarajatRight pr-main">
           {isRightPanelOpen && (
             <div
               className="sidebar-overlay"
@@ -907,13 +908,18 @@ function OfficeXarajat() {
           >
             ‹
           </button>
-          <div className="rightTop">
-            <h3 className="addH3" onClick={handleAddExpenseClick}>
+          <div className="rightTop pr-header">
+            <div className="pr-title-area">
+              <span className="pr-icon">🏢</span>
+              <h2 className="pr-title">{t("o'fisxarajatlari")}</h2>
+            </div>
+            <div className="pr-header-actions">
+            <button className="pr-btn pr-btn-add" onClick={handleAddExpenseClick}>
               + {t("qo'shish")}
-            </h3>
-            <h3 className="addH3" onClick={handleBalansClick}>
+            </button>
+            <button className="pr-btn pr-btn-budget" onClick={handleBalansClick}>
               + {t("balans")}
-            </h3>
+            </button>
             <div className="ql">
               <div className="qoshishLine"></div>
             </div>
@@ -952,7 +958,7 @@ function OfficeXarajat() {
 
             {undoState && (
               <div className="undo-group">
-                <button className="undo-btn icon-only" onClick={handleUndoClick}>
+                <button className="pr-btn pr-btn-undo" onClick={handleUndoClick}>
                   ↩️
                 </button>
                 <button
@@ -963,9 +969,10 @@ function OfficeXarajat() {
                 </button>
               </div>
             )}
+            </div>
           </div>
 
-          <div className="rightBottom">
+          <div className="rightBottom pr-list">
             {loading ? (<Loading />) : ((() => {
               let filtered = expenses.filter((e) =>
                 e.expenseName.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -994,31 +1001,33 @@ function OfficeXarajat() {
               }
 
               return (
-                <div className="worker-list">
+                <div className="worker-list pr-list">
                   {filtered.map((expense) => (
                     <div
                       key={expense.id}
-                      className={`worker-item ${expense.isPaid ? "paid-row" : ""}`}
+                      className={`worker-item pr-item ${expense.isPaid ? "paid-row pr-item-paid" : ""}`}
                     >
-                      <div className="worker-item-main">
-                        <div className="worker-info">
+                      <div className="worker-item-main pr-item-left">
+                        <div className="worker-info pr-item-left">
                           <input
                             type="checkbox"
-                            className="paid-checkbox"
+                            className="paid-checkbox pr-checkbox"
                             checked={expense.isPaid}
                             onChange={() => handleTogglePaid(expense.id)}
                           />
-                          <div className="name-date">
-                            <h3>{expense.expenseName}</h3>
-                            <span>
-                              {new Date(expense.createdAt).toLocaleDateString()}
-                            </span>
+                          <div className="name-date pr-item-info">
+                            <h3 className="pr-item-name">{expense.expenseName}</h3>
+                            <div className="pr-item-meta">
+                              <span className="pr-badge">{new Date(expense.createdAt).toLocaleDateString()}</span>
+                              <span className="pr-badge">{t("Xarajat")}</span>
+                              {expense.isPaid && <span className="pr-badge pr-badge-paid">✓ {t("To'langan")}</span>}
+                            </div>
                           </div>
                         </div>
-                        <div className="worker-values">
-                          <div className="val-group">
+                        <div className="worker-values pr-item-right">
+                          <div className="val-group pr-item-amount">
                             <p>{t("To'lanishi kerak")}:</p>
-                            <strong className="to-receive">
+                            <strong className="to-receive pr-item-amount">
                               {parseFloat(expense.amountToPay || 0).toLocaleString()}{" "}
                               {expense.currencyToPay === "sum" ? t("som") : "$"}
                             </strong>
@@ -1026,9 +1035,9 @@ function OfficeXarajat() {
                               {t("sana")}: {expense.dateToPay}
                             </span>
                           </div>
-                          <div className="val-group">
+                          <div className="val-group pr-item-amount">
                             <p>{t("To'langan summa")}:</p>
-                            <strong className="received">
+                            <strong className="received pr-item-amount">
                               {parseFloat(expense.amountAlreadyPaid || 0).toLocaleString()}{" "}
                               {expense.currencyAlreadyPaid === "sum"
                                 ? t("som")
@@ -1039,7 +1048,7 @@ function OfficeXarajat() {
                             </span>
                           </div>
                         </div>
-                        <div className="worker-actions">
+                        <div className="worker-actions pr-item-actions">
                           <button
                             className="month-btn"
                             onClick={() => handleNextCycle(expense.id)}
