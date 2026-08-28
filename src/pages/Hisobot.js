@@ -1020,9 +1020,11 @@ function Hisobot() {
     }
   };
 
+  const adminEmail = "archoltinnisbatarch@gmail.com"
+
   return (
     <div className="Hisobot">
-      {/* Left sidebar open button */}
+      {adminEmail === username ? ( <> {/* Left sidebar open button */}
       <button
         className="mobile-menu-btn"
         onClick={() => setIsSidebarOpen(true)}
@@ -1048,7 +1050,8 @@ function Hisobot() {
         <div className="hisobotLeftText">
           <div className="leftTop">
             <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
-            <p>{username}</p>
+            {/* <p>{username}</p> */}
+            <p>BOSS</p>
             {isOffline && (
               <div style={{ color: '#ffa500', fontSize: '10px', marginTop: '5px' }}>
                 ⚠️ {t("Working Offline")}
@@ -2669,7 +2672,7 @@ function Hisobot() {
             </div>
           </div>
         </div>
-      )}
+      )} </> ) : ("Bu yerga faqat admin kirishi mumkin!")}
     </div>
   );
 }

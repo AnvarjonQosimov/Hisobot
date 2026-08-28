@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import { db, auth } from "../Firebase/Firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import Loading from "../components/Loading";
 
@@ -14,15 +14,62 @@ function WorkerDashboard() {
 
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
 
+  // useEffect(() => {
+  //   const handleStatus = () => setIsOffline(!window.navigator.onLine);
+  //   window.addEventListener("online", handleStatus);
+  //   window.addEventListener("offline", handleStatus);
+  //   return () => {
+  //     window.removeEventListener("online", handleStatus);
+  //     window.removeEventListener("offline", handleStatus);
+  //   };
+  // }, []);
+
   useEffect(() => {
-    const handleStatus = () => setIsOffline(!window.navigator.onLine);
-    window.addEventListener("online", handleStatus);
-    window.addEventListener("offline", handleStatus);
-    return () => {
-      window.removeEventListener("online", handleStatus);
-      window.removeEventListener("offline", handleStatus);
-    };
-  }, []);
+  const role = localStorage.getItem("role");
+  const bEmail = localStorage.getItem("bossEmail");
+  const wId = localStorage.getItem("workerId");
+
+  if (role !== "worker" || !bEmail || !wId) {
+    navigate("/login");
+    return;
+  }
+
+  setBossEmail(bEmail);
+  setWorkerId(wId);
+
+  const docRef = doc(db, "cabinets", bEmail);
+
+  const unsubscribe = onSnapshot(
+    docRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+
+        setCabinetData(data);
+
+        if (data.workers) {
+          setFullWorkers(data.workers);
+
+          const pWorker = data.workers.find(
+            w => String(w.id) === String(wId)
+          );
+
+          if (pWorker) {
+            setWorker(pWorker);
+          }
+        }
+      }
+
+      setLoading(false);
+    },
+    (error) => {
+      console.error("Worker cloud sync error:", error);
+      setLoading(false);
+    }
+  );
+
+  return () => unsubscribe();
+}, [navigate]);
 
   const [worker, setWorker] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +81,13 @@ function WorkerDashboard() {
   const [workerId, setWorkerId] = useState("");
   const [fullWorkers, setFullWorkers] = useState([]);
   const [cabinetData, setCabinetData] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const handleOpenDetail = () => {
+  if (!worker) return;
+
+  setIsDetailModalOpen(true);
+};
 
   // Stats Period
   const [chartPeriod, setChartPeriod] = useState("week");
@@ -86,16 +140,18 @@ function WorkerDashboard() {
     }
   };
 
-  const handleTogglePaid = (id) => {
-    if (!worker) return;
-    const newIsPaid = !worker.isPaid;
-    const newWorkerDetails = { ...worker, isPaid: newIsPaid };
-    setWorker(newWorkerDetails);
+  // const handleTogglePaid = (id) => {
+  //   if (!worker) return;
+  //   const newIsPaid = !worker.isPaid;
+  //   const newWorkerDetails = { ...worker, isPaid: newIsPaid };
+  //   setWorker(newWorkerDetails);
 
-    const updatedWorkers = fullWorkers.map(w => w.id === worker.id ? newWorkerDetails : w);
-    setFullWorkers(updatedWorkers);
-    saveToCloud(updatedWorkers);
-  };
+  //   const updatedWorkers = fullWorkers.map(w => w.id === worker.id ? newWorkerDetails : w);
+  //   setFullWorkers(updatedWorkers);
+  //   saveToCloud(updatedWorkers);
+  // };
+
+  const handleTogglePaid = () => {};
 
   const toggleHistory = (id) => {
     setExpandedHistory((prev) =>
@@ -270,16 +326,19 @@ function WorkerDashboard() {
         <div className="rightBottom" style={{ flex: 1, padding: "30px" }}>
           {worker ? (
             <div className="worker-list" style={{ height: "auto" }}>
-              <div className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}>
+              <div
+  className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}
+  onClick={handleOpenDetail}
+>
                 <div className="worker-item-main">
                   <div className="worker-info" style={{ width: '25%' }}>
                     <input
-                      type="checkbox"
-                      className="paid-checkbox"
-                      checked={worker.isPaid}
-                      onChange={() => handleTogglePaid()}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+  type="checkbox"
+  className="paid-checkbox"
+  checked={!!worker.isPaid}
+  readOnly
+  onClick={(e) => e.stopPropagation()}
+/>
                     <div className="name-date">
                       <h3>{worker.workerName}</h3>
                       <span>{new Date(worker.createdAt).toLocaleDateString()}</span>
@@ -407,6 +466,286 @@ function WorkerDashboard() {
           )}
         </div>
       </div>
+
+      {isDetailModalOpen && worker && (
+  <div
+    className="modal-overlay"
+    onClick={() => setIsDetailModalOpen(false)}
+  >
+    <div
+      className="modal-container finishedworks"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="modal-header">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "15px"
+          }}
+        >
+          <h2 style={{ margin: 0 }}>
+            {worker.workerName}
+          </h2>
+
+          {worker.workerCode && (
+            <span
+              style={{
+                fontSize: "0.8rem",
+                color: "rgb(146, 151, 223)",
+                fontWeight: "600",
+                background: "rgba(146, 151, 223, 0.15)",
+                padding: "4px 10px",
+                borderRadius: "12px",
+                marginLeft: "10px"
+              }}
+            >
+              Password: {worker.workerCode}
+            </span>
+          )}
+        </div>
+
+        <button
+          className="close-btn"
+          onClick={() => setIsDetailModalOpen(false)}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="modal-body">
+
+        <div className="aboutTop">
+
+          {/* ЛЕВАЯ ЧАСТЬ */}
+          <div className="aboutTopLeft">
+
+            <div className="val-group">
+              <p>{t("olishikerak")}:</p>
+
+              <strong className="to-receive">
+                {worker.amountToReceive}{" "}
+                {worker.currencyToReceive === "sum"
+                  ? t("som")
+                  : "$"}
+              </strong>
+
+              <span className="small-date">
+                {t("sana")}: {worker.dateToGive}
+              </span>
+            </div>
+
+            <div className="work-field">
+              <label>
+                {t("qilayotganishi")}:
+              </label>
+
+              <span
+                style={{
+                  color: "#fff",
+                  fontWeight: "600"
+                }}
+              >
+                {worker.currentWork || t("yo'q")}
+              </span>
+            </div>
+
+            <div className="work-field">
+              <label>
+                {t("qilinayotganishfoizi")}:
+              </label>
+
+              <strong className="progress-text">
+                {worker.workPercent || "0%"}
+              </strong>
+            </div>
+
+          </div>
+
+
+          {/* ПРАВАЯ ЧАСТЬ */}
+          <div className="aboutTopRight">
+
+            <div className="val-group">
+              <p>{t("olgansumma")}:</p>
+
+              <strong className="received">
+                {worker.amountAlreadyReceived}{" "}
+                {worker.currencyAlreadyReceived === "sum"
+                  ? t("som")
+                  : "$"}
+              </strong>
+
+              <span className="small-date">
+                {t("olgan")}: {worker.dateAlreadyReceived}
+              </span>
+            </div>
+
+            <div className="work-field">
+              <label>
+                {t("oldin_qilingan_ish")}:
+              </label>
+
+              <span
+                style={{
+                  color: "#fff",
+                  fontWeight: "600"
+                }}
+              >
+                {worker.prevWork || t("yo'q")}
+              </span>
+            </div>
+
+            <div className="work-field">
+              <label>
+                {t("oldin_qilingan_foiz")}:
+              </label>
+
+              <strong className="progress-text">
+                {worker.prevWorkPercent || "0%"}
+              </strong>
+            </div>
+
+          </div>
+        </div>
+
+
+        {/* СТАТУС ОПЛАТЫ */}
+        <div
+          className="payment-status"
+          style={{
+            marginTop: "20px",
+            padding: "15px 20px",
+            borderRadius: "10px"
+          }}
+        >
+          <span>
+            {t("to'langan") || "Оплата"}:
+          </span>
+
+          <strong>
+            {worker.isPaid
+              ? "✓ Оплачено"
+              : "○ Не оплачено"}
+          </strong>
+        </div>
+
+
+        {/* ИСТОРИЯ ПРОЕКТОВ */}
+        <div className="aboutBottom">
+
+          <h3>
+            {t("loyiha_tarixi")}
+          </h3>
+
+          <div className="project-history-list">
+
+            {(
+              !worker.history ||
+              worker.history.filter(
+                h =>
+                  h.type === "project_completed" ||
+                  h.type === "archived"
+              ).length === 0
+            ) ? (
+
+              <p className="no-history">
+                {t("tarix_mavjud_emas")}
+              </p>
+
+            ) : (
+
+              worker.history
+
+                .map((h, idx) => ({
+                  ...h,
+                  originalIdx: idx
+                }))
+
+                .filter(
+                  h =>
+                    h.type === "project_completed" ||
+                    h.type === "archived"
+                )
+
+                .reverse()
+
+                .map((h) => (
+
+                  <div
+                    key={h.originalIdx}
+                    className="project-history-item"
+                  >
+
+                    <div className="history-main">
+
+                      <div className="history-text">
+
+                        <strong>
+                          {h.work ||
+                            t("noma'lum_ish")}
+                        </strong>
+
+                        <span>
+                          {h.percent || "100%"}
+                        </span>
+
+                      </div>
+
+                    </div>
+
+
+                    <div className="history-details">
+
+                      <small>
+                        {h.date}
+                      </small>
+
+                      <small>
+                        {h.amount}{" "}
+                        {h.currency === "sum"
+                          ? t("som")
+                          : "$"}
+
+                        {" / "}
+
+                        {h.received}{" "}
+                        {h.receivedCurrency === "sum"
+                          ? t("som")
+                          : "$"}
+                      </small>
+
+                    </div>
+
+                  </div>
+
+                ))
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      {/* ТОЛЬКО КНОПКА ЗАКРЫТЬ */}
+      <div className="modal-footer">
+
+        <button
+          className="btn cancel"
+          onClick={() =>
+            setIsDetailModalOpen(false)
+          }
+        >
+          {t("yopish")}
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
 
       {logoutDialog && (
         <div className="confirm-overlay" onClick={() => setLogoutDialog(false)}>
