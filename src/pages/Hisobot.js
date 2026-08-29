@@ -366,7 +366,11 @@ function Hisobot() {
     const swo = localStorage.getItem(`workerObjects_${storedUsername}`);
     if (swo) setWorkerObjects(JSON.parse(swo));
     const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
-    if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
+if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
+const scdm = localStorage.getItem(`currencyDisplayMode_${storedUsername}`);
+if (scdm) setCurrencyDisplayMode(scdm);
+const sdr = localStorage.getItem(`dollarRate_${storedUsername}`);
+if (sdr) setDollarRate(JSON.parse(sdr));
 
     // 3. Fetch from Cloud
     const loadCloud = async () => {
@@ -407,7 +411,9 @@ function Hisobot() {
     localStorage.setItem(`officeBranches_${username}`, JSON.stringify(officeBranches));
     localStorage.setItem(`workerObjects_${username}`, JSON.stringify(workerObjects));
     localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
-  }, [workers, totalBalance, initialBalance, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, cloudLoadComplete]);
+    localStorage.setItem(`currencyDisplayMode_${username}`, currencyDisplayMode);
+  localStorage.setItem(`dollarRate_${username}`, JSON.stringify(dollarRate));
+  }, [workers, totalBalance, initialBalance, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, dollarRate, cloudLoadComplete]);
 
   // 2. Cloud Save Effect (Synced)
   useEffect(() => {
