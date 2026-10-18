@@ -36,6 +36,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
   });
 
   const [budgetForm, setBudgetForm] = useState({ sum: "", dollar: "" });
+  const [budgetMode, setBudgetMode] = useState("add");
 
   // Undo state
   const [undoStack, setUndoStack] = useState([]);
@@ -278,10 +279,22 @@ function ProjectReport({ projectId, projectName, onBack }) {
   };
 
   const handleBudgetSave = () => {
+    saveForUndo();
     const s = parseFloat(budgetForm.sum || 0);
     const d = parseFloat(budgetForm.dollar || 0);
-    setBudget({ sum: s, dollar: d });
-    setInitialBudget({ sum: s, dollar: d });
+    if (budgetMode === "add") {
+      setBudget((prev) => ({
+        sum: (prev.sum || 0) + s,
+        dollar: (prev.dollar || 0) + d,
+      }));
+      setInitialBudget((prev) => ({
+        sum: (prev.sum || 0) + s,
+        dollar: (prev.dollar || 0) + d,
+      }));
+    } else {
+      setBudget({ sum: s, dollar: d });
+      setInitialBudget({ sum: s, dollar: d });
+    }
     setBudgetForm({ sum: "", dollar: "" });
     setBudgetModal(false);
   };
@@ -653,28 +666,71 @@ function ProjectReport({ projectId, projectName, onBack }) {
         <div className="pr-overlay" onClick={() => setBudgetModal(false)}>
           <div className="pr-modal pr-modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="pr-modal-header">
-              <h3>{t("pr_byudjet_qoshish")}</h3>
+              <h3>
+                {budgetMode === "add"
+                  ? (t("byudjet_qoshish_tab") || "Byudjetga qo'shish")
+                  : (t("byudjet_yangilash_tab") || "Byudjetni yangilash")}
+              </h3>
               <button className="pr-close-btn" onClick={() => setBudgetModal(false)}>✕</button>
             </div>
             <div className="pr-modal-body">
+              {/* TABS */}
+              <div className="pr-budget-tabs">
+                <button
+                  type="button"
+                  className={`pr-budget-tab ${budgetMode === "add" ? "active tab-add" : ""}`}
+                  onClick={() => setBudgetMode("add")}
+                >
+                  ➕ {t("byudjet_qoshish_tab") || "Byudjetga qo'shish"}
+                </button>
+                <button
+                  type="button"
+                  className={`pr-budget-tab ${budgetMode === "update" ? "active" : ""}`}
+                  onClick={() => setBudgetMode("update")}
+                >
+                  🔄 {t("byudjet_yangilash_tab") || "Byudjetni yangilash"}
+                </button>
+              </div>
+
               <div className="pr-budget-current">
                 <p>{t("pr_joriy_byudjet")}:</p>
                 <strong>{initialBudget.sum.toLocaleString()} so'm / {initialBudget.dollar.toLocaleString()} $</strong>
               </div>
               <div className="pr-form-group">
-                <label>{t("pr_qoshish_som")} (so'm)</label>
+                <label>
+                  {budgetMode === "add"
+                    ? `${t("qoshiladigan_miqdor") || "Qo'shiladigan miqdor"} (so'm)`
+                    : `${t("pr_qoshish_som")} (so'm)`}
+                </label>
                 <input type="number" value={budgetForm.sum} placeholder="0"
                   onChange={(e) => setBudgetForm({ ...budgetForm, sum: e.target.value })} />
               </div>
               <div className="pr-form-group">
-                <label>{t("pr_qoshish_dollar")} ($)</label>
+                <label>
+                  {budgetMode === "add"
+                    ? `${t("qoshiladigan_miqdor") || "Qo'shiladigan miqdor"} ($)`
+                    : `${t("pr_qoshish_dollar")} ($)`}
+                </label>
                 <input type="number" value={budgetForm.dollar} placeholder="0"
                   onChange={(e) => setBudgetForm({ ...budgetForm, dollar: e.target.value })} />
               </div>
+
+              {(parseFloat(budgetForm.sum) > 0 || parseFloat(budgetForm.dollar) > 0) && (
+                <div className="pr-budget-preview">
+                  <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich byudjet"}:</span>
+                  <strong>
+                    {budgetMode === "add"
+                      ? `${(initialBudget.sum + (parseFloat(budgetForm.sum) || 0)).toLocaleString()} so'm / ${(initialBudget.dollar + (parseFloat(budgetForm.dollar) || 0)).toLocaleString()} $`
+                      : `${(parseFloat(budgetForm.sum) || 0).toLocaleString()} so'm / ${(parseFloat(budgetForm.dollar) || 0).toLocaleString()} $`}
+                  </strong>
+                </div>
+              )}
             </div>
             <div className="pr-modal-footer">
               <button className="pr-btn pr-btn-cancel" onClick={() => setBudgetModal(false)}>{t("bekorqilish")}</button>
-              <button className="pr-btn pr-btn-save" onClick={handleBudgetSave}>{t("yangilash")}</button>
+              <button className="pr-btn pr-btn-save" onClick={handleBudgetSave}>
+                {budgetMode === "add" ? (t("qoshish_btn") || "Qo'shish") : t("yangilash")}
+              </button>
             </div>
           </div>
         </div>

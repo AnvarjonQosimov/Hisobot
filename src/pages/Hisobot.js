@@ -32,6 +32,7 @@ function Hisobot() {
   const [currencyAlreadyReceived, setCurrencyAlreadyReceived] = useState("sum");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
+  const [balanceMode, setBalanceMode] = useState("add");
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
@@ -58,6 +59,14 @@ function Hisobot() {
   const [workers, setWorkers] = useState([]);
   const [totalBalance, setTotalBalance] = useState({ sum: 0, dollar: 0 });
   const [initialBalance, setInitialBalance] = useState({ sum: 0, dollar: 0 });
+  const [balanceTransactions, setBalanceTransactions] = useState([]);
+  const [deletedBalanceTransactions, setDeletedBalanceTransactions] = useState([]);
+  const [isBalanceHistoryOpen, setIsBalanceHistoryOpen] = useState(false);
+  const [balanceHistoryTab, setBalanceHistoryTab] = useState("active");
+  const [editingBalanceTransaction, setEditingBalanceTransaction] = useState(null);
+  const [showBalanceEditConfirm, setShowBalanceEditConfirm] = useState(false);
+  const [permanentlyDeletingBalanceId, setPermanentlyDeletingBalanceId] = useState(null);
+  const [pendingBalanceAction, setPendingBalanceAction] = useState(null);
 
   // UI/Edit Mode States
   const [editMode, setEditMode] = useState(false);
@@ -170,6 +179,33 @@ function Hisobot() {
       return `${totalBalance.sum.toLocaleString()} ${t("som")} / ${totalBalance.dollar.toLocaleString()} $`;
     }
     return formatModeAmount(getTotalInMode(totalBalance.sum, totalBalance.dollar), currencyDisplayMode);
+  };
+
+  const getBalanceTransactionEffect = (transaction) => ({
+    [transaction.currency]: (parseFloat(transaction.amount) || 0) * (transaction.type === "subtract" ? -1 : 1),
+  });
+
+  const adjustBalanceForTransaction = (transaction, multiplier) => {
+    const effect = getBalanceTransactionEffect(transaction);
+    setInitialBalance((prev) => ({
+      ...prev,
+      [transaction.currency]: (parseFloat(prev[transaction.currency]) || 0) + effect[transaction.currency] * multiplier,
+    }));
+    setTotalBalance((prev) => ({
+      ...prev,
+      [transaction.currency]: (parseFloat(prev[transaction.currency]) || 0) + effect[transaction.currency] * multiplier,
+    }));
+  };
+
+  const getLastBalanceTransaction = () =>
+    [...balanceTransactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+  const formatBalanceTransaction = (transaction) =>
+    `${transaction.type === "subtract" ? "−" : "+"}${parseFloat(transaction.amount || 0).toLocaleString()} ${transaction.currency === "sum" ? t("som") : "$"}`;
+
+  const getLastBalanceTransactionDisplay = () => {
+    const lastTransaction = getLastBalanceTransaction();
+    return lastTransaction ? formatBalanceTransaction(lastTransaction) : "—";
   };
 
   const getHighestSalaryDisplay = () => {
@@ -359,6 +395,10 @@ function Hisobot() {
     if (sb) setTotalBalance(JSON.parse(sb));
     const sib = localStorage.getItem(`initialBalance_${storedUsername}`);
     if (sib) setInitialBalance(JSON.parse(sib));
+    const sbt = localStorage.getItem(`balanceTransactions_${storedUsername}`);
+    if (sbt) setBalanceTransactions(JSON.parse(sbt));
+    const sdbt = localStorage.getItem(`deletedBalanceTransactions_${storedUsername}`);
+    if (sdbt) setDeletedBalanceTransactions(JSON.parse(sdbt));
     const sp = localStorage.getItem(`projects_${storedUsername}`);
     if (sp) setProjectFiles(JSON.parse(sp));
     const sob = localStorage.getItem(`officeBranches_${storedUsername}`);
@@ -382,6 +422,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           if (d.workers?.length) setWorkers(d.workers);
           if (d.totalBalance) setTotalBalance(d.totalBalance);
           if (d.initialBalance) setInitialBalance(d.initialBalance);
+          if (Array.isArray(d.balanceTransactions)) setBalanceTransactions(d.balanceTransactions);
+          if (Array.isArray(d.deletedBalanceTransactions)) setDeletedBalanceTransactions(d.deletedBalanceTransactions);
           if (d.projectFiles?.length) setProjectFiles(d.projectFiles);
           if (d.globalWorkerEmail) { 
             setGlobalWorkerEmail(d.globalWorkerEmail); 
@@ -407,20 +449,22 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     localStorage.setItem(`workers_${username}`, JSON.stringify(workers));
     localStorage.setItem(`totalBalance_${username}`, JSON.stringify(totalBalance));
     localStorage.setItem(`initialBalance_${username}`, JSON.stringify(initialBalance));
+    localStorage.setItem(`balanceTransactions_${username}`, JSON.stringify(balanceTransactions));
+    localStorage.setItem(`deletedBalanceTransactions_${username}`, JSON.stringify(deletedBalanceTransactions));
     localStorage.setItem(`projects_${username}`, JSON.stringify(projectFiles));
     localStorage.setItem(`officeBranches_${username}`, JSON.stringify(officeBranches));
     localStorage.setItem(`workerObjects_${username}`, JSON.stringify(workerObjects));
     localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
     localStorage.setItem(`currencyDisplayMode_${username}`, currencyDisplayMode);
   localStorage.setItem(`dollarRate_${username}`, JSON.stringify(dollarRate));
-  }, [workers, totalBalance, initialBalance, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, dollarRate, cloudLoadComplete]);
+  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, dollarRate, cloudLoadComplete]);
 
   // 2. Cloud Save Effect (Synced)
   useEffect(() => {
     if (!username || !cloudLoadComplete) return;
     
     // Safety: Don't save if everything is empty and we just started
-    const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0;
+    const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0 && balanceTransactions.length === 0 && deletedBalanceTransactions.length === 0;
     if (isTotallyEmpty) {
        console.log("Skipping potentially dangerous empty save...");
        return;
@@ -431,12 +475,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       try {
         console.log("Syncing to cloud...");
         await setDoc(doc(db, "cabinets", username), {
-          workers, totalBalance, initialBalance, projectFiles, globalWorkerEmail, officeBranches, workerObjects
+          workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, globalWorkerEmail, officeBranches, workerObjects
         }, { merge: true });
       } catch (e) { console.error("Cloud save failed", e); }
     };
     saveCloud();
-  }, [workers, totalBalance, initialBalance, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, cloudLoadComplete]);
+  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, cloudLoadComplete]);
 
   // --- END SYNC LOGIC ---
 
@@ -492,6 +536,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     setBalansQoshish(false);
     setBalanceAmount("");
     setBalanceCurrency("sum");
+    setBalanceMode("add");
   };
 
   const saveForUndo = () => {
@@ -499,6 +544,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       workers: JSON.parse(JSON.stringify(workers)),
       totalBalance: { ...totalBalance },
       initialBalance: { ...initialBalance },
+      balanceTransactions: JSON.parse(JSON.stringify(balanceTransactions)),
+      deletedBalanceTransactions: JSON.parse(JSON.stringify(deletedBalanceTransactions)),
     });
   };
 
@@ -511,6 +558,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     setWorkers(undoState.workers);
     setTotalBalance(undoState.totalBalance);
     setInitialBalance(undoState.initialBalance);
+    setBalanceTransactions(undoState.balanceTransactions || []);
+    setDeletedBalanceTransactions(undoState.deletedBalanceTransactions || []);
     setUndoState(null);
     setShowPerformUndoConfirm(false);
   };
@@ -845,7 +894,117 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   };
 
   const handleBalansClick = () => {
+    setBalanceMode("add");
     setBalansQoshish(true);
+  };
+
+  const handleAddBalans = () => {
+    const addAmount = parseFloat(balanceAmount || 0);
+    if (!Number.isFinite(addAmount) || addAmount <= 0) return;
+    saveForUndo();
+
+    setBalanceTransactions((prev) => [{
+      id: Date.now(),
+      type: "add",
+      amount: addAmount,
+      currency: balanceCurrency,
+      createdAt: new Date().toISOString(),
+    }, ...prev]);
+
+    setInitialBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) + addAmount,
+    }));
+
+    setTotalBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) + addAmount,
+    }));
+
+    handleBalansModalClose();
+  };
+
+  const handleSubtractBalans = () => {
+    const subtractAmount = parseFloat(balanceAmount || 0);
+    if (!Number.isFinite(subtractAmount) || subtractAmount <= 0) return;
+    saveForUndo();
+
+    setBalanceTransactions((prev) => [{
+      id: Date.now(),
+      type: "subtract",
+      amount: subtractAmount,
+      currency: balanceCurrency,
+      createdAt: new Date().toISOString(),
+    }, ...prev]);
+
+    setInitialBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) - subtractAmount,
+    }));
+
+    setTotalBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) - subtractAmount,
+    }));
+
+    handleBalansModalClose();
+  };
+
+  const confirmEditBalanceTransaction = () => {
+    if (!editingBalanceTransaction) return;
+    const oldTransaction = balanceTransactions.find((item) => item.id === editingBalanceTransaction.id);
+    const newAmount = parseFloat(editingBalanceTransaction.amount);
+    if (!oldTransaction || !Number.isFinite(newAmount) || newAmount <= 0) return;
+
+    saveForUndo();
+    adjustBalanceForTransaction(oldTransaction, -1);
+    const revisedTransaction = {
+      ...oldTransaction,
+      originalAmount: oldTransaction.originalAmount ?? oldTransaction.amount,
+      originalCurrency: oldTransaction.originalCurrency ?? oldTransaction.currency,
+      amount: newAmount,
+      currency: editingBalanceTransaction.currency,
+      editedAt: new Date().toISOString(),
+    };
+    adjustBalanceForTransaction(revisedTransaction, 1);
+    setBalanceTransactions((prev) => prev.map((item) => item.id === revisedTransaction.id ? revisedTransaction : item));
+    setShowBalanceEditConfirm(false);
+    setEditingBalanceTransaction(null);
+  };
+
+  const moveBalanceTransactionToTrash = (id) => {
+    const transaction = balanceTransactions.find((item) => item.id === id);
+    if (!transaction) return;
+    saveForUndo();
+    adjustBalanceForTransaction(transaction, -1);
+    setBalanceTransactions((prev) => prev.filter((item) => item.id !== id));
+    setDeletedBalanceTransactions((prev) => [{ ...transaction, deletedAt: new Date().toISOString() }, ...prev]);
+  };
+
+  const restoreBalanceTransaction = (id) => {
+    const transaction = deletedBalanceTransactions.find((item) => item.id === id);
+    if (!transaction) return;
+    saveForUndo();
+    adjustBalanceForTransaction(transaction, 1);
+    const restoredTransaction = { ...transaction };
+    delete restoredTransaction.deletedAt;
+    setBalanceTransactions((prev) => [restoredTransaction, ...prev]);
+    setDeletedBalanceTransactions((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const confirmPermanentlyDeleteBalanceTransaction = () => {
+    setDeletedBalanceTransactions((prev) => prev.filter((item) => item.id !== permanentlyDeletingBalanceId));
+    setPermanentlyDeletingBalanceId(null);
+  };
+
+  const confirmBalanceAction = () => {
+    if (!pendingBalanceAction) return;
+    if (pendingBalanceAction.type === "trash") {
+      moveBalanceTransactionToTrash(pendingBalanceAction.id);
+    } else if (pendingBalanceAction.type === "restore") {
+      restoreBalanceTransaction(pendingBalanceAction.id);
+    }
+    setPendingBalanceAction(null);
   };
 
   const handleUpdateBalans = () => {
@@ -873,17 +1032,17 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       return acc + currentCost + historyCost + lastMonthPaid;
     }, 0);
 
-    // Reset initial balance: set the new one and CLEAR the other one
-    setInitialBalance({
-      sum: balanceCurrency === "sum" ? newAmount : 0,
-      dollar: balanceCurrency === "dollar" ? newAmount : 0,
-    });
+    // Reset initial balance: set the new one and preserve the other currency
+    setInitialBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: newAmount,
+    }));
 
-    // Reset total balance: set the new one (minus expenses) and CLEAR the other one
-    setTotalBalance({
-      sum: balanceCurrency === "sum" ? newAmount - totalExpenses : 0,
-      dollar: balanceCurrency === "dollar" ? newAmount - totalExpenses : 0,
-    });
+    // Reset total balance: set the new one (minus expenses) and preserve the other currency
+    setTotalBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: newAmount - totalExpenses,
+    }));
 
     handleBalansModalClose();
   };
@@ -1294,7 +1453,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           projectName={projectFiles.find(p => p.id === activeProjectId)?.name}
           onBack={() => setActiveProjectId(null)}
         />
-      ) : activeBranchId !== null ? (
+      ) : activeBranchId !== null ? ( 
         <BranchReport
           branchId={activeBranchId}
           branchName={officeBranches.find(b => b.id === activeBranchId)?.name}
@@ -1630,8 +1789,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             <div className="statistic">
               <h2>{t("statistika")}</h2>
               <div className="statistic1">
-                <h3>{t("boshlang'ichbalans")}:</h3>
-                <p>{getInitialBalanceDisplay()}</p>
+                <h3>{t("qolganbalans")}:</h3>
+                <p>{getTotalBalanceDisplay()}</p>
               </div>
               <div className="statistic2">
                 <h3>{t("jamiishchilar")}:</h3>
@@ -1649,9 +1808,28 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 <h3>{t("to'lanishikerakbo'lganqoldiq")}:</h3>
                 <p>{getRemainingUnpaidDisplay()}</p>
               </div>
+              <div
+                className="statistic6 balance-history-statistic"
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setBalanceHistoryTab("active");
+                  setIsBalanceHistoryOpen(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setBalanceHistoryTab("active");
+                    setIsBalanceHistoryOpen(true);
+                  }
+                }}
+              >
+                <h3>{t("balance_last_transaction")}:</h3>
+                <p>{getLastBalanceTransactionDisplay()}</p>
+              </div>
               <div className="statistic6">
-                <h3>{t("qolganbalans")}:</h3>
-                <p>{getTotalBalanceDisplay()}</p>
+                <h3>{t("boshlang'ichbalans")}:</h3>
+                <p>{getInitialBalanceDisplay()}</p>
               </div>
 
               <div className="linear-stats">
@@ -2083,8 +2261,20 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             {/* HEADER */}
             <div className="modal-header">
               <div>
-                <h2>{t("balansyangilash")}</h2>
-                <p>{t("yangibalansmiqdorinikiriting")}</p>
+                <h2>
+                  {balanceMode === "add"
+                    ? (t("balans_qoshish_tab") || "Balansga qo'shish")
+                    : balanceMode === "subtract"
+                      ? (t("balans_ayirish_tab") || "Balansdan ayirish")
+                    : (t("balansyangilash") || "Balansni yangilash")}
+                </h2>
+                <p>
+                  {balanceMode === "add"
+                    ? (t("balans_qoshish_desc") || "Mavjud balans miqdoriga qo'shish")
+                    : balanceMode === "subtract"
+                      ? (t("balans_ayirish_desc") || "Balansdan summa ayirish")
+                    : (t("yangibalansmiqdorinikiriting") || "Yangi balans miqdorini kiriting")}
+                </p>
               </div>
               <button className="close-btn" onClick={handleBalansModalClose}>
                 ✕
@@ -2093,10 +2283,58 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
             {/* BODY */}
             <div className="modal-body">
+              {/* TABS FOR ADD / UPDATE */}
+              <div className="balance-tabs-container">
+                <button
+                  type="button"
+                  className={`balance-tab ${balanceMode === "add" ? "active tab-add" : ""}`}
+                  onClick={() => setBalanceMode("add")}
+                >
+                  ➕ {t("balans_qoshish_tab") || "Balansga qo'shish"}
+                </button>
+                <button
+                  type="button"
+                  className={`balance-tab ${balanceMode === "subtract" ? "active tab-subtract" : ""}`}
+                  onClick={() => setBalanceMode("subtract")}
+                >
+                  ➖ {t("balans_ayirish_tab") || "Balansdan ayirish"}
+                </button>
+                <button
+                  type="button"
+                  className={`balance-tab ${balanceMode === "update" ? "active" : ""}`}
+                  onClick={() => setBalanceMode("update")}
+                >
+                  🔄 {t("balans_yangilash_tab") || "Balansni yangilash"}
+                </button>
+              </div>
+
+              {/* CURRENT STANDING BALANCE INFO */}
+              <div className="current-balance-info-card">
+                <span className="info-title">
+                  {t("joriy_balans") || "Joriy balans"}:
+                </span>
+                <div className="info-values">
+                  <div className="info-badge">
+                    <span>{t("boshlang'ichbalans") || "Boshlang'ich"}:</span>
+                    {getInitialBalanceDisplay()}
+                  </div>
+                  <div className="info-badge">
+                    <span>{t("qolganbalans") || "Qolgan"}:</span>
+                    {getTotalBalanceDisplay()}
+                  </div>
+                </div>
+              </div>
+
               <div className="form-section">
                 <div className="row">
                   <div className="input-group">
-                    <label>{t("balansmiqdori")}</label>
+                    <label>
+                      {balanceMode === "add"
+                        ? (t("qoshiladigan_miqdor") || "Qo'shiladigan miqdor")
+                        : balanceMode === "subtract"
+                          ? (t("ayiriladigan_miqdor") || "Ayiriladigan miqdor")
+                        : (t("balansmiqdori") || "Balans miqdori")}
+                    </label>
                     <input
                       type="number"
                       value={balanceAmount}
@@ -2116,6 +2354,32 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                     </select>
                   </div>
                 </div>
+
+                {/* PREVIEW OF STANDING SUM + ADDED AMOUNT */}
+                {parseFloat(balanceAmount) > 0 && balanceMode === "add" && (
+                  <div className="balance-preview-box">
+                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <strong>
+                      {((parseFloat(initialBalance[balanceCurrency]) || 0) + parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                    </strong>
+                  </div>
+                )}
+                {parseFloat(balanceAmount) > 0 && balanceMode === "subtract" && (
+                  <div className="balance-preview-box preview-subtract">
+                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <strong>
+                      {((parseFloat(initialBalance[balanceCurrency]) || 0) - parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                    </strong>
+                  </div>
+                )}
+                {parseFloat(balanceAmount) > 0 && balanceMode === "update" && (
+                  <div className="balance-preview-box preview-update">
+                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <strong>
+                      {parseFloat(balanceAmount).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                    </strong>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2125,16 +2389,163 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 {t("bekorqilish")}
               </button>
               <button
-                className={`btn add ${!balanceAmount ? "disabled" : ""}`}
-                onClick={balanceAmount ? handleUpdateBalans : null}
-                disabled={!balanceAmount}
+                className={`btn ${balanceMode === "add" ? "add" : balanceMode === "subtract" ? "subtract" : "update"} ${!(parseFloat(balanceAmount) > 0) ? "disabled" : ""}`}
+                onClick={
+                  parseFloat(balanceAmount) > 0
+                    ? (balanceMode === "add" ? handleAddBalans : balanceMode === "subtract" ? handleSubtractBalans : handleUpdateBalans)
+                    : null
+                }
+                disabled={!(parseFloat(balanceAmount) > 0)}
               >
-                {t("yangilash")}
+                {balanceMode === "add"
+                  ? (t("qoshish_btn") || "Qo'shish")
+                  : balanceMode === "subtract"
+                    ? (t("balans_ayirish_tab") || "Balansdan ayirish")
+                  : (t("yangilash") || "Yangilash")}
               </button>
             </div>
           </div>
         </div>
       )}
+      {isBalanceHistoryOpen && (
+        <div className="modal-overlay balance-history-overlay" onClick={() => setIsBalanceHistoryOpen(false)}>
+          <div className="modal-container balance-history-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{t("balance_history_title")}</h2>
+                <p>{t("balance_history_description")}</p>
+              </div>
+              <button className="close-btn" onClick={() => setIsBalanceHistoryOpen(false)}>✕</button>
+            </div>
+            <div className="balance-history-tabs">
+              <button className={balanceHistoryTab === "active" ? "active" : ""} onClick={() => setBalanceHistoryTab("active")}>
+                {t("balance_history_tab")} ({balanceTransactions.length})
+              </button>
+              <button className={balanceHistoryTab === "trash" ? "active" : ""} onClick={() => setBalanceHistoryTab("trash")}>
+                🗑️ {t("balance_trash_tab")} ({deletedBalanceTransactions.length})
+              </button>
+            </div>
+            <div className="balance-history-list">
+              {(balanceHistoryTab === "active" ? balanceTransactions : deletedBalanceTransactions)
+                .slice()
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .map((transaction) => {
+                  const wasEdited = transaction.originalAmount !== undefined &&
+                    (Number(transaction.originalAmount) !== Number(transaction.amount) || transaction.originalCurrency !== transaction.currency);
+                  const originalDisplay = `${transaction.type === "subtract" ? "−" : "+"}${parseFloat(transaction.originalAmount || 0).toLocaleString()} ${transaction.originalCurrency === "sum" ? t("som") : "$"}`;
+                  return (
+                    <div className="balance-history-item" key={transaction.id}>
+                      <div className="balance-history-item-main">
+                        <span className={`balance-transaction-type ${transaction.type}`}>
+                          {transaction.type === "subtract" ? t("balance_subtracted") : t("balance_added")}
+                        </span>
+                        <span className="balance-transaction-date">{new Date(transaction.createdAt).toLocaleString()}</span>
+                        <div className="balance-transaction-amount">
+                          {wasEdited && <del>{originalDisplay}</del>}
+                          <strong>{formatBalanceTransaction(transaction)}</strong>
+                        </div>
+                      </div>
+                      <div className="balance-history-actions">
+                        {balanceHistoryTab === "active" ? (
+                          <>
+                            <button title={t("tahrirlash")} onClick={() => setEditingBalanceTransaction({ id: transaction.id, amount: String(transaction.amount), currency: transaction.currency })}>✏️</button>
+                            <button title={t("o'chirish")} onClick={() => setPendingBalanceAction({ type: "trash", id: transaction.id })}>🗑️</button>
+                          </>
+                        ) : (
+                          <>
+                            <button title={t("balance_restore")} onClick={() => setPendingBalanceAction({ type: "restore", id: transaction.id })}>↩️</button>
+                            <button title={t("balance_delete_permanently")} onClick={() => setPermanentlyDeletingBalanceId(transaction.id)}>❌</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              {(balanceHistoryTab === "active" ? balanceTransactions : deletedBalanceTransactions).length === 0 && (
+                <p className="balance-history-empty">{t("balance_history_empty")}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingBalanceTransaction && (
+        <div className="modal-overlay balance-edit-overlay" onClick={() => setEditingBalanceTransaction(null)}>
+          <div className="modal-container balance-edit-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{t("balance_edit_title")}</h2>
+                <p>{t("balance_edit_description")}</p>
+              </div>
+              <button className="close-btn" onClick={() => setEditingBalanceTransaction(null)}>✕</button>
+            </div>
+            <div className="modal-body form-section">
+              <div className="row">
+                <div className="input-group">
+                  <label>{t("summa")}</label>
+                  <input type="number" min="0.01" value={editingBalanceTransaction.amount} onChange={(event) => setEditingBalanceTransaction((prev) => ({ ...prev, amount: event.target.value }))} />
+                </div>
+                <div className="input-group small">
+                  <label>{t("valyuta")}</label>
+                  <select value={editingBalanceTransaction.currency} onChange={(event) => setEditingBalanceTransaction((prev) => ({ ...prev, currency: event.target.value }))}>
+                    <option value="sum">{t("som")}</option>
+                    <option value="dollar">$</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn cancel" onClick={() => setEditingBalanceTransaction(null)}>{t("bekorqilish")}</button>
+              <button className="btn add" disabled={!(parseFloat(editingBalanceTransaction.amount) > 0)} onClick={() => setShowBalanceEditConfirm(true)}>{t("saqlash_btn")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBalanceEditConfirm && (
+        <div className="confirm-overlay balance-action-confirm" onClick={() => setShowBalanceEditConfirm(false)}>
+          <div className="confirm-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="confirm-message">{t("balance_confirm_edit")}</div>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setShowBalanceEditConfirm(false)}>{t("bekorqilish")}</button>
+              <button className="confirm-btn confirm-logout" onClick={confirmEditBalanceTransaction}>{t("balance_confirm_button")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {permanentlyDeletingBalanceId !== null && (
+        <div className="confirm-overlay balance-action-confirm" onClick={() => setPermanentlyDeletingBalanceId(null)}>
+          <div className="confirm-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="confirm-message">{t("balance_confirm_permanent_delete")}</div>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setPermanentlyDeletingBalanceId(null)}>{t("bekorqilish")}</button>
+              <button className="confirm-btn confirm-logout" onClick={confirmPermanentlyDeleteBalanceTransaction}>{t("o'chirish")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingBalanceAction && (
+        <div className="confirm-overlay balance-action-confirm" onClick={() => setPendingBalanceAction(null)}>
+          <div className="confirm-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="confirm-message">
+              {pendingBalanceAction.type === "trash"
+                ? t("balance_confirm_move_to_trash")
+                : t("balance_confirm_restore")}
+            </div>
+            <div className="confirm-buttons">
+              <button className="confirm-btn confirm-cancel" onClick={() => setPendingBalanceAction(null)}>
+                {t("bekorqilish")}
+              </button>
+              <button className="confirm-btn confirm-logout" onClick={confirmBalanceAction}>
+                {t("balance_confirm_button")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteWorkerId && (
         <div
           className="confirm-overlay"

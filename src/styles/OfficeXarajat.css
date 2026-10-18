@@ -1038,9 +1038,135 @@
   background: rgba(40,236,112,0.35);
 }
 
+.btn.update {
+  background: rgba(86, 86, 255, 0.25);
+  color: rgb(161, 161, 255);
+}
+
+.btn.update:hover {
+  background: rgba(86, 86, 255, 0.4);
+}
+
 .disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Balance Modal Tabs & Enhancements */
+.balance-tabs-container {
+  display: flex;
+  background: rgba(0, 4, 45, 0.65);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(161, 161, 241, 0.2);
+  margin-bottom: 16px;
+  gap: 6px;
+}
+
+.balance-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: rgba(204, 194, 255, 0.75);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.balance-tab:hover {
+  color: #fff;
+  background: rgba(161, 161, 241, 0.1);
+}
+
+.balance-tab.active {
+  background: linear-gradient(135deg, rgba(86, 86, 255, 0.3) 0%, rgba(120, 80, 255, 0.3) 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(86, 86, 255, 0.15);
+  border: 1px solid rgba(161, 161, 241, 0.35);
+}
+
+.balance-tab.active.tab-add {
+  background: linear-gradient(135deg, rgba(40, 236, 112, 0.25) 0%, rgba(20, 180, 90, 0.25) 100%);
+  border-color: rgba(40, 236, 112, 0.4);
+  color: #a8fbc4;
+  box-shadow: 0 4px 12px rgba(40, 236, 112, 0.15);
+}
+
+.current-balance-info-card {
+  background: rgba(161, 161, 241, 0.08);
+  border: 1px solid rgba(161, 161, 241, 0.18);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.current-balance-info-card .info-title {
+  font-size: 13px;
+  color: rgb(146, 151, 223);
+  font-weight: 500;
+}
+
+.current-balance-info-card .info-values {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.current-balance-info-card .info-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 4, 45, 0.5);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(161, 161, 241, 0.15);
+}
+
+.current-balance-info-card .info-badge span {
+  color: rgb(146, 151, 223);
+  font-weight: normal;
+  margin-right: 5px;
+}
+
+.balance-preview-box {
+  background: rgba(40, 236, 112, 0.08);
+  border: 1px dashed rgba(40, 236, 112, 0.35);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #a8fbc4;
+}
+
+.balance-preview-box strong {
+  font-size: 14.5px;
+  color: #28ec70;
+}
+
+.balance-preview-box.preview-update {
+  background: rgba(86, 86, 255, 0.08);
+  border-color: rgba(161, 161, 241, 0.35);
+  color: #c4c4ff;
+}
+
+.balance-preview-box.preview-update strong {
+  color: #a1a1f1;
 }
 
 /* Circular Stats */

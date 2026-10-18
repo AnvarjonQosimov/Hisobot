@@ -28,6 +28,7 @@ function OfficeXarajat() {
   const [currencyAlreadyPaid, setCurrencyAlreadyPaid] = useState("sum");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
+  const [balanceMode, setBalanceMode] = useState("add");
 
   // Persistence States
   const [expenses, setExpenses] = useState([]);
@@ -272,6 +273,7 @@ function OfficeXarajat() {
     setBalansQoshish(false);
     setBalanceAmount("");
     setBalanceCurrency("sum");
+    setBalanceMode("add");
     setMiniCalcOpen(false);
     setCalcDisplay("0");
     setCalcPrevious(null);
@@ -501,7 +503,26 @@ function OfficeXarajat() {
   };
 
   const handleBalansClick = () => {
+    setBalanceMode("add");
     setBalansQoshish(true);
+  };
+
+  const handleAddBalans = () => {
+    saveForUndo();
+    const addAmount = parseFloat(balanceAmount || 0);
+    if (!addAmount || isNaN(addAmount)) return;
+
+    setInitialBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) + addAmount,
+    }));
+
+    setTotalBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) + addAmount,
+    }));
+
+    handleBalansModalClose();
   };
 
   const handleUpdateBalans = () => {
@@ -1455,20 +1476,72 @@ function OfficeXarajat() {
         <div className="modal-overlay" onClick={handleBalansModalClose}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{t("Balansni yangilash")}</h2>
+              <div>
+                <h2>
+                  {balanceMode === "add"
+                    ? (t("balans_qoshish_tab") || "Balansga qo'shish")
+                    : (t("balansyangilash") || "Balansni yangilash")}
+                </h2>
+                <p style={{ fontSize: "13px", color: "rgb(146,151,223)", marginTop: "4px" }}>
+                  {balanceMode === "add"
+                    ? (t("balans_qoshish_desc") || "Mavjud balans miqdoriga qo'shish")
+                    : (t("yangibalansmiqdorinikiriting") || "Yangi balans miqdorini kiriting")}
+                </p>
+              </div>
               <button className="close-btn" onClick={handleBalansModalClose}>
                 ✕
               </button>
             </div>
             <div className="modal-body">
+              {/* TABS FOR ADD / UPDATE */}
+              <div className="balance-tabs-container">
+                <button
+                  type="button"
+                  className={`balance-tab ${balanceMode === "add" ? "active tab-add" : ""}`}
+                  onClick={() => setBalanceMode("add")}
+                >
+                  ➕ {t("balans_qoshish_tab") || "Balansga qo'shish"}
+                </button>
+                <button
+                  type="button"
+                  className={`balance-tab ${balanceMode === "update" ? "active" : ""}`}
+                  onClick={() => setBalanceMode("update")}
+                >
+                  🔄 {t("balans_yangilash_tab") || "Balansni yangilash"}
+                </button>
+              </div>
+
+              {/* CURRENT STANDING BALANCE INFO */}
+              <div className="current-balance-info-card">
+                <span className="info-title">
+                  {t("joriy_balans") || "Joriy balans"} ({balanceCurrency === "sum" ? t("som") : "$"}):
+                </span>
+                <div className="info-values">
+                  <div className="info-badge">
+                    <span>{t("boshlang'ichbalans") || "Boshlang'ich"}:</span>
+                    {(initialBalance[balanceCurrency] || 0).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                  </div>
+                  <div className="info-badge">
+                    <span>{t("qolganbalans") || "Qolgan"}:</span>
+                    {(totalBalance[balanceCurrency] || 0).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                  </div>
+                </div>
+              </div>
+
               <div className="form-section">
                 <div className="input-group">
-                  <label>{t("Yangi balans miqdori")}</label>
+                  <label>
+                    {balanceMode === "add"
+                      ? (t("qoshiladigan_miqdor") || "Qo'shiladigan miqdor")
+                      : (t("balansmiqdori") || "Balans miqdori")}
+                  </label>
                   <div className="input-wrapper">
                     <input
                       type="number"
                       value={balanceAmount}
                       onChange={(e) => setBalanceAmount(e.target.value)}
+                      placeholder="0"
+                      autoFocus
                     />
                     <button
                       className="calc-btn-trigger"
@@ -1485,18 +1558,46 @@ function OfficeXarajat() {
                     onChange={(e) => setBalanceCurrency(e.target.value)}
                     className="modal-select"
                   >
-                    <option value="sum">So'm</option>
-                    <option value="dollar">Dollar ($)</option>
+                    <option value="sum">{t("som")}</option>
+                    <option value="dollar">$</option>
                   </select>
                 </div>
+
+                {/* PREVIEW OF STANDING SUM + ADDED AMOUNT */}
+                {parseFloat(balanceAmount) > 0 && balanceMode === "add" && (
+                  <div className="balance-preview-box">
+                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <strong>
+                      {((parseFloat(initialBalance[balanceCurrency]) || 0) + parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                    </strong>
+                  </div>
+                )}
+                {parseFloat(balanceAmount) > 0 && balanceMode === "update" && (
+                  <div className="balance-preview-box preview-update">
+                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <strong>
+                      {parseFloat(balanceAmount).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                    </strong>
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={handleBalansModalClose}>
+              <button className="btn cancel" onClick={handleBalansModalClose}>
                 {t("bekorqilish")}
               </button>
-              <button className="btn-submit" onClick={handleUpdateBalans}>
-                {t("yangilash")}
+              <button
+                className={`btn ${balanceMode === "add" ? "add" : "update"} ${!balanceAmount ? "disabled" : ""}`}
+                onClick={
+                  balanceAmount
+                    ? (balanceMode === "add" ? handleAddBalans : handleUpdateBalans)
+                    : null
+                }
+                disabled={!balanceAmount}
+              >
+                {balanceMode === "add"
+                  ? (t("qoshish_btn") || "Qo'shish")
+                  : (t("yangilash") || "Yangilash")}
               </button>
             </div>
           </div>
