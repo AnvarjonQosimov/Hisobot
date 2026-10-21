@@ -266,7 +266,9 @@
     "Secure Storage": "Secure Storage",
     "All rights reserved.": "All rights reserved.",
     "Worker Cabinet": "Worker Cabinet",
-    "Support": "Support"
+    "Support": "Support",
+    "email_chooser_title": "Choose how to send",
+    "email_chooser_description": "Which app would you like to use to contact support?",
+    "email_gmail_description": "Compose a message in Gmail",
+    "email_chooser_close": "Close window"
 }
-
-

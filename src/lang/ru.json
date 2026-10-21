@@ -266,6 +266,9 @@
     "Secure Storage": "Безопасное хранилище",
     "All rights reserved.": "Все права защищены.",
     "Worker Cabinet": "Кабинет сотрудника",
-    "Support": "Поддержка"
+    "Support": "Поддержка",
+    "email_chooser_title": "Выберите способ отправки",
+    "email_chooser_description": "Через какое приложение отправить сообщение в поддержку?",
+    "email_gmail_description": "Написать письмо в Gmail",
+    "email_chooser_close": "Закрыть окно"
 }
-

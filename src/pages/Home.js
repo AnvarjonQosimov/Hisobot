@@ -1,11 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import "../styles/Home.css";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { FiArrowRight, FiActivity, FiUsers, FiGlobe, FiCloud, FiPieChart, FiBriefcase } from "react-icons/fi";
+import { FiArrowRight, FiActivity, FiUsers, FiGlobe, FiCloud, FiPieChart, FiBriefcase, FiMail, FiX } from "react-icons/fi";
 
 function Home() {
   const { t } = useTranslation();
+  const [isEmailChooserOpen, setIsEmailChooserOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isEmailChooserOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsEmailChooserOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isEmailChooserOpen]);
 
   const features = [
     { icon: <FiActivity />, title: t("Expense Tracking"), desc: t("Track every penny with advanced expense management tools.") },
@@ -30,6 +48,9 @@ function Home() {
               {t("Get Started")} <FiArrowRight />
             </Link>
             <a href="#features" className='secondary-btn'>{t("Learn More")}</a>
+            <button type="button" className="secondary-btn help-trigger" onClick={() => setIsEmailChooserOpen(true)}>
+              {t("Support")} <FiMail />
+            </button>
           </div>
         </div>
       </section>
@@ -83,10 +104,47 @@ function Home() {
           <div className='footer-links'>
             <Link to="/login">{t("Login")}</Link>
             <Link to="/worker-auth">{t("Worker Cabinet")}</Link>
-            <a href="mailto:support@officereport.com">{t("Support")}</a>
+            <button type="button" onClick={() => setIsEmailChooserOpen(true)}>{t("Support")}</button>
           </div>
         </div>
       </footer>
+
+      {isEmailChooserOpen && (
+        <div
+          className="email-chooser-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsEmailChooserOpen(false);
+          }}
+        >
+          <section className="email-chooser" role="dialog" aria-modal="true" aria-labelledby="email-chooser-title">
+            <button
+              type="button"
+              className="email-chooser-close"
+              onClick={() => setIsEmailChooserOpen(false)}
+              aria-label={t("email_chooser_close")}
+            >
+              <FiX />
+            </button>
+            <span className="email-chooser-icon"><FiMail /></span>
+            <h2 id="email-chooser-title">{t("email_chooser_title")}</h2>
+            <p>{t("email_chooser_description")}</p>
+            <div className="email-chooser-options">
+              <a
+                className="email-chooser-option gmail-option"
+                href="https://mail.google.com/mail/?view=cm&fs=1&to=adminOfficereport%40gmail.com&su=OfficeReport%20-%20Yordam"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsEmailChooserOpen(false)}
+              >
+                <span className="email-option-mark gmail-mark">G</span>
+                <span><strong>Gmail</strong><small>{t("email_gmail_description")}</small></span>
+                <FiArrowRight />
+              </a>
+            </div>
+            <span className="email-chooser-recipient">adminOfficereport@gmail.com</span>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

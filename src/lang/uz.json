@@ -273,5 +273,9 @@
     "Secure Storage": "Xavfsiz saqlash",
     "All rights reserved.": "Barcha huquqlar himoyalangan.",
     "Worker Cabinet": "Ishchi kabineti",
-    "Support": "Yordam"
+    "Support": "Yordam",
+    "email_chooser_title": "Yuborish usulini tanlang",
+    "email_chooser_description": "Yordam xabaringizni qaysi ilova orqali yubormoqchisiz?",
+    "email_gmail_description": "Gmail saytida xat yozish",
+    "email_chooser_close": "Oynani yopish"
 }
