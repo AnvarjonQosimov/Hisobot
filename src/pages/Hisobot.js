@@ -473,6 +473,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           }
           if (d.officeBranches?.length) setOfficeBranches(d.officeBranches);
           if (d.workerObjects?.length) setWorkerObjects(d.workerObjects);
+          if (["combined", "sum", "dollar"].includes(d.currencyDisplayMode)) {
+            setCurrencyDisplayMode(d.currencyDisplayMode);
+          }
         }
       } catch (e) { 
         console.error("Cloud load failed/offline:", e); 
@@ -532,24 +535,24 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   useEffect(() => {
     if (!username || !cloudLoadComplete) return;
     
-    // Safety: Don't save if everything is empty and we just started
+    // Preserve display preferences even when this cabinet has no report data yet.
     const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0 && balanceTransactions.length === 0 && deletedBalanceTransactions.length === 0;
-    if (isTotallyEmpty) {
-       console.log("Skipping potentially dangerous empty save...");
-       return;
-    }
 
     // Cloud Sync
     const saveCloud = async () => {
       try {
         console.log("Syncing to cloud...");
+        if (isTotallyEmpty) {
+          await setDoc(doc(db, "cabinets", username), { currencyDisplayMode }, { merge: true });
+          return;
+        }
         await setDoc(doc(db, "cabinets", username), {
-          workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, globalWorkerEmail, officeBranches, workerObjects
+          workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, globalWorkerEmail, officeBranches, workerObjects, currencyDisplayMode
         }, { merge: true });
       } catch (e) { console.error("Cloud save failed", e); }
     };
     saveCloud();
-  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, cloudLoadComplete]);
+  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, cloudLoadComplete]);
 
   // --- END SYNC LOGIC ---
 

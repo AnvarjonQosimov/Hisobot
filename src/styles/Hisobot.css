@@ -30,11 +30,14 @@
 .hisobotLeftText{
     color: rgb(204, 194, 255);
     height: 95%;
+    min-height: 0;
     width: 99%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     align-items: start;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
 }
 
 .leftTop{
