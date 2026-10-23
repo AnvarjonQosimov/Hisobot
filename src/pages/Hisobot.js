@@ -13,6 +13,26 @@ import FloatingCalculator from "../components/FloatingCalculator";
 import Loading from "../components/Loading";
 import { AnimatePresence } from "framer-motion";
 
+const createWorkerObjectCopy = (worker) => ({
+  ...worker,
+  history: Array.isArray(worker.history)
+    ? worker.history.map((item) => ({ ...item }))
+    : [],
+});
+
+const isEmptyWorkerObjectCopy = (worker) =>
+  !worker.amountToReceive &&
+  !worker.dateToGive &&
+  !worker.amountAlreadyReceived &&
+  !worker.dateAlreadyReceived &&
+  !worker.currentWork &&
+  !worker.workPercent &&
+  !worker.prevWork &&
+  !worker.prevWorkPercent &&
+  !worker.workerCode &&
+  !worker.isPaid &&
+  (!Array.isArray(worker.history) || worker.history.length === 0);
+
 function Hisobot() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
@@ -130,6 +150,28 @@ function Hisobot() {
   const [age, setAge] = useState(i18n.language || "uz");
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
 
+  const currentWorkers = activeWorkerObjectId === null
+    ? workers
+    : workerObjects.find((object) => object.id === activeWorkerObjectId)?.workers || [];
+
+  const updateCurrentWorkers = (update) => {
+    if (activeWorkerObjectId === null) {
+      setWorkers(update);
+      return;
+    }
+
+    setWorkerObjects((currentObjects) =>
+      currentObjects.map((object) => {
+        if (object.id !== activeWorkerObjectId) return object;
+        const objectWorkers = Array.isArray(object.workers) ? object.workers : [];
+        return {
+          ...object,
+          workers: typeof update === "function" ? update(objectWorkers) : update,
+        };
+      }),
+    );
+  };
+
   useEffect(() => {
     const handleStatus = () => setIsOffline(!window.navigator.onLine);
     window.addEventListener("online", handleStatus);
@@ -210,14 +252,14 @@ function Hisobot() {
 
   const getHighestSalaryDisplay = () => {
     if (currencyDisplayMode === "combined") {
-      const sumHigh = workers
+      const sumHigh = currentWorkers
         .filter((w) => w.currencyToReceive === "sum")
         .sort(
           (a, b) =>
             (parseFloat(b.amountToReceive) || 0) -
             (parseFloat(a.amountToReceive) || 0),
         )[0];
-      const dolHigh = workers
+      const dolHigh = currentWorkers
         .filter((w) => w.currencyToReceive === "dollar")
         .sort(
           (a, b) =>
@@ -235,7 +277,7 @@ function Hisobot() {
       return `${sumText} / ${dolText}`;
     }
 
-    const converted = workers
+    const converted = currentWorkers
       .map((w) => {
         const amount = parseAmount(w.amountToReceive);
         const value =
@@ -253,7 +295,7 @@ function Hisobot() {
 
   const getTotalExpensesDisplay = () => {
     if (currencyDisplayMode === "combined") {
-      const totalSum = workers
+      const totalSum = currentWorkers
         .reduce((acc, curr) => {
           const currentCost =
             curr.currencyToReceive === "sum"
@@ -274,7 +316,7 @@ function Hisobot() {
         }, 0)
         .toLocaleString();
 
-      const totalDollar = workers
+      const totalDollar = currentWorkers
         .reduce((acc, curr) => {
           const currentCost =
             curr.currencyToReceive === "dollar"
@@ -298,7 +340,7 @@ function Hisobot() {
       return `${totalSum} ${t("som")} / ${totalDollar} $`;
     }
 
-    const total = workers.reduce((acc, curr) => {
+    const total = currentWorkers.reduce((acc, curr) => {
       const currentCost = parseAmount(curr.amountToReceive);
       const historyCost = (curr.history || []).reduce((hAcc, hCurr) => {
         const amount = parseAmount(hCurr.amount);
@@ -324,14 +366,14 @@ function Hisobot() {
 
   const getRemainingUnpaidDisplay = () => {
     if (currencyDisplayMode === "combined") {
-      const unpaidSum = workers
+      const unpaidSum = currentWorkers
         .filter((w) => !w.isPaid)
         .reduce((acc, curr) =>
           acc + (curr.currencyToReceive === "sum" ? parseAmount(curr.amountToReceive) : 0),
           0,
         )
         .toLocaleString();
-      const unpaidDollar = workers
+      const unpaidDollar = currentWorkers
         .filter((w) => !w.isPaid)
         .reduce((acc, curr) =>
           acc + (curr.currencyToReceive === "dollar" ? parseAmount(curr.amountToReceive) : 0),
@@ -341,7 +383,7 @@ function Hisobot() {
       return `${unpaidSum} ${t("som")} / ${unpaidDollar} $`;
     }
 
-    const total = workers
+    const total = currentWorkers
       .filter((w) => !w.isPaid)
       .reduce((acc, curr) => {
         const amount = parseAmount(curr.amountToReceive);
@@ -443,6 +485,33 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     loadCloud();
   }, [navigate]);
 
+  useEffect(() => {
+    if (!cloudLoadComplete) return;
+
+    setWorkerObjects((currentObjects) => {
+      let hasLegacyObjects = false;
+      const migratedObjects = currentObjects.map((object) => {
+          if (!Array.isArray(object.workers)) {
+            hasLegacyObjects = true;
+            return { ...object, workers: workers.map(createWorkerObjectCopy) };
+          }
+
+          const migratedWorkers = object.workers.map((objectWorker) => {
+            const sourceWorker = workers.find((worker) => worker.id === objectWorker.id);
+            if (!sourceWorker || !isEmptyWorkerObjectCopy(objectWorker)) return objectWorker;
+            hasLegacyObjects = true;
+            return createWorkerObjectCopy(sourceWorker);
+          });
+
+          return migratedWorkers.some((worker, index) => worker !== object.workers[index])
+            ? { ...object, workers: migratedWorkers }
+            : object;
+        });
+
+      return hasLegacyObjects ? migratedObjects : currentObjects;
+    });
+  }, [cloudLoadComplete, workers, workerObjects]);
+
   // 1. Local Save Effect (Immediate)
   useEffect(() => {
     if (!username || !cloudLoadComplete) return;
@@ -541,7 +610,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
   const saveForUndo = () => {
     setUndoState({
-      workers: JSON.parse(JSON.stringify(workers)),
+      workers: JSON.parse(JSON.stringify(currentWorkers)),
+      workerObjectId: activeWorkerObjectId,
       totalBalance: { ...totalBalance },
       initialBalance: { ...initialBalance },
       balanceTransactions: JSON.parse(JSON.stringify(balanceTransactions)),
@@ -555,7 +625,17 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
   const confirmPerformUndo = () => {
     if (!undoState) return;
-    setWorkers(undoState.workers);
+    if (undoState.workerObjectId === null) {
+      setWorkers(undoState.workers);
+    } else {
+      setWorkerObjects((currentObjects) =>
+        currentObjects.map((object) =>
+          object.id === undoState.workerObjectId
+            ? { ...object, workers: undoState.workers }
+            : object,
+        ),
+      );
+    }
     setTotalBalance(undoState.totalBalance);
     setInitialBalance(undoState.initialBalance);
     setBalanceTransactions(undoState.balanceTransactions || []);
@@ -581,6 +661,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   };
 
   const handleAddWorker = async () => {
+    if (!isFormValid) return;
+
     const finalWork = isOtherWork ? customWork : currentWork;
     const finalPercent = isOtherWorkPercent
       ? (customWorkPercent && !customWorkPercent.includes('%') ? `${customWorkPercent}%` : customWorkPercent)
@@ -593,8 +675,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
     if (editMode) {
       saveForUndo();
-      setWorkers(
-        workers.map((w) =>
+      updateCurrentWorkers(
+        currentWorkers.map((w) =>
           w.id === editingWorkerId
             ? {
               ...w,
@@ -614,7 +696,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             : w,
         ),
       );
-      if (workerCode.trim()) {
+      if (workerCode.trim() && activeWorkerObjectId === null) {
         // Non-blocking write
         setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: editingWorkerId })
           .catch(e => console.error("Failed to save invite code:", e));
@@ -640,8 +722,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         history: [],
         workerCode: workerCode.trim()
       };
-      setWorkers([newWorker, ...workers]);
-      if (workerCode.trim()) {
+      updateCurrentWorkers([newWorker, ...currentWorkers]);
+      if (workerCode.trim() && activeWorkerObjectId === null) {
         // Non-blocking write
         setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: newWorkerId })
           .catch(e => console.error("Failed to save invite code:", e));
@@ -663,7 +745,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   const confirmNewProject = () => {
     const id = newProjectConfirmId;
     saveForUndo();
-    setWorkers(workers.map(w => {
+    updateCurrentWorkers(currentWorkers.map(w => {
       if (w.id !== id) return w;
 
       const archiveItem = {
@@ -776,7 +858,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   const confirmDeleteWorker = () => {
     if (deleteWorkerId) {
       saveForUndo(); // Save state before deletion
-      setWorkers(workers.filter((w) => w.id !== deleteWorkerId));
+      updateCurrentWorkers(currentWorkers.filter((w) => w.id !== deleteWorkerId));
       setDeleteWorkerId(null);
     }
   };
@@ -786,8 +868,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       saveForUndo();
       const { workerId, index } = deleteHistoryData;
 
-      setWorkers(
-        workers.map((w) => {
+      updateCurrentWorkers(
+        currentWorkers.map((w) => {
           if (w.id === workerId) {
             const newHistory = [...(w.history || [])];
             newHistory.splice(index, 1);
@@ -813,8 +895,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   const handleEditHistorySave = () => {
     if (editingHistoryData) {
       saveForUndo();
-      setWorkers(
-        workers.map((w) => {
+      updateCurrentWorkers(
+        currentWorkers.map((w) => {
           if (w.id === editingHistoryData.workerId) {
             const newHistory = [...(w.history || [])];
             newHistory[editingHistoryData.index] = {
@@ -833,7 +915,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   };
 
   const handleTogglePaid = (id) => {
-    const worker = workers.find((w) => w.id === id);
+    const worker = currentWorkers.find((w) => w.id === id);
     if (!worker) return;
 
     const newIsPaid = !worker.isPaid;
@@ -842,20 +924,22 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     const amount = parseFloat(worker.amountToReceive || 0);
     const currency = worker.currencyToReceive;
 
-    setTotalBalance((prev) => ({
-      ...prev,
-      [currency]: newIsPaid ? prev[currency] - amount : prev[currency] + amount,
-    }));
+    if (activeWorkerObjectId === null) {
+      setTotalBalance((prev) => ({
+        ...prev,
+        [currency]: newIsPaid ? prev[currency] - amount : prev[currency] + amount,
+      }));
+    }
 
-    setWorkers(
-      workers.map((w) => (w.id === id ? { ...w, isPaid: newIsPaid } : w)),
+    updateCurrentWorkers(
+      currentWorkers.map((w) => (w.id === id ? { ...w, isPaid: newIsPaid } : w)),
     );
   };
 
   const handleNextMonth = (id) => {
     saveForUndo(); // Save state before archiving
-    setWorkers(
-      workers.map((w) => {
+    updateCurrentWorkers(
+      currentWorkers.map((w) => {
         if (w.id !== id) return w;
 
         // Rotate: old alreadyReceived goes to history, current amountToReceive becomes alreadyReceived
@@ -1053,7 +1137,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
     // Aggregating historical and current payments
     let allPayments = [];
-    workers.forEach((w) => {
+    currentWorkers.forEach((w) => {
       // Add current month's payment if it exists
       if (parseFloat(w.amountAlreadyReceived) > 0) {
         allPayments.push({
@@ -1130,19 +1214,22 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   };
 
   const getCircularData = () => {
-    const totalCount = workers.length;
+    const totalCount = currentWorkers.length;
     if (totalCount === 0) return { paid: 0, unpaid: 0, percent: 0 };
-    const paidCount = workers.filter((w) => w.isPaid).length;
+    const paidCount = currentWorkers.filter((w) => w.isPaid).length;
     const percent = Math.round((paidCount / totalCount) * 100);
     return { paid: paidCount, unpaid: totalCount - paidCount, percent };
   };
 
-  const isFormValid =
-    workerName &&
-    amountToReceive &&
-    dateToGive &&
-    amountAlreadyReceived &&
-    dateAlreadyReceived;
+  const isFormValid = activeWorkerObjectId === null
+    ? Boolean(workerName.trim())
+    : Boolean(
+        workerName.trim() &&
+        amountToReceive &&
+        dateToGive &&
+        amountAlreadyReceived &&
+        dateAlreadyReceived
+      );
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
@@ -1165,7 +1252,10 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       setActiveProjectId(null);
       setActiveWorkerObjectId(null);
     } else if (fileModalType === "object") {
-      setWorkerObjects([...workerObjects, newItem]);
+      setWorkerObjects([
+        ...workerObjects,
+        { ...newItem, workers: workers.map(createWorkerObjectCopy) },
+      ]);
       setActiveWorkerObjectId(newItem.id);
       setActiveProjectId(null);
       setActiveBranchId(null);
@@ -1252,11 +1342,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       key={obj.id}
                       className={`project-sidebar-item ${activeWorkerObjectId === obj.id ? "active" : ""}`}
                       onClick={() => {
-                        if (activeWorkerObjectId !== obj.id) {
-                          setActiveWorkerObjectId(obj.id);
-                          setActiveProjectId(null);
-                          setActiveBranchId(null);
-                        }
+                        setActiveWorkerObjectId(obj.id);
+                        setActiveProjectId(null);
+                        setActiveBranchId(null);
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -1288,11 +1376,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       key={branch.id}
                       className={`project-sidebar-item ${activeBranchId === branch.id ? "active" : ""}`}
                       onClick={() => {
-                        if (activeBranchId !== branch.id) {
-                          setActiveBranchId(branch.id);
-                          setActiveProjectId(null);
-                          setActiveWorkerObjectId(null);
-                        }
+                        setActiveBranchId(branch.id);
+                        setActiveProjectId(null);
+                        setActiveWorkerObjectId(null);
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -1324,7 +1410,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       key={project.id}
                       className={`project-sidebar-item ${activeProjectId === project.id ? "active" : ""}`}
                       onClick={() => {
-                        setActiveProjectId(activeProjectId === project.id ? null : project.id);
+                        setActiveProjectId(project.id);
+                        setActiveBranchId(null);
+                        setActiveWorkerObjectId(null);
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -1532,7 +1620,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
           <div className="rightBottom">
             {!cloudLoadComplete ? <Loading /> : (() => {
-              let filtered = workers.filter((w) =>
+              let filtered = currentWorkers.filter((w) =>
                 w.workerName.toLowerCase().includes(searchTerm.toLowerCase()),
               );
 
@@ -1587,23 +1675,19 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                     >
                       <div className="worker-item-main">
                         <div className="worker-info">
-                          {!activeWorkerObjectId && (
-                            <input
-                              type="checkbox"
-                              className="paid-checkbox"
-                              checked={worker.isPaid}
-                              onChange={() => handleTogglePaid(worker.id)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          )}
+                          <input
+                            type="checkbox"
+                            className="paid-checkbox"
+                            checked={worker.isPaid}
+                            onChange={() => handleTogglePaid(worker.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
                           <div className="name-date">
                             <h3 style={{ display: 'flex', alignItems: 'center' }}>
                               {worker.workerName}
-                              {!activeWorkerObjectId && (
-                                <span style={{ fontSize: "14px", marginLeft: "10px", lineHeight: 1 }} title={worker.workerCode ? "Has Access Code" : "No Access Code"}>
-                                  {worker.workerCode ? "🟢" : "🔴"}
-                                </span>
-                              )}
+                              <span style={{ fontSize: "14px", marginLeft: "10px", lineHeight: 1 }} title={worker.workerCode ? "Has Access Code" : "No Access Code"}>
+                                {worker.workerCode ? "🟢" : "🔴"}
+                              </span>
                             </h3>
                             <span>
                               {new Date(worker.createdAt).toLocaleDateString()}
@@ -1611,8 +1695,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                           </div>
                         </div>
 
-                        {!activeWorkerObjectId ? (
-                          <div className="worker-values">
+                        <div className="worker-values">
                             <div className="val-group-procent">
                               <p>{t("qilayotganishi")}</p>
                               <strong>
@@ -1633,16 +1716,10 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                                 {t("olgan")}: {worker.dateAlreadyReceived}
                               </span>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="worker-values simple-worker-values">
-                             {/* Only basic info here if needed */}
-                          </div>
-                        )}
+                        </div>
 
                         <div className="worker-actions">
-                          {!activeWorkerObjectId ? (
-                            <>
+                          <>
                               <button
                                 className="month-btn"
                                 onClick={(e) => {
@@ -1672,8 +1749,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                               >
                                 📜
                               </button>
-                            </>
-                          ) : null}
+                          </>
                           <button
                             className="edit-btn"
                             onClick={(e) => {
@@ -1794,7 +1870,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               </div>
               <div className="statistic2">
                 <h3>{t("jamiishchilar")}:</h3>
-                <p>{workers.length}</p>
+                <p>{currentWorkers.length}</p>
               </div>
               <div className="statistic3">
                 <h3>{t("engbalandmaosh")}:</h3>
