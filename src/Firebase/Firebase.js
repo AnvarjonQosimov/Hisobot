@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { initializeFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAxp5nDt3zA0df6_GpKPa3UpICAg46OLng",
@@ -17,9 +18,10 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
 const auth = getAuth(app);
+const functions = getFunctions(app);
 const provider = new GoogleAuthProvider();
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
 
-export { auth, provider, db };
+export { auth, provider, db, functions };

@@ -4,13 +4,17 @@ import { FaGoogle } from "react-icons/fa";
 import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
 import { setDoc, doc, getDoc } from "firebase/firestore";
 import { auth, provider, db } from "../Firebase/Firebase.js";
+import {
+  ADMIN_EMAIL,
+  LEGACY_ADMIN_EMAIL,
+  checkAccountAccess,
+} from "../auth/accountAccess";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 function LogIn() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const adminEmail = "archoltinnisbatarch@gmail.com";
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -63,8 +67,16 @@ function LogIn() {
   }
 
   if (
+    cachedRole === "admin" &&
+    cachedEmail.toLowerCase() === ADMIN_EMAIL
+  ) {
+    navigate("/admin", { replace: true });
+    return;
+  }
+
+  if (
     cachedRole === "boss" &&
-    cachedEmail.toLowerCase() === adminEmail.toLowerCase()
+    cachedEmail.toLowerCase() === LEGACY_ADMIN_EMAIL
   ) {
     navigate("/hisobot", { replace: true });
     return;
@@ -105,6 +117,7 @@ function LogIn() {
         const workerData = workerSnap.data();
 
         localStorage.setItem("role", "worker");
+        await checkAndAddUserToFirestore(currentUser);
 
         navigate("/worker-auth", {
           state: {
@@ -119,11 +132,15 @@ function LogIn() {
         return;
       }
 
-      // =========================
-      // РУКОВОДИТЕЛЬ
-      // ТОЛЬКО adminEmail
-      // =========================
-      if (email === adminEmail.toLowerCase()) {
+      const access = await checkAccountAccess();
+      if (access.allowed) {
+        await checkAndAddUserToFirestore(currentUser);
+        if (access.admin) {
+          localStorage.setItem("role", "admin");
+          navigate("/admin", { replace: true });
+          return;
+        }
+
         localStorage.setItem("role", "boss");
 
         navigate("/hisobot", {
@@ -185,9 +202,6 @@ function LogIn() {
     localStorage.setItem("userEmail", email);
     localStorage.setItem("username", email);
 
-    // Сохраняем пользователя в Firestore
-    await checkAndAddUserToFirestore(user);
-
     console.log("Checking user role...");
 
     // Проверяем, является ли пользователь работником
@@ -207,6 +221,7 @@ function LogIn() {
     // =========================
     if (workerSnap.exists()) {
       const workerData = workerSnap.data();
+      await checkAndAddUserToFirestore(user);
 
       localStorage.setItem("role", "worker");
 
@@ -224,13 +239,18 @@ function LogIn() {
       return;
     }
 
-    // =========================
-    // РУКОВОДИТЕЛЬ
-    // =========================
-    if (email === adminEmail.toLowerCase()) {
+    const access = await checkAccountAccess();
+    if (access.allowed) {
+      await checkAndAddUserToFirestore(user);
+      if (access.admin) {
+        localStorage.setItem("role", "admin");
+        navigate("/admin", { replace: true });
+        return;
+      }
+
       localStorage.setItem("role", "boss");
 
-      console.log("Admin detected. Redirecting to Hisobot...");
+      console.log("Authorized boss detected. Redirecting to Hisobot...");
 
       navigate("/hisobot", { replace: true });
 

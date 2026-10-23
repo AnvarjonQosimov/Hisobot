@@ -8,6 +8,7 @@ import Profil from "./pages/Profil.js"
 import OfficeXarajat from "./pages/OfficeXarajat.js"
 import WorkerDashboard from "./pages/WorkerDashboard.js"
 import WorkerAuth from "./pages/WorkerAuth.js"
+import AdminPanel from "./pages/AdminPanel.js"
 import { Route, Routes } from "react-router-dom"
 import PrivateRoute from "./components/PrivateRoute";
 
@@ -21,6 +22,7 @@ function App() {
         <Route path="/calculator2" element={<Calculator2 />} />
         <Route path="/login" element={<LogIn />} />
         <Route path="/hisobot" element={<PrivateRoute><Hisobot /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute><AdminPanel /></PrivateRoute>} />
         <Route path="/workerdashboard" element={<WorkerDashboard />} />
         <Route path="/worker-auth" element={<WorkerAuth />} />
         <Route path="/profil" element={<Profil />} />

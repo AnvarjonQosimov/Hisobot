@@ -12,7 +12,7 @@ function Header() {
   const [scrolled, setScrolled] = useState(false);
   const menuRef = useRef(null);
 
-  const dashboardPaths = ["/hisobot", "/officexarajat", "/workerdashboard", "/profil", "/worker-auth"];
+  const dashboardPaths = ["/hisobot", "/admin", "/officexarajat", "/workerdashboard", "/profil", "/worker-auth"];
   const isDashboard = dashboardPaths.includes(location.pathname);
 
   useEffect(() => {
