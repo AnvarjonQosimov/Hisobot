@@ -163,6 +163,8 @@
     "pr_nom": "Name",
     "pr_nom_placeholder": "E.g.: Cement, Worker wages...",
     "pr_kategoriya": "Category",
+    "pr_custom_category_name": "Section name",
+    "pr_custom_category_placeholder": "Enter section name",
     "pr_miqdor": "Quantity",
     "pr_olchov": "Unit of measurement",
     "pr_birlik_narxi": "Price per unit",

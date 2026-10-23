@@ -120,6 +120,11 @@ function ProjectReport({ projectId, projectName, onBack }) {
     ishchi: t("pr_ishchi"), texnika: t("pr_texnika"), boshqa: t("pr_boshqa"),
   }[cat] || cat);
 
+  const expenseCategoryLabel = (expense) =>
+    expense.category === "boshqa" && expense.customCategoryName?.trim()
+      ? expense.customCategoryName
+      : catLabel(expense.category);
+
   const catIcon = (cat) => ({ material: "🧱", ishchi: "👷", texnika: "🚜", boshqa: "📋" }[cat] || "📦");
 
   const unitOptions = ["dona", "kg", "t", "m", "m²", "m³", "l", "kun", "soat"];
@@ -207,7 +212,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
   const openAdd = () => {
     setEditItem(null);
     setForm({ name: "", category: "material", quantity: "", unit: "dona", amountPerUnit: "", currency: "sum",
-      date: new Date().toISOString().split("T")[0], isPaid: false, note: "" });
+      date: new Date().toISOString().split("T")[0], isPaid: false, note: "", customCategoryName: "" });
     setAddModal(true);
   };
 
@@ -215,7 +220,8 @@ function ProjectReport({ projectId, projectName, onBack }) {
   const closeAdd = () => { setAddModal(false); setEditItem(null); };
 
   const handleSave = () => {
-    if (!form.name || !form.amountPerUnit) return;
+    if (!form.name || !form.amountPerUnit ||
+      (form.category === "boshqa" && !form.customCategoryName?.trim())) return;
     saveForUndo();
     const total = parseFloat(form.amountPerUnit) * parseFloat(form.quantity || 1);
     if (editItem) {
@@ -299,7 +305,10 @@ function ProjectReport({ projectId, projectName, onBack }) {
     setBudgetModal(false);
   };
 
-  const isFormValid = form.name.trim() && form.amountPerUnit;
+  const isFormValid =
+    form.name.trim() &&
+    form.amountPerUnit &&
+    (form.category !== "boshqa" || form.customCategoryName?.trim());
 
   return (
     <div className="ProjectReport">
@@ -378,7 +387,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
                     <div className="pr-item-info">
                       <h4 className="pr-item-name">{item.name}</h4>
                       <div className="pr-item-meta">
-                        <span className="pr-badge pr-badge-cat">{catLabel(item.category)}</span>
+                        <span className="pr-badge pr-badge-cat">{expenseCategoryLabel(item)}</span>
                         <span className="pr-badge">{item.date}</span>
                         {item.quantity && <span className="pr-badge">{item.quantity} {item.unit}</span>}
                         {item.isPaid && <span className="pr-badge pr-badge-paid">✓ {t("pr_tolangan")}</span>}
@@ -596,6 +605,17 @@ function ProjectReport({ projectId, projectName, onBack }) {
                   ))}
                 </div>
               </div>
+              {form.category === "boshqa" && (
+                <div className="pr-form-group">
+                  <label>{t("pr_custom_category_name")}</label>
+                  <input
+                    type="text"
+                    value={form.customCategoryName || ""}
+                    placeholder={t("pr_custom_category_placeholder")}
+                    onChange={(e) => setForm({ ...form, customCategoryName: e.target.value })}
+                  />
+                </div>
+              )}
               <div className="pr-form-row">
                 <div className="pr-form-group">
                   <label>{t("pr_miqdor")}</label>

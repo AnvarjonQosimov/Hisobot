@@ -163,6 +163,8 @@
     "pr_nom": "Nomi",
     "pr_nom_placeholder": "Masalan: Sement, Ishchi haqi...",
     "pr_kategoriya": "Kategoriya",
+    "pr_custom_category_name": "Bo'lim nomi",
+    "pr_custom_category_placeholder": "Bo'lim nomini kiriting",
     "pr_miqdor": "Miqdori",
     "pr_olchov": "O'lchov birligi",
     "pr_birlik_narxi": "Birlik narxi",

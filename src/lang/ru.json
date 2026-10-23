@@ -163,6 +163,8 @@
     "pr_nom": "Название",
     "pr_nom_placeholder": "Например: Цемент, Зарплата рабочих...",
     "pr_kategoriya": "Категория",
+    "pr_custom_category_name": "Название раздела",
+    "pr_custom_category_placeholder": "Введите название раздела",
     "pr_miqdor": "Количество",
     "pr_olchov": "Единица измерения",
     "pr_birlik_narxi": "Цена за единицу",
