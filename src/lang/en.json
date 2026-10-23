@@ -267,8 +267,8 @@
     "All rights reserved.": "All rights reserved.",
     "Worker Cabinet": "Worker Cabinet",
     "Support": "Support",
-    "email_chooser_title": "Choose how to send",
-    "email_chooser_description": "Which app would you like to use to contact support?",
-    "email_gmail_description": "Compose a message in Gmail",
+    "email_chooser_title": "Contact support",
+    "email_chooser_description": "Send your message using the Gmail app.",
+    "email_gmail_description": "Open the Gmail app",
     "email_chooser_close": "Close window"
 }

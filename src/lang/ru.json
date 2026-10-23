@@ -267,8 +267,8 @@
     "All rights reserved.": "Все права защищены.",
     "Worker Cabinet": "Кабинет сотрудника",
     "Support": "Поддержка",
-    "email_chooser_title": "Выберите способ отправки",
-    "email_chooser_description": "Через какое приложение отправить сообщение в поддержку?",
-    "email_gmail_description": "Написать письмо в Gmail",
+    "email_chooser_title": "Написать в поддержку",
+    "email_chooser_description": "Отправьте сообщение через приложение Gmail.",
+    "email_gmail_description": "Открыть приложение Gmail",
     "email_chooser_close": "Закрыть окно"
 }

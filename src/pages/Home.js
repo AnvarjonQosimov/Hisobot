@@ -8,6 +8,18 @@ function Home() {
   const { t } = useTranslation();
   const [isEmailChooserOpen, setIsEmailChooserOpen] = useState(false);
 
+  const recipient = encodeURIComponent("adminOfficereport@gmail.com");
+  const subject = encodeURIComponent("OfficeReport - Yordam");
+  const userAgent = navigator.userAgent || "";
+  const isAndroid = /Android/i.test(userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const supportEmailHref = isAndroid
+    ? `intent://co?to=${recipient}&subject=${subject}#Intent;scheme=googlegmail;package=com.google.android.gm;end`
+    : isIOS
+      ? `googlegmail://co?to=${recipient}&subject=${subject}`
+      : `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${subject}`;
+
   useEffect(() => {
     if (!isEmailChooserOpen) return undefined;
 
@@ -131,10 +143,9 @@ function Home() {
             <div className="email-chooser-options">
               <a
                 className="email-chooser-option gmail-option"
-                href="https://mail.google.com/mail/?view=cm&fs=1&to=adminOfficereport%40gmail.com&su=OfficeReport%20-%20Yordam"
-                target="_blank"
-                rel="noopener noreferrer"
+                href={supportEmailHref}
                 onClick={() => setIsEmailChooserOpen(false)}
+                aria-label="Open Gmail to email adminOfficereport@gmail.com"
               >
                 <span className="email-option-mark gmail-mark">G</span>
                 <span><strong>Gmail</strong><small>{t("email_gmail_description")}</small></span>
