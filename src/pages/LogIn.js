@@ -32,11 +32,14 @@ function LogIn() {
   const checkAndAddUserToFirestore = async (user) => {
     try {
       const userRef = doc(db, "users", user.uid);
+      const userSnapshot = await getDoc(userRef);
+      const now = new Date().toISOString();
       await setDoc(userRef, {
         email: user.email,
         displayName: user.displayName,
         photoUrl: user.photoURL,
-        lastLogin: new Date().toISOString()
+        registeredAt: userSnapshot.data()?.registeredAt || now,
+        lastLogin: now
       }, { merge: true });
     } catch (e) {
       // Silently handle firestore errors during background sync

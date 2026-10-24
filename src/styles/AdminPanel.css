@@ -162,6 +162,82 @@
   text-align: center;
 }
 
+.admin-chart-card {
+  overflow: hidden;
+}
+
+.admin-line-chart {
+  min-width: 760px;
+  height: 300px;
+}
+
+.admin-chart-tick,
+.admin-chart-label,
+.admin-chart-value {
+  font-family: inherit;
+}
+
+.admin-chart-label {
+  font-size: 10px;
+}
+
+.admin-boss-row {
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.admin-boss-row:hover {
+  background: rgba(129, 140, 248, 0.08);
+}
+
+.admin-boss-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-boss-chevron {
+  width: 14px;
+  color: #a5b4fc;
+  font-size: 18px;
+}
+
+.admin-boss-details-row td {
+  padding: 0 14px 16px;
+  background: rgba(6, 11, 25, 0.42);
+}
+
+.admin-boss-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 36px;
+  padding: 16px 22px;
+  border-left: 2px solid #818cf8;
+}
+
+.admin-boss-details div {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-boss-details span {
+  color: #8793ad;
+  font-size: 11px;
+}
+
+.admin-boss-details strong {
+  color: #e2e8f0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .admin-panel-card {
   min-width: 0;
   padding: 24px;
@@ -298,6 +374,55 @@
   color: #fecaca;
 }
 
+.admin-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.76);
+  backdrop-filter: blur(6px);
+}
+
+.admin-confirm-dialog {
+  width: min(100%, 420px);
+  padding: 26px;
+  border: 1px solid rgba(171, 183, 215, 0.18);
+  border-radius: 16px;
+  background: #131b30;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.admin-confirm-dialog h2 {
+  margin: 0;
+  color: #eef2ff;
+  font-size: 20px;
+}
+
+.admin-confirm-dialog p {
+  margin: 12px 0 24px;
+  color: #aab4ca;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.admin-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-confirm-logout {
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 16px;
+  background: #dc4454;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 @media (max-width: 900px) {
   .admin-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -338,7 +463,7 @@
   }
 
   .admin-line-chart {
-    min-width: 560px;
+    min-width: 760px;
   }
 
   .admin-add-account-form {

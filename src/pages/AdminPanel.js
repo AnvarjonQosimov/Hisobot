@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useState } from "react";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../Firebase/Firebase";
@@ -23,6 +23,8 @@ function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [expandedBossEmail, setExpandedBossEmail] = useState("");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -83,27 +85,54 @@ function AdminPanel() {
     }
     ["userEmail", "username", "role"].forEach((key) => localStorage.removeItem(key));
     navigate("/login", { replace: true });
+    setShowLogoutConfirm(false);
   };
 
   const stats = dashboard?.stats;
-  const bosses = dashboard?.bosses || [];
+  const monthlyLabels = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() - (11 - index));
+    return date;
+  });
+  const registeredHistory = dashboard?.registeredBossHistory || [];
+  const monthlyRegistrations = monthlyLabels.map((month) =>
+    registeredHistory.filter((boss) => {
+      if (!boss.registeredAt) return false;
+      const registeredAt = new Date(boss.registeredAt);
+      return registeredAt.getFullYear() === month.getFullYear() &&
+        registeredAt.getMonth() === month.getMonth();
+    }).length,
+  );
+  const firstMonth = monthlyLabels[0];
+  let cumulativeRegisteredBosses = registeredHistory.filter((boss) => {
+    if (!boss.registeredAt) return false;
+    const registeredAt = new Date(boss.registeredAt);
+    return registeredAt < firstMonth;
+  }).length;
+  const monthlyRegisteredBosses = monthlyRegistrations.map((count) => {
+    cumulativeRegisteredBosses += count;
+    return cumulativeRegisteredBosses;
+  });
   const chartHeight = 250;
   const chartPadding = { top: 20, right: 28, bottom: 65, left: 44 };
-  const chartWidth = Math.max(620, bosses.length * 150);
+  const chartWidth = Math.max(760, monthlyLabels.length * 76);
   const plotWidth = chartWidth - chartPadding.left - chartPadding.right;
   const plotHeight = chartHeight - chartPadding.top - chartPadding.bottom;
-  const maxWorkers = Math.max(1, ...bosses.map((boss) => boss.workerCount));
+  const maxRegisteredBosses = Math.max(1, ...monthlyRegisteredBosses);
   const chartTicks = [...new Set([
     0,
-    Math.round(maxWorkers * 0.25),
-    Math.round(maxWorkers * 0.5),
-    Math.round(maxWorkers * 0.75),
-    maxWorkers,
+    Math.round(maxRegisteredBosses * 0.25),
+    Math.round(maxRegisteredBosses * 0.5),
+    Math.round(maxRegisteredBosses * 0.75),
+    maxRegisteredBosses,
   ])];
-  const chartPoints = bosses.map((boss, index) => ({
-    ...boss,
-    x: chartPadding.left + (bosses.length <= 1 ? plotWidth / 2 : (index / (bosses.length - 1)) * plotWidth),
-    y: chartPadding.top + plotHeight - (boss.workerCount / maxWorkers) * plotHeight,
+  const chartPoints = monthlyLabels.map((month, index) => ({
+    month,
+    count: monthlyRegisteredBosses[index],
+    x: chartPadding.left + (index / (monthlyLabels.length - 1)) * plotWidth,
+    y: chartPadding.top + plotHeight -
+      (monthlyRegisteredBosses[index] / maxRegisteredBosses) * plotHeight,
   }));
   const chartLine = chartPoints
     .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
@@ -119,7 +148,7 @@ function AdminPanel() {
         </div>
         <div className="admin-header-actions">
           <span className="admin-current-user">{auth.currentUser?.email}</span>
-          <button className="admin-secondary-button" type="button" onClick={handleLogout}>
+          <button className="admin-secondary-button" type="button" onClick={() => setShowLogoutConfirm(true)}>
             Выйти
           </button>
         </div>
@@ -153,24 +182,24 @@ function AdminPanel() {
       <section className="admin-panel-card admin-chart-card">
         <div className="admin-card-heading">
           <div>
-            <h2>Работники по аккаунтам боссов</h2>
-            <p>Линейный график количества email-подключённых работников у каждого босса.</p>
+            <h2>Регистрация боссов</h2>
+            <p>Накопительное количество аккаунтов боссов, впервые вошедших за последние 12 месяцев.</p>
           </div>
         </div>
         {loading ? (
           <p className="admin-chart-empty">Загрузка данных...</p>
-        ) : bosses.length === 0 ? (
-          <p className="admin-chart-empty">Пока нет данных для построения графика.</p>
+        ) : stats?.registeredBosses === 0 ? (
+          <p className="admin-chart-empty">Пока нет зарегистрированных аккаунтов боссов.</p>
         ) : (
           <div className="admin-chart-scroll">
             <svg
               className="admin-line-chart"
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
               role="img"
-              aria-label="Количество работников по аккаунтам боссов"
+              aria-label="Накопительное количество зарегистрированных боссов за последние 12 месяцев"
             >
               {chartTicks.map((tickValue) => {
-                const y = chartPadding.top + plotHeight * (1 - tickValue / maxWorkers);
+                const y = chartPadding.top + plotHeight * (1 - tickValue / maxRegisteredBosses);
                 return (
                   <g key={tickValue}>
                     <line
@@ -186,12 +215,12 @@ function AdminPanel() {
                   </g>
                 );
               })}
-              {chartPoints.length > 1 && <path d={chartLine} className="admin-chart-line" />}
+              <path d={chartLine} className="admin-chart-line" />
               {chartPoints.map((point) => (
-                <g key={point.email}>
+                <g key={`${point.month.getFullYear()}-${point.month.getMonth()}`}>
                   <circle cx={point.x} cy={point.y} r="5" className="admin-chart-point" />
                   <text x={point.x} y={point.y - 12} textAnchor="middle" className="admin-chart-value">
-                    {point.workerCount}
+                    {point.count}
                   </text>
                   <text
                     x={point.x}
@@ -199,8 +228,7 @@ function AdminPanel() {
                     textAnchor="middle"
                     className="admin-chart-label"
                   >
-                    {point.email.length > 18 ? `${point.email.slice(0, 16)}...` : point.email}
-                    <title>{point.email}</title>
+                    {point.month.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" })}
                   </text>
                 </g>
               ))}
@@ -251,35 +279,72 @@ function AdminPanel() {
               </thead>
               <tbody>
                 {dashboard?.bosses.map((boss) => (
-                  <tr key={boss.email}>
-                    <td>
-                      <strong>{boss.displayName || boss.email}</strong>
-                      {boss.displayName && <small>{boss.email}</small>}
-                    </td>
-                    <td>
-                      <span className={`admin-status ${boss.registered ? "is-registered" : ""}`}>
-                        {boss.registered ? "Зарегистрирован" : "Ожидает входа"}
-                      </span>
-                    </td>
-                    <td>{boss.workerCount}</td>
-                    <td>
-                      {boss.lastLogin
-                        ? new Date(boss.lastLogin).toLocaleDateString()
-                        : "—"}
-                    </td>
-                    <td>
-                      {!boss.administrator && (
+                  <Fragment key={boss.email}>
+                    <tr
+                      className="admin-boss-row"
+                      onClick={() => setExpandedBossEmail((current) => current === boss.email ? "" : boss.email)}
+                    >
+                      <td>
                         <button
                           type="button"
-                          className="admin-remove-button"
-                          onClick={() => handleRemoveAccount(boss.email)}
-                          disabled={busy}
+                          className="admin-boss-toggle"
+                          aria-expanded={expandedBossEmail === boss.email}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setExpandedBossEmail((current) => current === boss.email ? "" : boss.email);
+                          }}
                         >
-                          Удалить
+                          <span className="admin-boss-chevron">{expandedBossEmail === boss.email ? "▾" : "▸"}</span>
+                          <span>
+                            <strong>{boss.displayName || boss.email}</strong>
+                            {boss.displayName && <small>{boss.email}</small>}
+                          </span>
                         </button>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                      <td>
+                        <span className={`admin-status ${boss.registered ? "is-registered" : ""}`}>
+                          {boss.registered ? "Зарегистрирован" : "Ожидает входа"}
+                        </span>
+                      </td>
+                      <td>{boss.workerCount}</td>
+                      <td>
+                        {boss.lastLogin
+                          ? new Date(boss.lastLogin).toLocaleDateString()
+                          : "—"}
+                      </td>
+                      <td>
+                        {!boss.administrator && (
+                          <button
+                            type="button"
+                            className="admin-remove-button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleRemoveAccount(boss.email);
+                            }}
+                            disabled={busy}
+                          >
+                            Удалить
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {expandedBossEmail === boss.email && (
+                      <tr className="admin-boss-details-row">
+                        <td colSpan="5">
+                          <div className="admin-boss-details">
+                            <div>
+                              <span>Email для работников</span>
+                              <strong>{boss.hasWorkerEmail ? boss.workerEmail : "Не указан"}</strong>
+                            </div>
+                            <div>
+                              <span>Рабочие, зарегистрированные через этот аккаунт</span>
+                              <strong>{boss.hasWorkerEmail ? boss.workerCount : 0}</strong>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
                 {!loading && dashboard?.bosses.length === 0 && (
                   <tr><td colSpan="5" className="admin-empty-state">Аккаунтов пока нет.</td></tr>
@@ -289,6 +354,28 @@ function AdminPanel() {
           </div>
         </article>
       </section>
+      {showLogoutConfirm && (
+        <div
+          className="admin-confirm-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowLogoutConfirm(false);
+          }}
+        >
+          <section className="admin-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-logout-title">
+            <h2 id="admin-logout-title">Выйти из панели?</h2>
+            <p>Вы уверены, что хотите выйти из аккаунта администратора?</p>
+            <div className="admin-confirm-actions">
+              <button type="button" className="admin-secondary-button" onClick={() => setShowLogoutConfirm(false)}>
+                Отмена
+              </button>
+              <button type="button" className="admin-confirm-logout" onClick={handleLogout}>
+                Выйти
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

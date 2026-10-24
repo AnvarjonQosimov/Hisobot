@@ -36,38 +36,55 @@ export const getAdminDashboard = async () => {
     if (email) usersByEmail.set(email, userDoc.data());
   });
 
-  const workerCounts = new Map();
-  workersSnapshot.forEach((workerDoc) => {
-    const bossEmail = workerDoc.data().bossEmail?.toLowerCase();
-    if (bossEmail) workerCounts.set(bossEmail, (workerCounts.get(bossEmail) || 0) + 1);
-  });
-
   const bossEmails = new Set([
     ADMIN_EMAIL,
     LEGACY_ADMIN_EMAIL,
     ...accountsSnapshot.docs.map((account) => account.id.toLowerCase()),
   ]);
+  const bossEmailsList = [...bossEmails];
+  const cabinetSnapshots = await Promise.all(
+    bossEmailsList.map((email) => getDoc(doc(db, "cabinets", email))),
+  );
+  const workerEmailsByBoss = new Map();
+  workersSnapshot.forEach((workerDoc) => {
+    const bossEmail = workerDoc.data().bossEmail?.toLowerCase();
+    if (bossEmail) {
+      workerEmailsByBoss.set(bossEmail, (workerEmailsByBoss.get(bossEmail) || 0) + 1);
+    }
+  });
+
   const bosses = [...bossEmails]
-    .map((email) => {
+    .map((email, index) => {
       const user = usersByEmail.get(email);
+      const cabinet = cabinetSnapshots[index].exists()
+        ? cabinetSnapshots[index].data()
+        : {};
       return {
         email,
         registered: Boolean(user),
         displayName: user?.displayName || "",
         lastLogin: user?.lastLogin || null,
-        workerCount: workerCounts.get(email) || 0,
+        registeredAt: user?.registeredAt || user?.lastLogin || null,
+        hasWorkerEmail: Boolean(cabinet.globalWorkerEmail?.trim()),
+        workerEmail: cabinet.globalWorkerEmail?.trim() || "",
+        workerCount: workerEmailsByBoss.get(email) || 0,
         administrator: email === ADMIN_EMAIL || email === LEGACY_ADMIN_EMAIL,
       };
     })
     .sort((a, b) => a.email.localeCompare(b.email));
 
+  const registeredBosses = bosses.filter((boss) => boss.registered);
   return {
     stats: {
       registeredUsers: usersSnapshot.size,
       bossAccounts: bossEmails.size,
-      registeredBosses: bosses.filter((boss) => boss.registered).length,
+      registeredBosses: registeredBosses.length,
       registeredWorkers: workersSnapshot.size,
     },
+    registeredBossHistory: registeredBosses.map(({ email, registeredAt }) => ({
+      email,
+      registeredAt,
+    })),
     bosses,
     managedAccounts: accountsSnapshot.docs.map((account) => account.id).sort(),
   };
