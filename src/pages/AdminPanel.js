@@ -1,4 +1,4 @@
-import React, { Fragment, useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../Firebase/Firebase";
@@ -23,7 +23,7 @@ function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [expandedBossEmail, setExpandedBossEmail] = useState("");
+  const [selectedBoss, setSelectedBoss] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const loadDashboard = useCallback(async () => {
@@ -279,22 +279,13 @@ function AdminPanel() {
               </thead>
               <tbody>
                 {dashboard?.bosses.map((boss) => (
-                  <Fragment key={boss.email}>
-                    <tr
-                      className="admin-boss-row"
-                      onClick={() => setExpandedBossEmail((current) => current === boss.email ? "" : boss.email)}
-                    >
+                    <tr key={boss.email}>
                       <td>
                         <button
                           type="button"
                           className="admin-boss-toggle"
-                          aria-expanded={expandedBossEmail === boss.email}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setExpandedBossEmail((current) => current === boss.email ? "" : boss.email);
-                          }}
+                          onClick={() => setSelectedBoss(boss)}
                         >
-                          <span className="admin-boss-chevron">{expandedBossEmail === boss.email ? "▾" : "▸"}</span>
                           <span>
                             <strong>{boss.displayName || boss.email}</strong>
                             {boss.displayName && <small>{boss.email}</small>}
@@ -328,23 +319,6 @@ function AdminPanel() {
                         )}
                       </td>
                     </tr>
-                    {expandedBossEmail === boss.email && (
-                      <tr className="admin-boss-details-row">
-                        <td colSpan="5">
-                          <div className="admin-boss-details">
-                            <div>
-                              <span>Email для работников</span>
-                              <strong>{boss.hasWorkerEmail ? boss.workerEmail : "Не указан"}</strong>
-                            </div>
-                            <div>
-                              <span>Рабочие, зарегистрированные через этот аккаунт</span>
-                              <strong>{boss.hasWorkerEmail ? boss.workerCount : 0}</strong>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
                 ))}
                 {!loading && dashboard?.bosses.length === 0 && (
                   <tr><td colSpan="5" className="admin-empty-state">Аккаунтов пока нет.</td></tr>
@@ -354,6 +328,53 @@ function AdminPanel() {
           </div>
         </article>
       </section>
+      {selectedBoss && (
+        <div
+          className="admin-confirm-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedBoss(null);
+          }}
+        >
+          <section
+            className="admin-boss-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-boss-dialog-title"
+          >
+            <button
+              type="button"
+              className="admin-dialog-close"
+              onClick={() => setSelectedBoss(null)}
+              aria-label="Закрыть"
+            >
+              ×
+            </button>
+            <p className="admin-eyebrow">АККАУНТ БОССА</p>
+            <h2 id="admin-boss-dialog-title">{selectedBoss.displayName || selectedBoss.email}</h2>
+            {selectedBoss.displayName && (
+              <p className="admin-boss-dialog-email">{selectedBoss.email}</p>
+            )}
+            <div className="admin-boss-dialog-details">
+              <div>
+                <span>Email для работников</span>
+                <strong>{selectedBoss.hasWorkerEmail ? selectedBoss.workerEmail : "Не указан"}</strong>
+              </div>
+              <div>
+                <span>Рабочие, зарегистрированные через этот аккаунт</span>
+                <strong>{selectedBoss.hasWorkerEmail ? selectedBoss.workerCount : 0}</strong>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="admin-dialog-done"
+              onClick={() => setSelectedBoss(null)}
+            >
+              Закрыть
+            </button>
+          </section>
+        </div>
+      )}
       {showLogoutConfirm && (
         <div
           className="admin-confirm-overlay"
