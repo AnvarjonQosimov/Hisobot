@@ -6,14 +6,7 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 The standalone admin dashboard is available to `anvarqosimov153@gmail.com`. It reports registered users, authorized boss accounts, and email-linked workers per boss. The admin can grant or revoke boss access; users continue to sign in with Google.
 
-Deploy the account-access and dashboard functions to the configured Firebase project before using these features:
-
-```sh
-npx firebase-tools login
-npx firebase-tools deploy --only functions
-```
-
-Firebase Cloud Functions deployment requires the Blaze billing plan.
+The admin dashboard reads and updates the Firestore collections directly after verifying the signed-in Google email.
 
 ## Available Scripts
 

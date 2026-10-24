@@ -107,6 +107,61 @@
   margin-top: 20px;
 }
 
+.admin-chart-card {
+  max-width: 1440px;
+  margin: 20px auto 0;
+}
+
+.admin-chart-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.admin-line-chart {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+  height: 250px;
+  overflow: visible;
+}
+
+.admin-chart-gridline {
+  stroke: rgba(171, 183, 215, 0.12);
+  stroke-width: 1;
+}
+
+.admin-chart-tick,
+.admin-chart-label {
+  fill: #8793ad;
+  font-size: 11px;
+}
+
+.admin-chart-value {
+  fill: #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-chart-line {
+  fill: none;
+  stroke: #818cf8;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-chart-point {
+  fill: #a5b4fc;
+  stroke: #1e293b;
+  stroke-width: 3;
+}
+
+.admin-chart-empty {
+  margin: 28px 0;
+  color: #8793ad;
+  text-align: center;
+}
+
 .admin-panel-card {
   min-width: 0;
   padding: 24px;
@@ -280,6 +335,10 @@
 
   .admin-panel-card {
     padding: 16px;
+  }
+
+  .admin-line-chart {
+    min-width: 560px;
   }
 
   .admin-add-account-form {
