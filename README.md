@@ -8,6 +8,16 @@ The standalone admin dashboard is available to `anvarqosimov153@gmail.com`. It r
 
 The admin dashboard reads and updates the Firestore collections directly after verifying the signed-in Google email.
 
+## Firestore access rules
+
+Firestore rules are defined in `firestore.rules` and attached through `firebase.json` for the `loginforofficereport` project. Access requires a verified Google email. The administrator `anvarqosimov153@gmail.com` can access all application documents; an approved boss can access only their cabinet and worker records. Unmatched users are denied.
+
+Workers no longer read the boss's full cabinet. After a worker enters a valid invite code, `workerAccess/{workerEmail}` links that authenticated account to one worker record in `workerData`. The boss's report page synchronizes worker records to that collection and removes records that are deleted from the boss's list.
+
+For a safe rollout, publish the updated application first and have each boss open the report page once so their worker records are synchronized while the existing Firestore rules are still active. Then publish the new rules. Workers should sign in again and enter their invite code once to establish their individual access record. Publishing the rules before these steps can temporarily prevent workers from seeing their data.
+
+The rules have not been deployed to Firebase. To publish them after the rollout, use the Firebase Console or run `firebase deploy --only firestore:rules --project loginforofficereport` from a machine authenticated to that project.
+
 ## Available Scripts
 
 In the project directory, you can run:

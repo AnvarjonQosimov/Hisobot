@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import { db, auth } from "../Firebase/Firebase";
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import Loading from "../components/Loading";
+import { getWorkerDataId } from "../auth/firestoreOwnership";
 
 function WorkerDashboard() {
   const navigate = useNavigate();
@@ -24,121 +25,63 @@ function WorkerDashboard() {
   //   };
   // }, []);
 
-  useEffect(() => {
-  const role = localStorage.getItem("role");
-  const bEmail = localStorage.getItem("bossEmail");
-  const wId = localStorage.getItem("workerId");
+const [worker, setWorker] = useState(null);
+const [loading, setLoading] = useState(true);
+const [workerLoadError, setWorkerLoadError] = useState("");
+const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+const [logoutDialog, setLogoutDialog] = useState(false);
+const [expandedHistory, setExpandedHistory] = useState([]);
+const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  if (role !== "worker" || !bEmail || !wId) {
+useEffect(() => {
+  const role = localStorage.getItem("role");
+  const bossEmail = localStorage.getItem("bossEmail");
+  const workerId = localStorage.getItem("workerId");
+
+  if (role !== "worker" || !bossEmail || !workerId) {
     navigate("/login");
-    return;
+    return undefined;
   }
 
-  setBossEmail(bEmail);
-  setWorkerId(wId);
-
-  const docRef = doc(db, "cabinets", bEmail);
-
-  const unsubscribe = onSnapshot(
-    docRef,
-    (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-
-        setCabinetData(data);
-
-        if (data.workers) {
-          setFullWorkers(data.workers);
-
-          const pWorker = data.workers.find(
-            w => String(w.id) === String(wId)
-          );
-
-          if (pWorker) {
-            setWorker(pWorker);
-          }
-        }
+  const workerRef = doc(
+    db,
+    "workerData",
+    getWorkerDataId(bossEmail, workerId),
+  );
+  return onSnapshot(
+    workerRef,
+    (workerSnapshot) => {
+      if (workerSnapshot.exists()) {
+        setWorker(workerSnapshot.data().worker);
+        setWorkerLoadError("");
+      } else {
+        setWorker(null);
+        setWorkerLoadError(
+          t("worker_data_unavailable") ||
+            "Worker data is not available. Ask your manager to sync the report and sign in again with your invite code.",
+        );
       }
-
       setLoading(false);
     },
     (error) => {
-      console.error("Worker cloud sync error:", error);
+      console.error("Worker data sync failed:", error);
+      setWorkerLoadError(
+        t("worker_data_unavailable") ||
+          "Worker data is not available. Ask your manager to sync the report and sign in again with your invite code.",
+      );
       setLoading(false);
-    }
+    },
   );
+}, [navigate, t]);
 
-  return () => unsubscribe();
-}, [navigate]);
+const handleOpenDetail = () => {
+if (!worker) return;
 
-  const [worker, setWorker] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [logoutDialog, setLogoutDialog] = useState(false);
-  const [expandedHistory, setExpandedHistory] = useState([]);
-
-  const [bossEmail, setBossEmail] = useState("");
-  const [workerId, setWorkerId] = useState("");
-  const [fullWorkers, setFullWorkers] = useState([]);
-  const [cabinetData, setCabinetData] = useState(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-
-  const handleOpenDetail = () => {
-  if (!worker) return;
-
-  setIsDetailModalOpen(true);
+setIsDetailModalOpen(true);
 };
 
   // Stats Period
   const [chartPeriod, setChartPeriod] = useState("week");
-
-  useEffect(() => {
-    const role = localStorage.getItem("role");
-    const bEmail = localStorage.getItem("bossEmail");
-    const wId = localStorage.getItem("workerId");
-
-    if (role !== "worker" || !bEmail || !wId) {
-      navigate("/login");
-      return;
-    }
-    setBossEmail(bEmail);
-    setWorkerId(wId);
-
-    const checkCloud = async () => {
-      try {
-        const docRef = doc(db, "cabinets", bEmail);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setCabinetData(data);
-          if (data.workers) {
-            setFullWorkers(data.workers);
-            const pWorker = data.workers.find(w => w.id === parseInt(wId) || w.id === wId);
-            if (pWorker) {
-              setWorker(pWorker);
-            }
-          }
-        }
-      } catch (e) {
-        console.log("Worker cloud sync paused (offline).");
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkCloud();
-  }, [navigate]);
-
-  const saveToCloud = async (newWorkers) => {
-    if (!bossEmail || !cabinetData) return;
-    try {
-      await setDoc(doc(db, "cabinets", bossEmail), {
-        ...cabinetData,
-        workers: newWorkers
-      }, { merge: true });
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   // const handleTogglePaid = (id) => {
   //   if (!worker) return;
@@ -324,6 +267,11 @@ function WorkerDashboard() {
         </div>
 
         <div className="rightBottom" style={{ flex: 1, padding: "30px" }}>
+          {workerLoadError && (
+            <p role="alert" style={{ color: "#ff8a8a", textAlign: "center" }}>
+              {workerLoadError}
+            </p>
+          )}
           {worker ? (
             <div className="worker-list" style={{ height: "auto" }}>
               <div

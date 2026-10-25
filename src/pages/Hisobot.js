@@ -12,6 +12,7 @@ import { signOut } from "firebase/auth";
 import FloatingCalculator from "../components/FloatingCalculator";
 import Loading from "../components/Loading";
 import { AnimatePresence } from "framer-motion";
+import { saveBossCabinet } from "../auth/firestoreOwnership";
 
 const createWorkerObjectCopy = (worker) => ({
   ...worker,
@@ -408,16 +409,20 @@ function Hisobot() {
     setEmailError(false);
     try {
       // 1. Save to the global lookup collection
-      await setDoc(doc(db, "globalWorkerEmails", val.toLowerCase()), { bossEmail: username });
+      await setDoc(doc(db, "globalWorkerEmails", val.toLowerCase()), {
+        bossEmail: username,
+        ownerEmail: username,
+        ownerUid: auth.currentUser.uid,
+      });
 
       // 2. Ensure it's in the state and trigger cabinet sync
       setSavedGlobalWorkerEmail(val);
       setGlobalWorkerEmail(val);
 
       // Force immediate sync to cabinet for this field
-      await setDoc(doc(db, "cabinets", username), {
+      await saveBossCabinet(username, {
         globalWorkerEmail: val
-      }, { merge: true });
+      });
 
     } catch (err) {
       console.error(err);
@@ -543,12 +548,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       try {
         console.log("Syncing to cloud...");
         if (isTotallyEmpty) {
-          await setDoc(doc(db, "cabinets", username), { currencyDisplayMode }, { merge: true });
+          await saveBossCabinet(username, { currencyDisplayMode, workers });
           return;
         }
-        await setDoc(doc(db, "cabinets", username), {
+        await saveBossCabinet(username, {
           workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, globalWorkerEmail, officeBranches, workerObjects, currencyDisplayMode
-        }, { merge: true });
+        });
       } catch (e) { console.error("Cloud save failed", e); }
     };
     saveCloud();
@@ -701,7 +706,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       );
       if (workerCode.trim() && activeWorkerObjectId === null) {
         // Non-blocking write
-        setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: editingWorkerId })
+        setDoc(doc(db, "inviteCodes", workerCode.trim()), {
+          bossEmail: username,
+          workerId: editingWorkerId,
+          ownerEmail: username,
+          ownerUid: auth.currentUser.uid,
+        })
           .catch(e => console.error("Failed to save invite code:", e));
       }
     } else {
@@ -728,7 +738,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       updateCurrentWorkers([newWorker, ...currentWorkers]);
       if (workerCode.trim() && activeWorkerObjectId === null) {
         // Non-blocking write
-        setDoc(doc(db, "inviteCodes", workerCode.trim()), { bossEmail: username, workerId: newWorkerId })
+        setDoc(doc(db, "inviteCodes", workerCode.trim()), {
+          bossEmail: username,
+          workerId: newWorkerId,
+          ownerEmail: username,
+          ownerUid: auth.currentUser.uid,
+        })
           .catch(e => console.error("Failed to save invite code:", e));
       }
     }

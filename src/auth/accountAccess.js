@@ -1,4 +1,12 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  runTransaction,
+  setDoc,
+} from "firebase/firestore";
 import { auth, db } from "../Firebase/Firebase";
 
 export const ADMIN_EMAIL = "anvarqosimov153@gmail.com";
@@ -42,6 +50,12 @@ export const getAdminDashboard = async () => {
     ...accountsSnapshot.docs.map((account) => account.id.toLowerCase()),
   ]);
   const bossEmailsList = [...bossEmails];
+  const managedAccountsByEmail = new Map(
+    accountsSnapshot.docs.map((account) => [
+      account.id.toLowerCase(),
+      account.data(),
+    ]),
+  );
   const cabinetSnapshots = await Promise.all(
     bossEmailsList.map((email) => getDoc(doc(db, "cabinets", email))),
   );
@@ -65,6 +79,7 @@ export const getAdminDashboard = async () => {
         displayName: user?.displayName || "",
         lastLogin: user?.lastLogin || null,
         registeredAt: user?.registeredAt || user?.lastLogin || null,
+        accountCreatedAt: managedAccountsByEmail.get(email)?.createdAt || null,
         hasWorkerEmail: Boolean(cabinet.globalWorkerEmail?.trim()),
         workerEmail: cabinet.globalWorkerEmail?.trim() || "",
         workerCount: workerEmailsByBoss.get(email) || 0,
@@ -112,4 +127,47 @@ export const removeManagedAccount = async (email) => {
     throw new Error("Нельзя удалить аккаунт администратора.");
   }
   await deleteDoc(doc(db, "managedAccounts", normalizedEmail));
+};
+
+export const updateManagedAccount = async (currentEmail, nextEmail) => {
+  if (!isAdminEmail(auth.currentUser?.email || "")) {
+    throw new Error("Только администратор может изменять аккаунты.");
+  }
+
+  const normalizedCurrentEmail = currentEmail.trim().toLowerCase();
+  const normalizedNextEmail = nextEmail.trim().toLowerCase();
+  if (normalizedCurrentEmail === normalizedNextEmail) {
+    throw new Error("Новый email должен отличаться от текущего.");
+  }
+  if (
+    normalizedCurrentEmail === ADMIN_EMAIL ||
+    normalizedCurrentEmail === LEGACY_ADMIN_EMAIL ||
+    normalizedNextEmail === ADMIN_EMAIL ||
+    normalizedNextEmail === LEGACY_ADMIN_EMAIL
+  ) {
+    throw new Error("Нельзя изменять аккаунты администратора.");
+  }
+
+  const currentRef = doc(db, "managedAccounts", normalizedCurrentEmail);
+  const nextRef = doc(db, "managedAccounts", normalizedNextEmail);
+  await runTransaction(db, async (transaction) => {
+    const [currentAccount, nextAccount] = await Promise.all([
+      transaction.get(currentRef),
+      transaction.get(nextRef),
+    ]);
+    if (!currentAccount.exists()) {
+      throw new Error("Аккаунт для изменения не найден.");
+    }
+    if (nextAccount.exists()) {
+      throw new Error("Аккаунт с таким email уже существует.");
+    }
+
+    transaction.set(nextRef, {
+      ...currentAccount.data(),
+      email: normalizedNextEmail,
+      updatedAt: new Date().toISOString(),
+      updatedBy: ADMIN_EMAIL,
+    });
+    transaction.delete(currentRef);
+  });
 };

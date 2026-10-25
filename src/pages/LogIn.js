@@ -38,12 +38,13 @@ function LogIn() {
         email: user.email,
         displayName: user.displayName,
         photoUrl: user.photoURL,
+        ownerEmail: user.email?.toLowerCase(),
+        ownerUid: user.uid,
         registeredAt: userSnapshot.data()?.registeredAt || now,
         lastLogin: now
       }, { merge: true });
     } catch (e) {
-      // Silently handle firestore errors during background sync
-      console.log("Firestore background sync paused (offline).");
+      console.error("Firestore user profile sync failed:", e);
     }
   };
 

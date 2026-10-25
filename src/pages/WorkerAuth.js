@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { db, auth } from "../Firebase/Firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useTranslation } from "react-i18next";
 import Loading from "../components/Loading";
@@ -47,8 +47,19 @@ function WorkerAuth() {
 
       if (codeSnap.exists() && codeSnap.data().bossEmail === pendingWorker.data.bossEmail) {
         const codeData = codeSnap.data();
+        const workerEmail = pendingWorker.email.toLowerCase();
+        if (!auth.currentUser) {
+          throw new Error("The worker account is no longer authenticated.");
+        }
+        await setDoc(doc(db, "workerAccess", workerEmail), {
+          bossEmail: codeData.bossEmail,
+          workerId: codeData.workerId,
+          inviteCode: workerCode.trim(),
+          ownerEmail: workerEmail,
+          ownerUid: auth.currentUser.uid,
+        });
         localStorage.setItem("username", pendingWorker.email);
-        localStorage.setItem("userEmail", pendingWorker.email);
+        localStorage.setItem("userEmail", workerEmail);
         localStorage.setItem("role", "worker");
         localStorage.setItem("bossEmail", codeData.bossEmail);
         localStorage.setItem("workerId", codeData.workerId);

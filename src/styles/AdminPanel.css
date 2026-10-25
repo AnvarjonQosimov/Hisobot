@@ -223,6 +223,47 @@
   font-size: 13px;
 }
 
+.admin-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: #aab4ca;
+  font-size: 12px;
+}
+
+.admin-chart-period-select,
+.admin-sort-select {
+  border: 1px solid rgba(171, 183, 215, 0.2);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #0c1325;
+  color: #eef2ff;
+}
+
+.admin-chart-period-caption {
+  margin: -10px 0 14px;
+  color: #8d98b2;
+  font-size: 13px;
+}
+
+.admin-chart-card .admin-card-heading > div > p {
+  display: none;
+}
+
+.admin-sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #aab4ca;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-sort-select {
+  font-size: 12px;
+}
+
 .admin-add-account-form {
   display: flex;
   gap: 10px;
@@ -323,6 +364,22 @@
   cursor: pointer;
 }
 
+.admin-edit-button {
+  margin-right: 8px;
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  border-radius: 7px;
+  padding: 7px 10px;
+  background: rgba(129, 140, 248, 0.1);
+  color: #c7d2fe;
+  cursor: pointer;
+}
+
+.admin-edit-button:disabled,
+.admin-remove-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .admin-empty-state {
   padding: 28px !important;
   color: #8290aa !important;
@@ -370,6 +427,38 @@
   color: #aab4ca;
   font-size: 14px;
   line-height: 1.5;
+}
+
+.admin-account-dialog {
+  width: min(100%, 480px);
+}
+
+.admin-edit-email-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #aab4ca;
+  font-size: 13px;
+}
+
+.admin-account-dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 22px;
+  border: 1px solid rgba(171, 183, 215, 0.2);
+  border-radius: 9px;
+  padding: 12px 14px;
+  background: rgba(6, 11, 25, 0.7);
+  color: #fff;
+}
+
+.admin-confirm-actions .admin-dialog-done {
+  width: auto;
+  margin-top: 0;
+}
+
+.admin-confirm-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .admin-boss-dialog {

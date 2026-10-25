@@ -9,6 +9,7 @@ import { db, auth } from "../Firebase/Firebase";
 import { signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import Loading from "../components/Loading";
+import { saveBossCabinet } from "../auth/firestoreOwnership";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
@@ -102,7 +103,11 @@ function OfficeXarajat() {
 
     setEmailError(false);
     try {
-      await setDoc(doc(db, "globalWorkerEmails", val.toLowerCase()), { bossEmail: username });
+      await setDoc(doc(db, "globalWorkerEmails", val.toLowerCase()), {
+        bossEmail: username,
+        ownerEmail: username,
+        ownerUid: auth.currentUser.uid,
+      });
       setSavedGlobalWorkerEmail(val);
       localStorage.setItem(`globalEmail_${username}`, val);
       alert(t("email_saqlandi") || "Email muvaffaqiyatli saqlandi!");
@@ -194,9 +199,9 @@ function OfficeXarajat() {
     const save = async () => {
       try {
         console.log("Syncing office data to cloud...");
-        await setDoc(doc(db, "cabinets", username), {
+        await saveBossCabinet(username, {
           officeExpenses: expenses, officeTotalBalance: totalBalance, officeInitialBalance: initialBalance, projectFiles: projectFiles, globalWorkerEmail
-        }, { merge: true });
+        });
       } catch (e) { console.error("Office sync failed", e); }
     };
     save();
@@ -209,13 +214,13 @@ function OfficeXarajat() {
     if (!username) return;
     try {
       setSyncStatus("syncing");
-      await setDoc(doc(db, "cabinets", username), {
+      await saveBossCabinet(username, {
         officeExpenses: expenses,
         officeTotalBalance: totalBalance,
         officeInitialBalance: initialBalance,
         projectFiles,
         globalWorkerEmail,
-      }, { merge: true });
+      });
     } catch (e) {
       console.error("Logout save failed:", e);
     } finally {

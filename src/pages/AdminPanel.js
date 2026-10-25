@@ -6,6 +6,7 @@ import {
   addManagedAccount,
   getAdminDashboard,
   removeManagedAccount,
+  updateManagedAccount,
 } from "../auth/accountAccess";
 import "../styles/AdminPanel.css";
 
@@ -25,6 +26,10 @@ function AdminPanel() {
   const [error, setError] = useState("");
   const [selectedBoss, setSelectedBoss] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [accountDialog, setAccountDialog] = useState(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [chartPeriod, setChartPeriod] = useState("month");
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -60,16 +65,44 @@ function AdminPanel() {
     }
   };
 
-  const handleRemoveAccount = async (accountEmail) => {
+  const handleConfirmDelete = async () => {
+    if (!accountDialog || accountDialog.type !== "delete" || busy) return;
     if (busy) return;
     setBusy(true);
     setError("");
     try {
-      await removeManagedAccount(accountEmail);
+      await removeManagedAccount(accountDialog.email);
+      setAccountDialog(null);
       await loadDashboard();
     } catch (removeError) {
       console.error("Failed to remove boss account:", removeError);
       setError(getAdminErrorMessage(removeError, "Не удалось удалить аккаунт."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveAccount = (accountEmail) => {
+    setAccountDialog({ type: "delete", email: accountEmail });
+  };
+
+  const handleEditAccount = (accountEmail) => {
+    setEditEmail(accountEmail);
+    setAccountDialog({ type: "edit", email: accountEmail });
+  };
+
+  const handleConfirmEdit = async (event) => {
+    event.preventDefault();
+    if (!accountDialog || accountDialog.type !== "edit" || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await updateManagedAccount(accountDialog.email, editEmail);
+      setAccountDialog(null);
+      await loadDashboard();
+    } catch (editError) {
+      console.error("Failed to update boss account:", editError);
+      setError(getAdminErrorMessage(editError, "Не удалось изменить email аккаунта."));
     } finally {
       setBusy(false);
     }
@@ -89,37 +122,82 @@ function AdminPanel() {
   };
 
   const stats = dashboard?.stats;
-  const monthlyLabels = Array.from({ length: 12 }, (_, index) => {
-    const date = new Date();
-    date.setDate(1);
-    date.setMonth(date.getMonth() - (11 - index));
-    return date;
-  });
   const registeredHistory = dashboard?.registeredBossHistory || [];
-  const monthlyRegistrations = monthlyLabels.map((month) =>
-    registeredHistory.filter((boss) => {
-      if (!boss.registeredAt) return false;
-      const registeredAt = new Date(boss.registeredAt);
-      return registeredAt.getFullYear() === month.getFullYear() &&
-        registeredAt.getMonth() === month.getMonth();
-    }).length,
-  );
-  const firstMonth = monthlyLabels[0];
-  let cumulativeRegisteredBosses = registeredHistory.filter((boss) => {
-    if (!boss.registeredAt) return false;
-    const registeredAt = new Date(boss.registeredAt);
-    return registeredAt < firstMonth;
-  }).length;
-  const monthlyRegisteredBosses = monthlyRegistrations.map((count) => {
+  const registrationDates = registeredHistory
+    .map((boss) => new Date(boss.registeredAt))
+    .filter((date) => Number.isFinite(date.getTime()));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const firstYear = registrationDates.length
+    ? Math.min(...registrationDates.map((date) => date.getFullYear()))
+    : today.getFullYear();
+  const chartFirstYear = Math.min(firstYear, today.getFullYear());
+  const chartDates = chartPeriod === "day"
+    ? Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - 29 + index);
+      return date;
+    })
+    : chartPeriod === "year"
+      ? Array.from(
+        { length: today.getFullYear() - chartFirstYear + 1 },
+        (_, index) => new Date(chartFirstYear + index, 0, 1),
+      )
+      : Array.from({ length: 12 }, (_, index) => {
+        const date = new Date(today.getFullYear(), today.getMonth(), 1);
+        date.setMonth(date.getMonth() - 11 + index);
+        return date;
+      });
+  const getDatePeriodIndex = (date) => {
+    const firstDate = chartDates[0];
+    if (chartPeriod === "day") {
+      const dateNumber = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+      const firstDateNumber = Date.UTC(
+        firstDate.getFullYear(),
+        firstDate.getMonth(),
+        firstDate.getDate(),
+      );
+      return Math.floor((dateNumber - firstDateNumber) / 86400000);
+    }
+    if (chartPeriod === "year") {
+      return date.getFullYear() - firstDate.getFullYear();
+    }
+    return (date.getFullYear() - firstDate.getFullYear()) * 12
+      + date.getMonth() - firstDate.getMonth();
+  };
+  const periodRegistrations = Array(chartDates.length).fill(0);
+  let cumulativeRegisteredBosses = 0;
+  registrationDates.forEach((date) => {
+    const periodIndex = getDatePeriodIndex(date);
+    if (periodIndex < 0) {
+      cumulativeRegisteredBosses += 1;
+    } else if (periodIndex < periodRegistrations.length) {
+      periodRegistrations[periodIndex] += 1;
+    }
+  });
+  const periodRegisteredBosses = periodRegistrations.map((count) => {
     cumulativeRegisteredBosses += count;
     return cumulativeRegisteredBosses;
   });
+  const sortedBosses = [...(dashboard?.bosses || [])].sort((first, second) => {
+    const firstTime = Date.parse(first.accountCreatedAt || "");
+    const secondTime = Date.parse(second.accountCreatedAt || "");
+    const firstHasDate = Number.isFinite(firstTime);
+    const secondHasDate = Number.isFinite(secondTime);
+    if (firstHasDate !== secondHasDate) return firstHasDate ? -1 : 1;
+    if (firstHasDate && secondHasDate && firstTime !== secondTime) {
+      return sortOrder === "newest"
+        ? secondTime - firstTime
+        : firstTime - secondTime;
+    }
+    return first.email.localeCompare(second.email);
+  });
   const chartHeight = 250;
   const chartPadding = { top: 20, right: 28, bottom: 65, left: 44 };
-  const chartWidth = Math.max(760, monthlyLabels.length * 76);
+  const chartWidth = Math.max(760, chartDates.length * 76);
   const plotWidth = chartWidth - chartPadding.left - chartPadding.right;
   const plotHeight = chartHeight - chartPadding.top - chartPadding.bottom;
-  const maxRegisteredBosses = Math.max(1, ...monthlyRegisteredBosses);
+  const maxRegisteredBosses = Math.max(1, ...periodRegisteredBosses);
   const chartTicks = [...new Set([
     0,
     Math.round(maxRegisteredBosses * 0.25),
@@ -127,12 +205,12 @@ function AdminPanel() {
     Math.round(maxRegisteredBosses * 0.75),
     maxRegisteredBosses,
   ])];
-  const chartPoints = monthlyLabels.map((month, index) => ({
-    month,
-    count: monthlyRegisteredBosses[index],
-    x: chartPadding.left + (index / (monthlyLabels.length - 1)) * plotWidth,
+  const chartPoints = chartDates.map((date, index) => ({
+    date,
+    count: periodRegisteredBosses[index],
+    x: chartPadding.left + (index / Math.max(1, chartDates.length - 1)) * plotWidth,
     y: chartPadding.top + plotHeight -
-      (monthlyRegisteredBosses[index] / maxRegisteredBosses) * plotHeight,
+      (periodRegisteredBosses[index] / maxRegisteredBosses) * plotHeight,
   }));
   const chartLine = chartPoints
     .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
@@ -180,12 +258,32 @@ function AdminPanel() {
       </section>
 
       <section className="admin-panel-card admin-chart-card">
+        <div className="admin-chart-toolbar">
+          <label htmlFor="admin-chart-period">Период</label>
+          <select
+            id="admin-chart-period"
+            className="admin-chart-period-select"
+            value={chartPeriod}
+            onChange={(event) => setChartPeriod(event.target.value)}
+          >
+            <option value="day">По дням</option>
+            <option value="month">По месяцам</option>
+            <option value="year">По годам</option>
+          </select>
+        </div>
         <div className="admin-card-heading">
           <div>
             <h2>Регистрация боссов</h2>
             <p>Накопительное количество аккаунтов боссов, впервые вошедших за последние 12 месяцев.</p>
           </div>
         </div>
+        <p className="admin-chart-period-caption">
+          {chartPeriod === "day"
+            ? "Накопительное число боссов за последние 30 дней."
+            : chartPeriod === "year"
+              ? "Накопительное число боссов по годам."
+              : "Накопительное число боссов за последние 12 месяцев."}
+        </p>
         {loading ? (
           <p className="admin-chart-empty">Загрузка данных...</p>
         ) : stats?.registeredBosses === 0 ? (
@@ -217,7 +315,7 @@ function AdminPanel() {
               })}
               <path d={chartLine} className="admin-chart-line" />
               {chartPoints.map((point) => (
-                <g key={`${point.month.getFullYear()}-${point.month.getMonth()}`}>
+                <g key={point.date.toISOString()}>
                   <circle cx={point.x} cy={point.y} r="5" className="admin-chart-point" />
                   <text x={point.x} y={point.y - 12} textAnchor="middle" className="admin-chart-value">
                     {point.count}
@@ -228,7 +326,11 @@ function AdminPanel() {
                     textAnchor="middle"
                     className="admin-chart-label"
                   >
-                    {point.month.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" })}
+                    {chartPeriod === "day"
+                      ? point.date.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" })
+                      : chartPeriod === "year"
+                        ? point.date.toLocaleDateString("ru-RU", { year: "numeric" })
+                        : point.date.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" })}
                   </text>
                 </g>
               ))}
@@ -244,6 +346,18 @@ function AdminPanel() {
               <h2>Аккаунты боссов</h2>
               <p>Добавьте Google-почту, чтобы разрешить вход в отчёты.</p>
             </div>
+            <label className="admin-sort-control" htmlFor="admin-account-sort">
+              <span>Сортировка</span>
+              <select
+                id="admin-account-sort"
+                className="admin-sort-select"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value)}
+              >
+                <option value="newest">Сначала новые</option>
+                <option value="oldest">Сначала старые</option>
+              </select>
+            </label>
             <button
               type="button"
               className="admin-refresh-button"
@@ -278,7 +392,7 @@ function AdminPanel() {
                 </tr>
               </thead>
               <tbody>
-                {dashboard?.bosses.map((boss) => (
+                {sortedBosses.map((boss) => (
                     <tr key={boss.email}>
                       <td>
                         <button
@@ -305,6 +419,15 @@ function AdminPanel() {
                       </td>
                       <td>
                         {!boss.administrator && (
+                          <>
+                          <button
+                            type="button"
+                            className="admin-edit-button"
+                            onClick={() => handleEditAccount(boss.email)}
+                            disabled={busy}
+                          >
+                            Изменить
+                          </button>
                           <button
                             type="button"
                             className="admin-remove-button"
@@ -316,6 +439,7 @@ function AdminPanel() {
                           >
                             Удалить
                           </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -328,6 +452,80 @@ function AdminPanel() {
           </div>
         </article>
       </section>
+      {accountDialog && (
+        <div
+          className="admin-confirm-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !busy) setAccountDialog(null);
+          }}
+        >
+          <section
+            className="admin-confirm-dialog admin-account-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-account-dialog-title"
+          >
+            {accountDialog.type === "edit" ? (
+              <form onSubmit={handleConfirmEdit}>
+                <h2 id="admin-account-dialog-title">Изменить email для входа?</h2>
+                <p>
+                  Изменится только адрес доступа. Данные кабинета останутся привязаны к старому email.
+                </p>
+                <label className="admin-edit-email-label" htmlFor="admin-edit-email">
+                  Новый email
+                </label>
+                <input
+                  id="admin-edit-email"
+                  type="email"
+                  value={editEmail}
+                  onChange={(event) => setEditEmail(event.target.value)}
+                  required
+                  autoFocus
+                />
+                <div className="admin-confirm-actions">
+                  <button
+                    type="button"
+                    className="admin-secondary-button"
+                    onClick={() => setAccountDialog(null)}
+                    disabled={busy}
+                  >
+                    Отмена
+                  </button>
+                  <button type="submit" className="admin-dialog-done" disabled={busy}>
+                    {busy ? "Сохранение..." : "Изменить email"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <h2 id="admin-account-dialog-title">Удалить доступ?</h2>
+                <p>
+                  Для <strong>{accountDialog.email}</strong> вход будет закрыт. Данные кабинета останутся в Firestore.
+                </p>
+                <div className="admin-confirm-actions">
+                  <button
+                    type="button"
+                    className="admin-secondary-button"
+                    onClick={() => setAccountDialog(null)}
+                    disabled={busy}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-confirm-logout"
+                    onClick={handleConfirmDelete}
+                    disabled={busy}
+                  >
+                    {busy ? "Удаление..." : "Удалить доступ"}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
       {selectedBoss && (
         <div
           className="admin-confirm-overlay"
