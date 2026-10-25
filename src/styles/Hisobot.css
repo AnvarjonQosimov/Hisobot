@@ -84,8 +84,8 @@
 .leftTop h3:hover {
     transform: translateX(5px);
     background: linear-gradient(135deg, rgba(161, 161, 241, 0.3) 0%, rgba(86, 86, 255, 0.4) 100%);
-    box-shadow: 0 6px 20px rgba(86, 86, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2);
-    border-left: 4px solid rgb(161, 161, 241);
+    box-shadow: 0 6px 20px rgba(86, 86, 255, 0.2), inset 3px 0 0 rgb(161, 161, 241), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    border-left: 1px solid rgba(161, 161, 241, 0.3);
     color: #fff;
 }
 
@@ -1529,8 +1529,8 @@
 .QurilishXarajatlari h2:hover {
     transform: translateX(5px);
     background: linear-gradient(135deg, rgba(161, 161, 241, 0.3) 0%, rgba(86, 86, 255, 0.4) 100%);
-    box-shadow: 0 6px 20px rgba(86, 86, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2);
-    border-left: 4px solid rgb(161, 161, 241);
+    box-shadow: 0 6px 20px rgba(86, 86, 255, 0.2), inset 3px 0 0 rgb(161, 161, 241), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    border-left: 1px solid rgba(161, 161, 241, 0.3);
     color: #fff;
 }
 
