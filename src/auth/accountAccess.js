@@ -44,17 +44,22 @@ export const getAdminDashboard = async () => {
     if (email) usersByEmail.set(email, userDoc.data());
   });
 
+  const managedAccountEntries = accountsSnapshot.docs.map((account) => {
+    const data = account.data();
+    return {
+      email: String(data.email || account.id).trim().toLowerCase(),
+      documentId: account.id,
+      data,
+    };
+  });
   const bossEmails = new Set([
     ADMIN_EMAIL,
     LEGACY_ADMIN_EMAIL,
-    ...accountsSnapshot.docs.map((account) => account.id.toLowerCase()),
+    ...managedAccountEntries.map((account) => account.email),
   ]);
   const bossEmailsList = [...bossEmails];
   const managedAccountsByEmail = new Map(
-    accountsSnapshot.docs.map((account) => [
-      account.id.toLowerCase(),
-      account.data(),
-    ]),
+    managedAccountEntries.map((account) => [account.email, account]),
   );
   const cabinetSnapshots = await Promise.all(
     bossEmailsList.map((email) => getDoc(doc(db, "cabinets", email))),
@@ -79,7 +84,8 @@ export const getAdminDashboard = async () => {
         displayName: user?.displayName || "",
         lastLogin: user?.lastLogin || null,
         registeredAt: user?.registeredAt || user?.lastLogin || null,
-        accountCreatedAt: managedAccountsByEmail.get(email)?.createdAt || null,
+        accountCreatedAt: managedAccountsByEmail.get(email)?.data.createdAt || null,
+        managedAccountId: managedAccountsByEmail.get(email)?.documentId || null,
         hasWorkerEmail: Boolean(cabinet.globalWorkerEmail?.trim()),
         workerEmail: cabinet.globalWorkerEmail?.trim() || "",
         workerCount: workerEmailsByBoss.get(email) || 0,
@@ -101,7 +107,7 @@ export const getAdminDashboard = async () => {
       registeredAt,
     })),
     bosses,
-    managedAccounts: accountsSnapshot.docs.map((account) => account.id).sort(),
+    managedAccounts: managedAccountEntries.map((account) => account.email).sort(),
   };
 };
 
@@ -118,7 +124,7 @@ export const addManagedAccount = async (email) => {
   return { email: normalizedEmail };
 };
 
-export const removeManagedAccount = async (email) => {
+export const removeManagedAccount = async (email, accountId = email) => {
   if (!isAdminEmail(auth.currentUser?.email || "")) {
     throw new Error("Только администратор может удалять аккаунты.");
   }
@@ -126,10 +132,10 @@ export const removeManagedAccount = async (email) => {
   if (normalizedEmail === ADMIN_EMAIL || normalizedEmail === LEGACY_ADMIN_EMAIL) {
     throw new Error("Нельзя удалить аккаунт администратора.");
   }
-  await deleteDoc(doc(db, "managedAccounts", normalizedEmail));
+  await deleteDoc(doc(db, "managedAccounts", accountId));
 };
 
-export const updateManagedAccount = async (currentEmail, nextEmail) => {
+export const updateManagedAccount = async (currentEmail, nextEmail, currentAccountId = currentEmail) => {
   if (!isAdminEmail(auth.currentUser?.email || "")) {
     throw new Error("Только администратор может изменять аккаунты.");
   }
@@ -148,7 +154,7 @@ export const updateManagedAccount = async (currentEmail, nextEmail) => {
     throw new Error("Нельзя изменять аккаунты администратора.");
   }
 
-  const currentRef = doc(db, "managedAccounts", normalizedCurrentEmail);
+  const currentRef = doc(db, "managedAccounts", currentAccountId);
   const nextRef = doc(db, "managedAccounts", normalizedNextEmail);
   await runTransaction(db, async (transaction) => {
     const [currentAccount, nextAccount] = await Promise.all([

@@ -6,7 +6,6 @@ import { setDoc, doc, getDoc } from "firebase/firestore";
 import { auth, provider, db } from "../Firebase/Firebase.js";
 import {
   ADMIN_EMAIL,
-  LEGACY_ADMIN_EMAIL,
   checkAccountAccess,
 } from "../auth/accountAccess";
 import { useTranslation } from "react-i18next";
@@ -78,15 +77,12 @@ function LogIn() {
     return;
   }
 
-  if (
-    cachedRole === "boss" &&
-    cachedEmail.toLowerCase() === LEGACY_ADMIN_EMAIL
-  ) {
+  if (cachedRole === "boss") {
     navigate("/hisobot", { replace: true });
     return;
   }
 
-  // Если роль boss есть, но email не является adminEmail
+  // The private route validates the cached role and account access.
   localStorage.removeItem("role");
   localStorage.removeItem("userEmail");
   localStorage.removeItem("username");
@@ -165,10 +161,10 @@ function LogIn() {
 
       await auth.signOut();
 
-      setError("У вас нет доступа к странице руководителя.");
+      setError(t("login_boss_access_denied"));
 
     } catch (error) {
-      console.error("Ошибка проверки пользователя:", error);
+      console.error("Account access check failed:", error);
 
       // При ошибке Firestore НЕ считаем пользователя boss
       localStorage.removeItem("role");
@@ -177,14 +173,12 @@ function LogIn() {
 
       await auth.signOut();
 
-      setError(
-        "Не удалось проверить доступ. Проверьте подключение к интернету."
-      );
+      setError(t("login_access_check_failed"));
     }
   });
 
   return () => unsubscribe();
-}, [navigate]);
+}, [navigate, t]);
 
   const googleSignIn = async () => {
   if (loading) return;
@@ -270,7 +264,7 @@ function LogIn() {
     localStorage.removeItem("userEmail");
     localStorage.removeItem("username");
 
-    setError("У вас нет доступа к странице руководителя.");
+    setError(t("login_boss_access_denied"));
 
     await auth.signOut();
 
@@ -278,7 +272,7 @@ function LogIn() {
     console.error("Sign-in error details:", err);
 
     if (err.message === "timeout") {
-      setError("Не удалось проверить доступ. Проверьте подключение к интернету.");
+      setError(t("login_access_check_failed"));
     } else if (err.code === "auth/popup-blocked") {
       setError(
         "Popup was blocked by your browser. Please allow popups for this site."

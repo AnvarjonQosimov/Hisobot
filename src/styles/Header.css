@@ -127,6 +127,38 @@
   color: #111827;
 }
 
+.dashboard-language-switcher {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(171, 183, 215, 0.2);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: rgba(12, 19, 37, 0.94);
+  color: #c7d2fe;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24);
+}
+
+.dashboard-language-switcher select {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #eef2ff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dashboard-language-switcher option {
+  background: #0c1325;
+  color: #eef2ff;
+}
+
 .mobile-toggle {
   display: none;
   background: none;

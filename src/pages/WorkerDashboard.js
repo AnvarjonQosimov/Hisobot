@@ -573,8 +573,8 @@ setIsDetailModalOpen(true);
 
           <strong>
             {worker.isPaid
-              ? "✓ Оплачено"
-              : "○ Не оплачено"}
+              ? `✓ ${t("worker_paid_status")}`
+              : `○ ${t("worker_unpaid_status")}`}
           </strong>
         </div>
 

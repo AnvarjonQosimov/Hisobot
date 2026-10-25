@@ -21,12 +21,27 @@ function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  if (isDashboard) return null;
-
   const changeLanguage = (lang) => {
     i18n.changeLanguage(lang);
     setBurgerOpen(false);
   };
+
+  if (isDashboard) {
+    return (
+      <div className="dashboard-language-switcher">
+        <FiGlobe aria-hidden="true" />
+        <select
+          aria-label="Language"
+          value={i18n.language}
+          onChange={(event) => changeLanguage(event.target.value)}
+        >
+          <option value="uz">UZ</option>
+          <option value="ru">RU</option>
+          <option value="en">EN</option>
+        </select>
+      </div>
+    );
+  }
 
   return (
     <header className={`Header ${scrolled ? "scrolled" : ""}`}>

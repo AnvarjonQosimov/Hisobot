@@ -431,8 +431,14 @@ function Hisobot() {
 
   // --- RELIABLE SYNC & LOAD LOGIC ---
   useEffect(() => {
-    const storedUsername = localStorage.getItem("username");
-    if (!storedUsername) { navigate("/login"); return; }
+    const signedInEmail = auth.currentUser?.email?.toLowerCase();
+    const sessionEmail = localStorage.getItem("userEmail")?.toLowerCase();
+    if (!signedInEmail || sessionEmail !== signedInEmail) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    const storedUsername = signedInEmail;
+    localStorage.setItem("username", storedUsername);
     setUsername(storedUsername);
 
     // 1. Initial Load from Local
@@ -1293,11 +1299,13 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     }
   };
 
-  const adminEmail = "archoltinnisbatarch@gmail.com"
+  const hasBossAccess = localStorage.getItem("role") === "boss"
+    && Boolean(username)
+    && auth.currentUser?.email?.toLowerCase() === username;
 
   return (
     <div className="Hisobot">
-      {adminEmail === username ? ( <> {/* Left sidebar open button */}
+      {hasBossAccess ? ( <> {/* Left sidebar open button */}
       <button
         className="mobile-menu-btn"
         onClick={() => setIsSidebarOpen(true)}
@@ -3183,7 +3191,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             </div>
           </div>
         </div>
-      )} </> ) : ("Bu yerga faqat admin kirishi mumkin!")}
+      )} </> ) : null}
     </div>
   );
 }
