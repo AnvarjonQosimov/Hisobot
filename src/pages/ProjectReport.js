@@ -682,7 +682,7 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
 
             {/* Highest expense */}
             <div className="statistic3">
-              <h3>{t("eng_qimmat_xarajat")}:</h3>
+              <h3>{t("pr_eng_katta_xarajat")}:</h3>
               <p>
                 {(() => {
                   const sumHigh = displayedExpenses

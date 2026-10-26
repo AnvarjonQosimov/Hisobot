@@ -84,9 +84,6 @@ function Hisobot() {
   const [dollarRate, setDollarRate] = useState(12000);
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportType, setExportType] = useState("selected"); // "selected" | "all"
-  const [separateWithHeaders, setSeparateWithHeaders] = useState(true);
-  const [includeAllWorkers, setIncludeAllWorkers] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
   // New Work Fields States
@@ -159,6 +156,7 @@ function Hisobot() {
   const [activeReportSection, setActiveReportSection] = useState(() =>
     isAssistant ? assistantSections[0] || "" : "workers",
   );
+  const [isReportSelectionActive, setIsReportSelectionActive] = useState(!isAssistant);
 
   // Dynamic Project Files State
   const [projectFiles, setProjectFiles] = useState([]);
@@ -282,25 +280,22 @@ function Hisobot() {
 
   const handleExportCurrentPage = () => {
     setIsExportModalOpen(true);
-    setExportType("selected");
-    setSeparateWithHeaders(true);
-    setIncludeAllWorkers(true);
   };
 
   const handleExecuteExport = async () => {
     try {
       setIsExporting(true);
 
-      if (exportType === "selected") {
-        if (activeProjectId !== null || activeBranchId !== null) {
-          await pageExporterRef.current?.();
-          setIsExportModalOpen(false);
-          return;
-        }
+      if (activeProjectId !== null || activeBranchId !== null) {
+        if (!pageExporterRef.current) throw new Error("Selected report exporter is not ready.");
+        await pageExporterRef.current();
+        setIsExportModalOpen(false);
+        return;
+      }
 
+      if (activeReportSection === "workers" && isReportSelectionActive) {
         const objectName = workerObjects.find((object) => object.id === activeWorkerObjectId)?.name;
         const reportTitle = objectName || t("barcha_ishchilar") || t("report_export_workers_title");
-
         await downloadReportExcel({
           fileName: `${reportTitle}_hisobot`,
           title: reportTitle,
@@ -310,158 +305,7 @@ function Hisobot() {
         return;
       }
 
-      // Export ALL
-      if (activeProjectId === null && activeBranchId === null) {
-        const sections = [];
-        if (includeAllWorkers) {
-          sections.push({
-            title: t("barcha_ishchilar") || "Barcha ishchilar",
-            summary: getWorkerSummary(workers),
-          });
-        }
-        workerObjects.forEach((obj) => {
-          sections.push({
-            title: obj.name,
-            summary: getWorkerSummary(obj.workers || []),
-          });
-        });
-
-        await downloadReportExcel({
-          fileName: t("excel_export_all_filename") || "Barcha_fayllar_hisoboti",
-          sections,
-          separateWithHeaders,
-        });
-        setIsExportModalOpen(false);
-        return;
-      }
-
-      if (activeProjectId !== null) {
-        const sections = [];
-        for (const proj of projectFiles) {
-          let projExpenses = [];
-          try {
-            const raw = localStorage.getItem(`project_${proj.id}_expenses_${username}`);
-            if (raw) projExpenses = JSON.parse(raw);
-          } catch (_) {}
-
-          sections.push({
-            title: proj.name,
-            columns: [
-              t("report_export_col_date") || "Sana",
-              "$",
-              t("report_export_col_name") || "Nomi",
-              t("report_export_col_type") || "turi",
-              t("report_export_col_size") || "O'lcham",
-              t("report_export_col_count") || "Soni",
-              t("report_export_col_measurement") || "o'lchov",
-              t("report_export_col_price_sum") || "Narxi so'm",
-              t("report_export_col_group_uz") || "Guruhi",
-              t("report_export_col_total_narxi") || "Umumiy narxi",
-              t("report_export_col_total_usd") || "Umumiy $",
-              t("report_export_col_worker") || "Xodim",
-            ],
-            rows: projExpenses.map((item) => {
-              const itemRate = parseFloat(item.dollarRate) || dollarRate || 12000;
-              const qty = parseFloat(item.quantity) || 1;
-              const rawPrice = parseFloat(item.amountPerUnit) || 0;
-              const priceInSum = item.currency === "dollar" ? rawPrice * itemRate : rawPrice;
-              const amountSum = priceInSum * qty;
-              const amountDollar = itemRate > 0 ? amountSum / itemRate : 0;
-              const typeLabel =
-                item.category === "ishchi"
-                  ? "mehnat"
-                  : item.category === "material"
-                  ? "material"
-                  : item.category === "boshqa" && item.customCategoryName?.trim()
-                  ? item.customCategoryName
-                  : item.category || "";
-
-              return [
-                item.date ? new Date(`${item.date}T00:00:00`) : "",
-                itemRate,
-                item.name || "",
-                typeLabel,
-                item.note || item.dimension || item.size || "",
-                qty,
-                item.unit || "",
-                priceInSum,
-                item.group || item.customCategoryName || "",
-                amountSum,
-                amountDollar,
-                item.workerName || item.createdByEmail || "",
-              ];
-            }),
-          });
-        }
-
-        await downloadReportExcel({
-          fileName: t("excel_export_all_filename") || "Barcha_fayllar_hisoboti",
-          sections,
-          separateWithHeaders,
-        });
-        setIsExportModalOpen(false);
-        return;
-      }
-
-      if (activeBranchId !== null) {
-        const sections = [];
-        for (const branch of officeBranches) {
-          let branchExpenses = [];
-          try {
-            const raw = localStorage.getItem(`branch_${branch.id}_expenses_${username}`);
-            if (raw) branchExpenses = JSON.parse(raw);
-          } catch (_) {}
-
-          sections.push({
-            title: branch.name,
-            columns: [
-              t("report_export_col_number"),
-              t("report_export_col_date"),
-              t("report_export_col_name"),
-              t("report_export_col_category"),
-              t("report_export_col_quantity"),
-              t("report_export_col_unit"),
-              t("report_export_col_currency"),
-              t("report_export_col_unit_price"),
-              t("report_export_col_group"),
-              t("report_export_col_total_sum"),
-              t("report_export_col_total_dollar"),
-              t("report_export_col_status"),
-              t("report_export_col_note"),
-              t("report_export_col_author"),
-            ],
-            rows: branchExpenses.map((item, index) => {
-              const amount = parseFloat(item.amount) || 0;
-              const amountSum = item.currency === "sum" ? amount : amount * dollarRate;
-              const amountDollar = item.currency === "dollar" ? amount : (dollarRate > 0 ? amount / dollarRate : 0);
-              return [
-                index + 1,
-                item.date ? new Date(`${item.date}T00:00:00`) : "",
-                item.name || "",
-                t("report_export_category_office"),
-                1,
-                t("report_export_col_piece"),
-                item.currency === "sum" ? t("som") : "$",
-                amount,
-                item.group || "",
-                amountSum,
-                amountDollar,
-                item.isPaid ? t("worker_paid_status") : t("worker_unpaid_status"),
-                item.note || "",
-                item.createdByEmail || "",
-              ];
-            }),
-          });
-        }
-
-        await downloadReportExcel({
-          fileName: t("excel_export_all_filename") || "Barcha_fayllar_hisoboti",
-          sections,
-          separateWithHeaders,
-        });
-        setIsExportModalOpen(false);
-        return;
-      }
+      throw new Error("Select a report before exporting.");
     } catch (exportError) {
       console.error("Failed to export report to Excel:", exportError);
       window.alert(t("report_export_failed"));
@@ -1711,11 +1555,15 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       setActiveProjectId(newItem.id);
       setActiveBranchId(null);
       setActiveWorkerObjectId(null);
+      setActiveReportSection("construction");
+      setIsReportSelectionActive(true);
     } else if (fileModalType === "branch") {
       setOfficeBranches([...officeBranches, newItem]);
       setActiveBranchId(newItem.id);
       setActiveProjectId(null);
       setActiveWorkerObjectId(null);
+      setActiveReportSection("office");
+      setIsReportSelectionActive(true);
     } else if (fileModalType === "object") {
       setWorkerObjects([
         ...workerObjects,
@@ -1724,6 +1572,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       setActiveWorkerObjectId(newItem.id);
       setActiveProjectId(null);
       setActiveBranchId(null);
+      setActiveReportSection("workers");
+      setIsReportSelectionActive(true);
     }
 
     setNewFileName("");
@@ -1734,7 +1584,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     if (deleteProjectId) {
       setProjectFiles(projectFiles.filter(p => p.id !== deleteProjectId));
       if (activeProjectId === deleteProjectId) {
-        setActiveProjectId(null); // Back to workers if active project is deleted
+        setActiveProjectId(null);
+        setIsReportSelectionActive(false);
       }
       setDeleteProjectId(null);
     }
@@ -1795,10 +1646,13 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             {(!isAssistant || assistantSections.includes("workers")) && (
             <div className={`QurilishXarajatlari ${isWorkersExpanded ? "expanded" : ""}`}>
               <h2 onClick={() => {
-                setActiveReportSection("workers");
-                setActiveProjectId(null);
-                setActiveBranchId(null);
-                setActiveWorkerObjectId(null);
+                if (activeReportSection !== "workers") {
+                  setActiveReportSection("workers");
+                  setActiveProjectId(null);
+                  setActiveBranchId(null);
+                  setActiveWorkerObjectId(null);
+                  setIsReportSelectionActive(false);
+                }
                 setIsWorkersExpanded(!isWorkersExpanded);
               }}>
                 {t("Ishchilar hisoboti") || "Ishchilar hisoboti"} <span>{">"}</span>
@@ -1813,6 +1667,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       setActiveBranchId(null);
                       setActiveWorkerObjectId(null);
                       setActiveReportSection("workers");
+                      setIsReportSelectionActive(true);
                       setIsSidebarOpen(false);
                     }}
                   >
@@ -1827,6 +1682,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         setActiveProjectId(null);
                         setActiveBranchId(null);
                         setActiveReportSection("workers");
+                        setIsReportSelectionActive(true);
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -1850,10 +1706,13 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             {(!isAssistant || assistantSections.includes("office")) && (
             <div className={`QurilishXarajatlari ${isOfficeExpanded ? "expanded" : ""}`}>
               <h2 onClick={() => {
-                setActiveReportSection("office");
-                setActiveProjectId(null);
-                setActiveBranchId(null);
-                setActiveWorkerObjectId(null);
+                if (activeReportSection !== "office") {
+                  setActiveReportSection("office");
+                  setActiveProjectId(null);
+                  setActiveBranchId(null);
+                  setActiveWorkerObjectId(null);
+                  setIsReportSelectionActive(false);
+                }
                 setIsOfficeExpanded(!isOfficeExpanded);
               }}>
                 {t("o'fisxarajatlari")} <span>{">"}</span>
@@ -1870,6 +1729,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         setActiveProjectId(null);
                         setActiveWorkerObjectId(null);
                         setActiveReportSection("office");
+                        setIsReportSelectionActive(true);
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -1893,10 +1753,13 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             {(!isAssistant || assistantSections.includes("construction")) && (
             <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
               <h2 onClick={() => {
-                setActiveReportSection("construction");
-                setActiveProjectId(null);
-                setActiveBranchId(null);
-                setActiveWorkerObjectId(null);
+                if (activeReportSection !== "construction") {
+                  setActiveReportSection("construction");
+                  setActiveProjectId(null);
+                  setActiveBranchId(null);
+                  setActiveWorkerObjectId(null);
+                  setIsReportSelectionActive(false);
+                }
                 setIsConstructionExpanded(!isConstructionExpanded);
               }}>
                 {t("qurilishxarajatlari")} <span>{">"}</span>
@@ -1913,6 +1776,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         setActiveBranchId(null);
                         setActiveWorkerObjectId(null);
                         setActiveReportSection("construction");
+                        setIsReportSelectionActive(true);
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -1948,7 +1812,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 disabled={
                   activeProjectId !== null || activeBranchId !== null
                     ? !pageExporterReady
-                    : !cloudLoadComplete
+                    : activeReportSection === "workers"
+                      ? !cloudLoadComplete || !isReportSelectionActive
+                      : true
                 }
               >
                 {t("report_export_button")}
@@ -2066,7 +1932,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           dollarRate={dollarRate}
           readOnly={isAssistant}
           onRegisterExport={!isAssistant ? registerPageExporter : undefined}
-          onBack={() => setActiveProjectId(null)}
+          onBack={() => { setActiveProjectId(null); setIsReportSelectionActive(false); }}
         />
       ) : activeBranchId !== null ? ( 
         <BranchReport
@@ -2076,11 +1942,11 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           dollarRate={dollarRate}
           readOnly={isAssistant}
           onRegisterExport={!isAssistant ? registerPageExporter : undefined}
-          onBack={() => setActiveBranchId(null)}
+          onBack={() => { setActiveBranchId(null); setIsReportSelectionActive(false); }}
         />
-      ) : isAssistant && activeReportSection !== "workers" ? (
+      ) : !isReportSelectionActive || (isAssistant && activeReportSection !== "workers") ? (
         <div className="HisobotRight assistant-section-placeholder">
-          <p>{t("assistant_choose_branch_or_project")}</p>
+          <p>{t("report_select_file_prompt") || t("assistant_choose_branch_or_project")}</p>
         </div>
       ) : (
         <div className="HisobotRight">
@@ -2584,10 +2450,16 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               <button className="confirm-btn confirm-delete" onClick={() => {
                 if (deleteItemId.type === 'branch') {
                   setOfficeBranches(officeBranches.filter(b => b.id !== deleteItemId.id));
-                  if (activeBranchId === deleteItemId.id) setActiveBranchId(null);
+                  if (activeBranchId === deleteItemId.id) {
+                    setActiveBranchId(null);
+                    setIsReportSelectionActive(false);
+                  }
                 } else if (deleteItemId.type === 'object') {
                   setWorkerObjects(workerObjects.filter(o => o.id !== deleteItemId.id));
-                  if (activeWorkerObjectId === deleteItemId.id) setActiveWorkerObjectId(null);
+                  if (activeWorkerObjectId === deleteItemId.id) {
+                    setActiveWorkerObjectId(null);
+                    setIsReportSelectionActive(false);
+                  }
                 }
                 setDeleteItemId(null);
               }}>
@@ -2884,96 +2756,26 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             <div className="modal-header">
               <div>
                 <h2>{t("excel_export_modal_title") || "Excelga eksport qilish"}</h2>
-                <p>{t("excel_export_choose_type") || "Eksport turini tanlang"}</p>
+                <p>{t("excel_export_option_selected_desc") || "Faqat ochiq hisobot eksport qilinadi"}</p>
               </div>
               <button className="close-btn" onClick={() => setIsExportModalOpen(false)}>✕</button>
             </div>
 
             <div className="modal-body export-modal-body">
-              <div className="export-options-grid">
-                <div
-                  className={`export-option-card ${exportType === "selected" ? "selected" : ""}`}
-                  onClick={() => setExportType("selected")}
-                >
-                  <div className="export-option-radio">
-                    <input
-                      type="radio"
-                      name="exportType"
-                      checked={exportType === "selected"}
-                      onChange={() => setExportType("selected")}
-                    />
-                  </div>
-                  <div className="export-option-info">
-                    <h4>📄 {t("excel_export_option_selected") || "Tanlangan faylni eksport qilish"}</h4>
-                    <p className="export-current-name">
-                      {activeProjectId !== null
-                        ? (projectFiles.find((p) => p.id === activeProjectId)?.name || t("fayl") || "Fayl")
-                        : activeBranchId !== null
-                        ? (officeBranches.find((b) => b.id === activeBranchId)?.name || t("filial") || "Filial")
-                        : (workerObjects.find((o) => o.id === activeWorkerObjectId)?.name || t("barcha_ishchilar") || "Barcha ishchilar")}
-                    </p>
-                    <small>{t("excel_export_option_selected_desc") || "Hozirda ochilgan fayl yoki ob'ektni yuklab olish"}</small>
-                  </div>
-                </div>
-
-                <div
-                  className={`export-option-card ${exportType === "all" ? "selected" : ""}`}
-                  onClick={() => setExportType("all")}
-                >
-                  <div className="export-option-radio">
-                    <input
-                      type="radio"
-                      name="exportType"
-                      checked={exportType === "all"}
-                      onChange={() => setExportType("all")}
-                    />
-                  </div>
-                  <div className="export-option-info">
-                    <h4>📚 {t("excel_export_option_all") || "Barchasini eksport qilish"}</h4>
-                    <small>{t("excel_export_option_all_desc") || "Barcha fayl va ob'ektlarni bitta Excel faylga yuklash"}</small>
-                  </div>
+              <div className="export-option-card selected">
+                <div className="export-option-info">
+                  <h4>📄 {t("excel_export_option_selected") || "Tanlangan faylni eksport qilish"}</h4>
+                  <p className="export-current-name">
+                    {activeProjectId !== null
+                      ? (projectFiles.find((project) => project.id === activeProjectId)?.name || t("fayl") || "Fayl")
+                      : activeBranchId !== null
+                        ? (officeBranches.find((branch) => branch.id === activeBranchId)?.name || t("filial") || "Filial")
+                        : activeReportSection === "workers"
+                          ? (workerObjects.find((object) => object.id === activeWorkerObjectId)?.name || t("barcha_ishchilar") || "Barcha ishchilar")
+                          : t(activeReportSection === "construction" ? "qurilishxarajatlari" : "o'fisxarajatlari")}
+                  </p>
                 </div>
               </div>
-
-              {exportType === "all" && (
-                <div className="export-all-settings-panel">
-                  <h4>⚙️ {t("excel_export_settings") || "Barchasini eksport qilish sozlamalari"}</h4>
-                  
-                  <label className="export-checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={separateWithHeaders}
-                      onChange={(e) => setSeparateWithHeaders(e.target.checked)}
-                    />
-                    <div>
-                      <span className="export-checkbox-title">
-                        {t("excel_export_separate_headers") || "Fayllarni sarlavhalar bilan ajratish"}
-                      </span>
-                      <span className="export-checkbox-desc">
-                        {t("excel_export_separate_headers_desc") || "Har bir fayl yoki ob'ekt uchun alohida nom sarlavhasi qo'shiladi"}
-                      </span>
-                    </div>
-                  </label>
-
-                  {activeProjectId === null && activeBranchId === null && (
-                    <label className="export-checkbox-row">
-                      <input
-                        type="checkbox"
-                        checked={includeAllWorkers}
-                        onChange={(e) => setIncludeAllWorkers(e.target.checked)}
-                      />
-                      <div>
-                        <span className="export-checkbox-title">
-                          {t("excel_export_include_all_workers") || "'Barcha ishchilar' fayli ham eksport qilinsinmi?"}
-                        </span>
-                        <span className="export-checkbox-desc">
-                          {t("excel_export_include_all_workers_desc") || "Umumiy asosiy ishchilar ro'yxati hisoboti ham qo'shiladi"}
-                        </span>
-                      </div>
-                    </label>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="modal-footer">

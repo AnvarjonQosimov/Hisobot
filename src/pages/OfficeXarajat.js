@@ -10,6 +10,7 @@ import { signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import Loading from "../components/Loading";
 import { saveBossCabinet } from "../auth/firestoreOwnership";
+import { downloadReportExcel } from "../utils/exportReportExcel";
 
 function OfficeXarajat() {
   const navigate = useNavigate();
@@ -740,6 +741,87 @@ function OfficeXarajat() {
     amountAlreadyPaid &&
     dateAlreadyPaid;
 
+  const handleExportOfficeExpenses = async () => {
+    const amountByCurrency = (amountSelector, currencySelector) =>
+      expenses.reduce((total, expense) => {
+        if (currencySelector(expense) !== "sum" && currencySelector(expense) !== "dollar") return total;
+        total[currencySelector(expense)] += Number(amountSelector(expense)) || 0;
+        return total;
+      }, { sum: 0, dollar: 0 });
+    const dueAmounts = amountByCurrency(
+      (expense) => expense.amountToPay,
+      (expense) => expense.currencyToPay,
+    );
+    const receivedAmounts = expenses.reduce((total, expense) => {
+      const currency = expense.currencyAlreadyPaid;
+      if (currency === "sum" || currency === "dollar") {
+        total[currency] += Number(expense.amountAlreadyPaid) || 0;
+      }
+      (expense.history || []).forEach((payment) => {
+        if (payment.currency === "sum" || payment.currency === "dollar") {
+          total[payment.currency] += Number(payment.amount) || 0;
+        }
+      });
+      return total;
+    }, { sum: 0, dollar: 0 });
+    const paidCount = expenses.filter((expense) => expense.isPaid).length;
+    const title = t("o'fisxarajatlari");
+    const columns = [
+      t("report_export_col_number"),
+      t("report_export_col_name"),
+      t("To'lanishi kerak"),
+      t("report_export_col_currency"),
+      t("report_export_col_date"),
+      t("To'langan summa"),
+      t("report_export_col_currency"),
+      t("report_export_col_date"),
+      t("report_export_col_status"),
+      t("report_export_col_payment_history"),
+    ];
+
+    try {
+      await downloadReportExcel({
+        fileName: `${title}_hisobot`,
+        sections: [
+          {
+            title,
+            summary: [
+              [t("report_export_generated_at"), new Date()],
+              [t("report_export_expense_count"), expenses.length],
+              [t("report_export_paid_count"), paidCount],
+              [t("report_export_unpaid_count"), expenses.length - paidCount],
+              [t("report_export_total_due_sum"), dueAmounts.sum],
+              [t("report_export_total_due_dollar"), dueAmounts.dollar],
+              [t("report_export_received_sum"), receivedAmounts.sum],
+              [t("report_export_received_dollar"), receivedAmounts.dollar],
+            ],
+          },
+          {
+            title: t("report_export_expense_details"),
+            columns,
+            rows: expenses.map((expense, index) => [
+              index + 1,
+              expense.expenseName || "",
+              Number(expense.amountToPay) || 0,
+              expense.currencyToPay === "sum" ? t("som") : "$",
+              expense.dateToPay ? new Date(`${expense.dateToPay}T00:00:00`) : "",
+              Number(expense.amountAlreadyPaid) || 0,
+              expense.currencyAlreadyPaid === "sum" ? t("som") : "$",
+              expense.dateAlreadyPaid ? new Date(`${expense.dateAlreadyPaid}T00:00:00`) : "",
+              expense.isPaid ? t("worker_paid_status") : t("worker_unpaid_status"),
+              (expense.history || [])
+                .map((payment) => `${payment.date || ""}: ${Number(payment.amount) || 0} ${payment.currency === "sum" ? t("som") : "$"}`)
+                .join("\n"),
+            ]),
+          },
+        ],
+      });
+    } catch (exportError) {
+      console.error("Failed to export office expense report:", exportError);
+      window.alert(t("report_export_failed"));
+    }
+  };
+
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
   };
@@ -965,6 +1047,9 @@ function OfficeXarajat() {
             </button>
             <button className="pr-btn pr-btn-budget" onClick={handleBalansClick}>
               + {t("balans")}
+            </button>
+            <button className="pr-btn pr-btn-export" onClick={handleExportOfficeExpenses} disabled={!cloudLoadComplete || loading}>
+              📥 {t("report_export_button")}
             </button>
             <div className="ql">
               <div className="qoshishLine"></div>

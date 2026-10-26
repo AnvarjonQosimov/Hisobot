@@ -283,12 +283,16 @@ export const downloadReportExcel = async ({
   let lastRow = 1;
 
   if (Array.isArray(sections) && sections.length > 0) {
-    // MULTIPLE SECTIONS (Export All)
-    // Determine if sections are summary-type or table-type
-    const isSummaryType = sections.some((s) => Array.isArray(s.summary) && s.summary.length > 0);
+    // MULTIPLE SECTIONS (Export All) — mixed mode: each section can be summary OR table
+    const hasMixedTypes =
+      sections.some((s) => Array.isArray(s.summary) && s.summary.length > 0) &&
+      sections.some((s) => Array.isArray(s.columns) && s.columns.length > 0);
+    const isSummaryType =
+      !hasMixedTypes &&
+      sections.some((s) => Array.isArray(s.summary) && s.summary.length > 0);
 
     if (isSummaryType) {
-      // Calculate max label length across all sections
+      // ALL sections are summary type
       let maxLabelLen = 25;
       sections.forEach((sec) => {
         (sec.summary || []).forEach(([lbl]) => {
@@ -307,7 +311,6 @@ export const downloadReportExcel = async ({
 
       sections.forEach((sec, sIdx) => {
         if (separateWithHeaders) {
-          // Banner row
           worksheetRows.push(
             `<row r="${currentRow}" ht="36" customHeight="1">${makeCell(`A${currentRow}`, sec.title || "Hisobot", 2)}${makeCell(`B${currentRow}`, "", 31)}</row>`,
           );
@@ -315,19 +318,118 @@ export const downloadReportExcel = async ({
           currentRow += 1;
         }
 
-        // Summary items for this section
         (sec.summary || []).forEach(([label, value], iIdx) => {
           const isZebra = iIdx % 2 === 1;
           const labelStyle = isZebra ? 4 : 3;
           const valueStyle = getSummaryValueStyle(label, value, isZebra);
-
           worksheetRows.push(
             `<row r="${currentRow}" ht="24" customHeight="1">${makeCell(`A${currentRow}`, label, labelStyle)}${makeCell(`B${currentRow}`, value, valueStyle)}</row>`,
           );
           currentRow += 1;
         });
 
-        // Add an empty spacer row between sections
+        if (sIdx < sections.length - 1) {
+          worksheetRows.push(`<row r="${currentRow}" ht="18" customHeight="1"/>`);
+          currentRow += 1;
+        }
+      });
+
+      lastRow = currentRow - 1;
+    } else if (hasMixedTypes) {
+      // MIXED: some sections are summary, some are table
+      // Determine max column count from table sections for merging banners
+      const tableSections = sections.filter((s) => Array.isArray(s.columns) && s.columns.length > 0);
+      const maxColCount = tableSections.reduce((m, s) => Math.max(m, s.columns.length), 2);
+      lastColumnName = getColumnName(maxColCount);
+
+      // Build column widths based on table sections
+      const widths = Array.from({ length: maxColCount }, (_, cIdx) => {
+        let maxLen = 10;
+        tableSections.forEach((sec) => {
+          const heading = (sec.columns || [])[cIdx] || "";
+          maxLen = Math.max(maxLen, String(heading).length);
+          (sec.rows || []).forEach((row) => {
+            const val = row[cIdx];
+            if (val instanceof Date) maxLen = Math.max(maxLen, 12);
+            else if (typeof val === "number") maxLen = Math.max(maxLen, val.toLocaleString().length + 4);
+            else maxLen = Math.max(maxLen, String(val ?? "").length);
+          });
+        });
+        const headingStr = String((tableSections[0]?.columns || [])[cIdx] || "");
+        let minW = 10;
+        if (headingStr === "$") minW = 8;
+        else if (/sana|date/i.test(headingStr)) minW = 13;
+        else if (/narxi|umumiy|so'?m/i.test(headingStr)) minW = 18;
+        else if (/nomi|name/i.test(headingStr)) minW = 32;
+        return Math.min(Math.max(maxLen + 3, minW), 45);
+      });
+
+      // Also account for summary sections (min 2 cols: A=label, B=value)
+      const summaryLabelWidth = Math.min(
+        Math.max(
+          ...sections
+            .filter((s) => Array.isArray(s.summary))
+            .flatMap((s) => s.summary.map(([lbl]) => String(lbl || "").length)),
+          25,
+        ),
+        52,
+      );
+      if (widths[0]) widths[0] = Math.max(widths[0], summaryLabelWidth);
+      if (widths[1]) widths[1] = Math.max(widths[1], 28);
+
+      colsXml = widths
+        .map((w, idx) => `<col min="${idx + 1}" max="${idx + 1}" width="${w}" customWidth="1"/>`)
+        .join("");
+
+      let currentRow = 1;
+
+      sections.forEach((sec, sIdx) => {
+        const secIsSummary = Array.isArray(sec.summary) && sec.summary.length > 0;
+        const secCols = sec.columns || [];
+        const secColCount = secIsSummary ? maxColCount : Math.max(secCols.length, 1);
+        const secLastCol = getColumnName(secColCount);
+
+        // Banner
+        if (separateWithHeaders) {
+          const bannerCells = [];
+          for (let c = 1; c <= secColCount; c++) {
+            bannerCells.push(makeCell(`${getColumnName(c)}${currentRow}`, c === 1 ? (sec.title || "Hisobot") : "", c === 1 ? 2 : 31));
+          }
+          worksheetRows.push(`<row r="${currentRow}" ht="36" customHeight="1">${bannerCells.join("")}</row>`);
+          mergeCellsList.push(`A${currentRow}:${secLastCol}${currentRow}`);
+          currentRow += 1;
+        }
+
+        if (secIsSummary) {
+          // Summary rows (A=label, B=value)
+          (sec.summary || []).forEach(([label, value], iIdx) => {
+            const isZebra = iIdx % 2 === 1;
+            const labelStyle = isZebra ? 4 : 3;
+            const valueStyle = getSummaryValueStyle(label, value, isZebra);
+            worksheetRows.push(
+              `<row r="${currentRow}" ht="24" customHeight="1">${makeCell(`A${currentRow}`, label, labelStyle)}${makeCell(`B${currentRow}`, value, valueStyle)}</row>`,
+            );
+            currentRow += 1;
+          });
+        } else {
+          // Table header row
+          const headerCells = secCols.map((h, i) => makeCell(`${getColumnName(i + 1)}${currentRow}`, h, 1));
+          worksheetRows.push(`<row r="${currentRow}" ht="28" customHeight="1">${headerCells.join("")}</row>`);
+          currentRow += 1;
+
+          // Data rows
+          (sec.rows || []).forEach((rowVals, rIdx) => {
+            const isZebra = rIdx % 2 === 1;
+            const dataCells = secCols.map((h, i) => {
+              const val = rowVals[i];
+              const style = getTableDataStyle(h, val, isZebra);
+              return makeCell(`${getColumnName(i + 1)}${currentRow}`, val, style);
+            });
+            worksheetRows.push(`<row r="${currentRow}" ht="22" customHeight="1">${dataCells.join("")}</row>`);
+            currentRow += 1;
+          });
+        }
+
         if (sIdx < sections.length - 1) {
           worksheetRows.push(`<row r="${currentRow}" ht="18" customHeight="1"/>`);
           currentRow += 1;
