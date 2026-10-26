@@ -1944,11 +1944,13 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           onRegisterExport={!isAssistant ? registerPageExporter : undefined}
           onBack={() => { setActiveBranchId(null); setIsReportSelectionActive(false); }}
         />
-      ) : !isReportSelectionActive || (isAssistant && activeReportSection !== "workers") ? (
-        <div className="HisobotRight assistant-section-placeholder">
-          <p>{t("report_select_file_prompt") || t("assistant_choose_branch_or_project")}</p>
-        </div>
-      ) : (
+      ) : 
+      // !isReportSelectionActive || (isAssistant && activeReportSection !== "workers") ? (
+      //   <div className="HisobotRight assistant-section-placeholder">
+      //     <p>{t("report_select_file_prompt") || t("assistant_choose_branch_or_project")}</p>
+      //   </div>
+      // ) : 
+      (
         <div className="HisobotRight">
           <div className="rightTop">
             {(!isAssistant || assistantSections.includes("workers")) && (
