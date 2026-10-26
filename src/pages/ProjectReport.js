@@ -571,10 +571,10 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
             </button>}
             {undoStack.length > 0 && (
               <div className="undo-group">
-                <button className="pr-btn pr-btn-undo" onClick={handleUndoClick} title="Undo">
+                <button className="pr-btn pr-btn-undo" onClick={handleUndoClick} title={t("undo_title") || "Undo"}>
                   ↶
                 </button>
-                <button className="pr-btn pr-btn-undo-clear" onClick={() => setClearUndoModal(true)} title="Clear Undo">
+                <button className="pr-btn pr-btn-undo-clear" onClick={() => setClearUndoModal(true)} title={t("clear_undo_title") || "Clear Undo"}>
                   ✕
                 </button>
               </div>

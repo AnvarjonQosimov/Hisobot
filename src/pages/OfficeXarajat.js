@@ -871,7 +871,7 @@ function OfficeXarajat() {
                 {t("qurilishxarajatlari")} <span>{">"}</span>
               </h2>
               <div className="project-list-container">
-                <h4 onClick={() => setIsFileModalOpen(true)}>+ Fayl</h4>
+                <h4 onClick={() => setIsFileModalOpen(true)}>+ {t("fayl") || "Fayl"}</h4>
                 <div className="project-items">
                   {projectFiles.map((project) => (
                     <div
