@@ -77,7 +77,8 @@
 }
 
 .pr-title {
-  font-size: 20px;
+  /* font-size: 20px; */
+  font-size: 17px;
   font-weight: 700;
   color: #fff;
   margin: 0;
