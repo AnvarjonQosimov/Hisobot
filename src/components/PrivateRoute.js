@@ -21,7 +21,8 @@ function PrivateRoute({ children }) {
       if (
         !firebaseUser?.email ||
         firebaseUser.email.toLowerCase() !== user?.toLowerCase() ||
-        role !== (isAdminRoute ? "admin" : "boss")
+        (isAdminRoute && role !== "admin") ||
+        (isBossRoute && role !== "boss" && role !== "assistant")
       ) {
         if (isCurrent) setAccountAccess("denied");
         return;
@@ -31,7 +32,9 @@ function PrivateRoute({ children }) {
         const access = await checkAccountAccess();
         const isAllowed = isAdminRoute
           ? access.admin
-          : access.allowed && !access.admin;
+          : role === "assistant"
+            ? access.assistant
+            : access.allowed && !access.admin && !access.assistant;
         if (isCurrent) setAccountAccess(isAllowed ? "allowed" : "denied");
       } catch (error) {
         console.error("Failed to verify account access:", error);

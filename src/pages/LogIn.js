@@ -81,6 +81,10 @@ function LogIn() {
     navigate("/hisobot", { replace: true });
     return;
   }
+  if (cachedRole === "assistant") {
+    navigate("/hisobot", { replace: true });
+    return;
+  }
 
   // The private route validates the cached role and account access.
   localStorage.removeItem("role");
@@ -141,7 +145,15 @@ function LogIn() {
           return;
         }
 
-        localStorage.setItem("role", "boss");
+        if (access.assistant) {
+          localStorage.setItem("role", "assistant");
+          localStorage.setItem("bossEmail", access.bossEmail);
+          localStorage.setItem("assistantSections", JSON.stringify(access.sections));
+        } else {
+          localStorage.setItem("role", "boss");
+          localStorage.removeItem("bossEmail");
+          localStorage.removeItem("assistantSections");
+        }
 
         navigate("/hisobot", {
           replace: true
@@ -246,7 +258,15 @@ function LogIn() {
         return;
       }
 
-      localStorage.setItem("role", "boss");
+      if (access.assistant) {
+        localStorage.setItem("role", "assistant");
+        localStorage.setItem("bossEmail", access.bossEmail);
+        localStorage.setItem("assistantSections", JSON.stringify(access.sections));
+      } else {
+        localStorage.setItem("role", "boss");
+        localStorage.removeItem("bossEmail");
+        localStorage.removeItem("assistantSections");
+      }
 
       console.log("Authorized boss detected. Redirecting to Hisobot...");
 

@@ -1,16 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import "../styles/ProjectReport.css";
+import { auth } from "../Firebase/Firebase";
+import { getBossSectionSnapshot, saveBossSectionSnapshot } from "../auth/assistantSnapshots";
+import {
+  createAssistantRecord,
+  deleteAssistantRecord,
+  subscribeAssistantRecords,
+  updateAssistantRecord,
+} from "../auth/assistantRecords";
+import { normalizeEmail } from "../auth/assistantAccess";
+import { downloadReportExcel } from "../utils/exportReportExcel";
 
 const CATEGORIES = ["hammasi", "material", "ishchi", "texnika", "boshqa"];
 
-function ProjectReport({ projectId, projectName, onBack }) {
+function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, readOnly = false, onBack, onRegisterExport }) {
   const { t } = useTranslation();
 
   const [username, setUsername] = useState("");
   const [expenses, setExpenses] = useState([]);
+  const [assistantRecords, setAssistantRecords] = useState([]);
   const [budget, setBudget] = useState({ sum: 0, dollar: 0 });
   const [initialBudget, setInitialBudget] = useState({ sum: 0, dollar: 0 });
+  const [loadedProjectId, setLoadedProjectId] = useState(null);
 
   // UI state
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
@@ -20,6 +32,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
   const [budgetModal, setBudgetModal] = useState(false);
   const [deleteItem, setDeleteItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
+  const [editConfirmModal, setEditConfirmModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("week");
 
   // Form state
@@ -37,6 +50,19 @@ function ProjectReport({ projectId, projectName, onBack }) {
 
   const [budgetForm, setBudgetForm] = useState({ sum: "", dollar: "" });
   const [budgetMode, setBudgetMode] = useState("add");
+  const [budgetError, setBudgetError] = useState("");
+  const currentEmail = normalizeEmail(auth.currentUser?.email);
+  const displayedExpenses = [
+    ...expenses,
+    ...assistantRecords
+      .filter((record) => record.type === "constructionExpense")
+      .map((record) => ({
+        ...record.payload,
+        id: record.id,
+        assistantRecordId: record.id,
+        createdByEmail: record.createdByEmail,
+      })),
+  ];
 
   // Undo state
   const [undoStack, setUndoStack] = useState([]);
@@ -44,62 +70,106 @@ function ProjectReport({ projectId, projectName, onBack }) {
   const [clearUndoModal, setClearUndoModal] = useState(false);
 
   // LocalStorage keys
-  const expKey = (u) => `project_${projectId}_expenses_${u}`;
-  const budgetKey = (u) => `project_${projectId}_budget_${u}`;
-  const initBudgetKey = (u) => `project_${projectId}_initBudget_${u}`;
+  const expKey = `project_${projectId}_expenses_`;
+  const budgetKey = `project_${projectId}_budget_`;
+  const initBudgetKey = `project_${projectId}_initBudget_`;
+
+  useEffect(() => {
+    const ownerEmail = bossEmail || username;
+    if (!ownerEmail) return undefined;
+    return subscribeAssistantRecords(
+      ownerEmail,
+      "construction",
+      setAssistantRecords,
+      (loadError) => console.error("Failed to load construction assistant entries:", loadError),
+      `project:${projectId}`,
+    );
+  }, [bossEmail, username, projectId]);
 
   useEffect(() => {
     const u = localStorage.getItem("username") || "";
     setUsername(u);
     if (!u) return;
-    const storedExp = localStorage.getItem(expKey(u));
-    if (storedExp) setExpenses(JSON.parse(storedExp));
-    else setExpenses([]);
-    
-    const storedBudget = localStorage.getItem(budgetKey(u));
-    if (storedBudget) setBudget(JSON.parse(storedBudget));
-    else setBudget({ sum: 0, dollar: 0 });
-    
-    const storedInit = localStorage.getItem(initBudgetKey(u));
-    if (storedInit) setInitialBudget(JSON.parse(storedInit));
-    else setInitialBudget({ sum: 0, dollar: 0 });
-
+    let active = true;
+    setLoadedProjectId(null);
     setUndoStack([]);
     setChartPeriod("week");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+    const loadProject = async () => {
+      try {
+        if (readOnly) {
+          const data = await getBossSectionSnapshot(bossEmail, "construction", `project:${projectId}`);
+          if (active && data) {
+            setExpenses(Array.isArray(data.expenses) ? data.expenses : []);
+            setBudget(data.budget || { sum: 0, dollar: 0 });
+            setInitialBudget(data.initialBudget || { sum: 0, dollar: 0 });
+          }
+        } else {
+          const storedExp = localStorage.getItem(`${expKey}${u}`);
+          setExpenses(storedExp ? JSON.parse(storedExp) : []);
+          const storedBudget = localStorage.getItem(`${budgetKey}${u}`);
+          setBudget(storedBudget ? JSON.parse(storedBudget) : { sum: 0, dollar: 0 });
+          const storedInit = localStorage.getItem(`${initBudgetKey}${u}`);
+          setInitialBudget(storedInit ? JSON.parse(storedInit) : { sum: 0, dollar: 0 });
+        }
+      } catch (loadError) {
+        console.error("Failed to load construction report:", loadError);
+      } finally {
+        if (active) setLoadedProjectId(projectId);
+      }
+    };
+    loadProject();
+    return () => {
+      active = false;
+    };
+  }, [projectId, readOnly, bossEmail, expKey, budgetKey, initBudgetKey]);
 
   useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(expKey(username), JSON.stringify(expenses));
+    if (!username || readOnly || loadedProjectId !== projectId) return;
+    localStorage.setItem(`${expKey}${username}`, JSON.stringify(expenses));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expenses, username, projectId]);
+  }, [expenses, username, projectId, readOnly, loadedProjectId]);
 
   useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(budgetKey(username), JSON.stringify(budget));
+    if (!username || readOnly || loadedProjectId !== projectId) return;
+    localStorage.setItem(`${budgetKey}${username}`, JSON.stringify(budget));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget, username, projectId]);
+  }, [budget, username, projectId, readOnly, loadedProjectId]);
 
   useEffect(() => {
-    if (!username) return;
-    localStorage.setItem(initBudgetKey(username), JSON.stringify(initialBudget));
+    if (!username || readOnly || loadedProjectId !== projectId) return;
+    localStorage.setItem(`${initBudgetKey}${username}`, JSON.stringify(initialBudget));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialBudget, username, projectId]);
+  }, [initialBudget, username, projectId, readOnly, loadedProjectId]);
+
+  useEffect(() => {
+    if (!username || readOnly || loadedProjectId !== projectId) return;
+    saveBossSectionSnapshot(bossEmail || username, "construction", {
+      expenses,
+      budget,
+      initialBudget,
+    }, `project:${projectId}`).catch((saveError) => {
+      console.error("Failed to publish construction report snapshot:", saveError);
+    });
+  }, [username, readOnly, loadedProjectId, projectId, bossEmail, expenses, budget, initialBudget]);
 
   // Computed stats
   const totalAmount = (currency) =>
-    expenses.filter((e) => e.currency === currency)
+    displayedExpenses.filter((e) => e.currency === currency)
       .reduce((acc, e) => acc + parseFloat(e.amountPerUnit || 0) * parseFloat(e.quantity || 1), 0);
+
+  const assistantExpenseAmount = (currency) =>
+    assistantRecords
+      .filter((record) => record.type === "constructionExpense" && record.payload.currency === currency)
+      .reduce((total, record) => total + (Number(record.payload.amountPerUnit) || 0) * (Number(record.payload.quantity) || 1), 0);
 
   const paidAmount = (currency) =>
-    expenses.filter((e) => e.currency === currency && e.isPaid)
+    displayedExpenses.filter((e) => e.currency === currency && e.isPaid)
       .reduce((acc, e) => acc + parseFloat(e.amountPerUnit || 0) * parseFloat(e.quantity || 1), 0);
 
-  const remaining = (currency) => budget[currency] - totalAmount(currency);
+  const remaining = (currency) => (Number(budget[currency]) || 0) - assistantExpenseAmount(currency);
 
   const catStats = ["material", "ishchi", "texnika", "boshqa"].map((cat) => {
-    const items = expenses.filter((e) => e.category === cat);
+    const items = displayedExpenses.filter((e) => e.category === cat);
     return {
       cat,
       count: items.length,
@@ -110,20 +180,105 @@ function ProjectReport({ projectId, projectName, onBack }) {
     };
   });
 
-  const filtered = expenses.filter((e) => {
+  const filtered = displayedExpenses.filter((e) => {
     const matchCat = activeCategory === "hammasi" ? true : e.category === activeCategory;
     return matchCat && e.name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const catLabel = (cat) => ({
+  const catLabel = useCallback((cat) => ({
     hammasi: t("pr_hammasi"), material: t("pr_material"),
     ishchi: t("pr_ishchi"), texnika: t("pr_texnika"), boshqa: t("pr_boshqa"),
-  }[cat] || cat);
+  }[cat] || cat), [t]);
 
-  const expenseCategoryLabel = (expense) =>
+  const expenseCategoryLabel = useCallback((expense) =>
     expense.category === "boshqa" && expense.customCategoryName?.trim()
       ? expense.customCategoryName
-      : catLabel(expense.category);
+      : catLabel(expense.category), [catLabel]);
+
+  useEffect(() => {
+    if (!onRegisterExport) return undefined;
+    if (readOnly || loadedProjectId !== projectId) {
+      onRegisterExport(null);
+      return undefined;
+    }
+
+    const exportReport = async () => {
+      const reportExpenses = [
+        ...expenses,
+        ...assistantRecords
+          .filter((record) => record.type === "constructionExpense")
+          .map((record) => ({
+            ...record.payload,
+            createdByEmail: record.createdByEmail,
+          })),
+      ];
+
+      await downloadReportExcel({
+        fileName: `${projectName || "construction"}_expenses`,
+        title: `${t("report_export_construction_title")} — ${projectName || ""}`,
+        columns: [
+          t("report_export_col_date") || "Sana",
+          "$",
+          t("report_export_col_name") || "Nomi",
+          t("report_export_col_type") || "turi",
+          t("report_export_col_size") || "O'lcham",
+          t("report_export_col_count") || "Soni",
+          t("report_export_col_measurement") || "o'lchov",
+          t("report_export_col_price_sum") || "Narxi so'm",
+          t("report_export_col_group_uz") || "Guruhi",
+          t("report_export_col_total_narxi") || "Umumiy narxi",
+          t("report_export_col_total_usd") || "Umumiy $",
+          t("report_export_col_worker") || "Xodim",
+        ],
+        rows: reportExpenses.map((item) => {
+          const itemRate = parseFloat(item.dollarRate) || dollarRate || 12000;
+          const qty = parseFloat(item.quantity) || 1;
+          const rawPrice = parseFloat(item.amountPerUnit) || 0;
+          const priceInSum = item.currency === "dollar" ? rawPrice * itemRate : rawPrice;
+          const amountSum = priceInSum * qty;
+          const amountDollar = itemRate > 0 ? amountSum / itemRate : 0;
+          const typeLabel =
+            item.category === "ishchi"
+              ? "mehnat"
+              : item.category === "material"
+              ? "material"
+              : item.category === "boshqa" && item.customCategoryName?.trim()
+              ? item.customCategoryName
+              : expenseCategoryLabel(item) || item.category || "";
+
+          return [
+            item.date ? new Date(`${item.date}T00:00:00`) : "",
+            itemRate,
+            item.name || "",
+            typeLabel,
+            item.note || item.dimension || item.size || "",
+            qty,
+            item.unit || "",
+            priceInSum,
+            item.group || item.customCategoryName || "",
+            amountSum,
+            amountDollar,
+            item.workerName || item.createdByEmail || "",
+          ];
+        }),
+      });
+    };
+
+    onRegisterExport(exportReport);
+    return () => onRegisterExport(null);
+  }, [
+    onRegisterExport,
+    readOnly,
+    loadedProjectId,
+    projectId,
+    projectName,
+    expenses,
+    assistantRecords,
+    budget,
+    dollarRate,
+    t,
+    expenseCategoryLabel,
+  ]);
 
   const catIcon = (cat) => ({ material: "🧱", ishchi: "👷", texnika: "🚜", boshqa: "📋" }[cat] || "📦");
 
@@ -134,7 +289,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
     let data = [];
     let allPayments = [];
 
-    expenses.forEach((e) => {
+    displayedExpenses.forEach((e) => {
       if (e.isPaid) {
         allPayments.push({
           date: new Date(e.date),
@@ -202,9 +357,9 @@ function ProjectReport({ projectId, projectName, onBack }) {
   };
 
   const getCircularData = () => {
-    const totalCount = expenses.length;
+    const totalCount = displayedExpenses.length;
     if (totalCount === 0) return { paid: 0, unpaid: 0, percent: 0 };
-    const paidCount = expenses.filter((e) => e.isPaid).length;
+    const paidCount = displayedExpenses.filter((e) => e.isPaid).length;
     const percent = Math.round((paidCount / totalCount) * 100);
     return { paid: paidCount, unpaid: totalCount - paidCount, percent };
   };
@@ -217,11 +372,48 @@ function ProjectReport({ projectId, projectName, onBack }) {
   };
 
   const openEdit = (item) => { setEditItem(item); setForm({ ...item }); setAddModal(true); };
-  const closeAdd = () => { setAddModal(false); setEditItem(null); };
+  const closeAdd = () => {
+    setAddModal(false);
+    setEditItem(null);
+    setEditConfirmModal(false);
+  };
 
-  const handleSave = () => {
+  const handleSave = async (confirmed = false) => {
     if (!form.name || !form.amountPerUnit ||
       (form.category === "boshqa" && !form.customCategoryName?.trim())) return;
+    if (editItem && !confirmed) {
+      setEditConfirmModal(true);
+      return;
+    }
+    if (editItem?.assistantRecordId) {
+      try {
+        const payload = { ...form };
+        delete payload.assistantRecordId;
+        delete payload.createdByEmail;
+        await updateAssistantRecord(editItem.assistantRecordId, "constructionExpense", payload);
+        closeAdd();
+      } catch (saveError) {
+        console.error("Failed to update assistant construction expense:", saveError);
+        window.alert(t("assistant_action_failed"));
+      }
+      return;
+    }
+    if (readOnly) {
+      try {
+        await createAssistantRecord(
+          bossEmail,
+          "construction",
+          `project:${projectId}`,
+          "constructionExpense",
+          { ...form, id: Date.now() },
+        );
+        closeAdd();
+      } catch (saveError) {
+        console.error("Failed to save assistant construction expense:", saveError);
+        window.alert(t("assistant_action_failed"));
+      }
+      return;
+    }
     saveForUndo();
     const total = parseFloat(form.amountPerUnit) * parseFloat(form.quantity || 1);
     if (editItem) {
@@ -243,18 +435,44 @@ function ProjectReport({ projectId, projectName, onBack }) {
     closeAdd();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteItem) {
-      saveForUndo();
-      const total = parseFloat(deleteItem.amountPerUnit) * parseFloat(deleteItem.quantity || 1);
-      setBudget((prev) => ({ ...prev, [deleteItem.currency]: prev[deleteItem.currency] + total }));
-      setExpenses(expenses.filter((e) => e.id !== deleteItem.id));
+      if (deleteItem.assistantRecordId) {
+        try {
+          await deleteAssistantRecord(deleteItem.assistantRecordId);
+        } catch (deleteError) {
+          console.error("Failed to delete assistant construction expense:", deleteError);
+          window.alert(t("assistant_action_failed"));
+        }
+      } else if (!readOnly) {
+        saveForUndo();
+        const total = parseFloat(deleteItem.amountPerUnit) * parseFloat(deleteItem.quantity || 1);
+        setBudget((prev) => ({ ...prev, [deleteItem.currency]: prev[deleteItem.currency] + total }));
+        setExpenses(expenses.filter((e) => e.id !== deleteItem.id));
+      }
     }
     setDeleteItem(null);
   };
 
-  const handleTogglePaid = (id) =>
-    setExpenses(expenses.map((e) => (e.id === id ? { ...e, isPaid: !e.isPaid } : e)));
+  const handleTogglePaid = async (id) => {
+    const item = displayedExpenses.find((expense) => expense.id === id);
+    if (!item) return;
+    if (item.assistantRecordId) {
+      const payload = { ...item, isPaid: !item.isPaid };
+      delete payload.assistantRecordId;
+      delete payload.createdByEmail;
+      try {
+        await updateAssistantRecord(item.assistantRecordId, "constructionExpense", payload);
+      } catch (updateError) {
+        console.error("Failed to update assistant construction expense status:", updateError);
+        window.alert(t("assistant_action_failed"));
+      }
+    } else if (!readOnly) {
+      setExpenses(expenses.map((expense) =>
+        expense.id === id ? { ...expense, isPaid: !expense.isPaid } : expense,
+      ));
+    }
+  };
 
   // Save state for undo
   const saveForUndo = () => {
@@ -285,23 +503,41 @@ function ProjectReport({ projectId, projectName, onBack }) {
   };
 
   const handleBudgetSave = () => {
+    const s = Number(budgetForm.sum || 0);
+    const d = Number(budgetForm.dollar || 0);
+    if (!Number.isFinite(s) || !Number.isFinite(d) || s < 0 || d < 0) {
+      setBudgetError(t("balance_invalid_amount") || "Enter valid positive amounts.");
+      return;
+    }
+    if (budgetMode !== "update" && s === 0 && d === 0) {
+      setBudgetError(t("balance_invalid_amount") || "Enter valid positive amounts.");
+      return;
+    }
+    if (budgetMode === "subtract" && (s > remaining("sum") || d > remaining("dollar"))) {
+      setBudgetError(t("balance_insufficient") || "Insufficient balance.");
+      return;
+    }
     saveForUndo();
-    const s = parseFloat(budgetForm.sum || 0);
-    const d = parseFloat(budgetForm.dollar || 0);
     if (budgetMode === "add") {
       setBudget((prev) => ({
-        sum: (prev.sum || 0) + s,
-        dollar: (prev.dollar || 0) + d,
+        sum: (Number(prev.sum) || 0) + s,
+        dollar: (Number(prev.dollar) || 0) + d,
       }));
       setInitialBudget((prev) => ({
-        sum: (prev.sum || 0) + s,
-        dollar: (prev.dollar || 0) + d,
+        sum: (Number(prev.sum) || 0) + s,
+        dollar: (Number(prev.dollar) || 0) + d,
+      }));
+    } else if (budgetMode === "subtract") {
+      setBudget((prev) => ({
+        sum: (Number(prev.sum) || 0) - s,
+        dollar: (Number(prev.dollar) || 0) - d,
       }));
     } else {
       setBudget({ sum: s, dollar: d });
       setInitialBudget({ sum: s, dollar: d });
     }
     setBudgetForm({ sum: "", dollar: "" });
+    setBudgetError("");
     setBudgetModal(false);
   };
 
@@ -311,7 +547,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
     (form.category !== "boshqa" || form.customCategoryName?.trim());
 
   return (
-    <div className="ProjectReport">
+    <div className={`ProjectReport ${readOnly ? "assistant-read-only" : ""}`}>
       {/* Mobile right panel toggle button */}
       <button className="right-panel-toggle-btn" onClick={() => setIsRightPanelOpen(true)}>‹</button>
 
@@ -330,9 +566,9 @@ function ProjectReport({ projectId, projectName, onBack }) {
             <button className="pr-btn pr-btn-add" onClick={openAdd}>
               + {t("pr_xarajat_qoshish")}
             </button>
-            <button className="pr-btn pr-btn-budget" onClick={() => setBudgetModal(true)}>
+            {!readOnly && <button className="pr-btn pr-btn-budget" onClick={() => { setBudgetError(""); setBudgetModal(true); }}>
               + {t("pr_byudjet")}
-            </button>
+            </button>}
             {undoStack.length > 0 && (
               <div className="undo-group">
                 <button className="pr-btn pr-btn-undo" onClick={handleUndoClick} title="Undo">
@@ -377,14 +613,18 @@ function ProjectReport({ projectId, projectName, onBack }) {
             </div>
           ) : (
             filtered.map((item) => {
+              const canManageItem = !readOnly || (
+                item.assistantRecordId && item.createdByEmail === currentEmail
+              );
               const itemTotal = parseFloat(item.amountPerUnit || 0) * parseFloat(item.quantity || 1);
               return (
                 <div key={item.id} className={`pr-item ${item.isPaid ? "pr-item-paid" : ""}`}>
                   <div className="pr-item-left">
-                    <input type="checkbox" className="pr-checkbox" checked={item.isPaid}
+                    <input type="checkbox" className="pr-checkbox" checked={item.isPaid} disabled={!canManageItem}
                       onChange={() => handleTogglePaid(item.id)} />
                     <span className="pr-item-cat-icon">{catIcon(item.category)}</span>
                     <div className="pr-item-info">
+                      {item.createdByEmail && <small className="assistant-author-label">{item.createdByEmail}</small>}
                       <h4 className="pr-item-name">{item.name}</h4>
                       <div className="pr-item-meta">
                         <span className="pr-badge pr-badge-cat">{expenseCategoryLabel(item)}</span>
@@ -405,8 +645,10 @@ function ProjectReport({ projectId, projectName, onBack }) {
                       )}
                     </div>
                     <div className="pr-item-actions">
-                      <button className="pr-action-btn pr-edit-btn" onClick={() => openEdit(item)}>✏️</button>
-                      <button className="pr-action-btn pr-delete-btn" onClick={() => setDeleteItem(item)}>🗑️</button>
+                      {canManageItem && <>
+                        <button className="pr-action-btn pr-edit-btn" onClick={() => openEdit(item)}>✏️</button>
+                        <button className="pr-action-btn pr-delete-btn" onClick={() => setDeleteItem(item)}>🗑️</button>
+                      </>}
                     </div>
                   </div>
                 </div>
@@ -435,7 +677,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
             {/* Total items */}
             <div className="statistic2">
               <h3>{t("jami_xarajatlar")}:</h3>
-              <p>{expenses.length}</p>
+              <p>{displayedExpenses.length}</p>
             </div>
 
             {/* Highest expense */}
@@ -443,10 +685,10 @@ function ProjectReport({ projectId, projectName, onBack }) {
               <h3>{t("eng_qimmat_xarajat")}:</h3>
               <p>
                 {(() => {
-                  const sumHigh = expenses
+                  const sumHigh = displayedExpenses
                     .filter((e) => e.currency === "sum")
                     .sort((a, b) => (parseFloat(b.amountPerUnit) || 0) - (parseFloat(a.amountPerUnit) || 0))[0];
-                  const dolHigh = expenses
+                  const dolHigh = displayedExpenses
                     .filter((e) => e.currency === "dollar")
                     .sort((a, b) => (parseFloat(b.amountPerUnit) || 0) - (parseFloat(a.amountPerUnit) || 0))[0];
 
@@ -673,7 +915,7 @@ function ProjectReport({ projectId, projectName, onBack }) {
             </div>
             <div className="pr-modal-footer">
               <button className="pr-btn pr-btn-cancel" onClick={closeAdd}>{t("bekorqilish")}</button>
-              <button className="pr-btn pr-btn-save" disabled={!isFormValid} onClick={handleSave}>
+              <button className="pr-btn pr-btn-save" disabled={!isFormValid} onClick={() => handleSave()}>
                 {editItem ? t("saqlash") : t("qo'shish")}
               </button>
             </div>
@@ -689,24 +931,32 @@ function ProjectReport({ projectId, projectName, onBack }) {
               <h3>
                 {budgetMode === "add"
                   ? (t("byudjet_qoshish_tab") || "Byudjetga qo'shish")
-                  : (t("byudjet_yangilash_tab") || "Byudjetni yangilash")}
+                  : budgetMode === "subtract"
+                    ? (t("byudjet_ayirish_tab") || "Byudjetdan ayirish")
+                    : (t("byudjet_yangilash_tab") || "Byudjetni yangilash")}
               </h3>
               <button className="pr-close-btn" onClick={() => setBudgetModal(false)}>✕</button>
             </div>
             <div className="pr-modal-body">
-              {/* TABS */}
               <div className="pr-budget-tabs">
                 <button
                   type="button"
                   className={`pr-budget-tab ${budgetMode === "add" ? "active tab-add" : ""}`}
-                  onClick={() => setBudgetMode("add")}
+                  onClick={() => { setBudgetMode("add"); setBudgetError(""); }}
                 >
                   ➕ {t("byudjet_qoshish_tab") || "Byudjetga qo'shish"}
                 </button>
                 <button
                   type="button"
+                  className={`pr-budget-tab ${budgetMode === "subtract" ? "active tab-subtract" : ""}`}
+                  onClick={() => { setBudgetMode("subtract"); setBudgetError(""); }}
+                >
+                  ➖ {t("byudjet_ayirish_tab") || "Byudjetdan ayirish"}
+                </button>
+                <button
+                  type="button"
                   className={`pr-budget-tab ${budgetMode === "update" ? "active" : ""}`}
-                  onClick={() => setBudgetMode("update")}
+                  onClick={() => { setBudgetMode("update"); setBudgetError(""); }}
                 >
                   🔄 {t("byudjet_yangilash_tab") || "Byudjetni yangilash"}
                 </button>
@@ -714,25 +964,29 @@ function ProjectReport({ projectId, projectName, onBack }) {
 
               <div className="pr-budget-current">
                 <p>{t("pr_joriy_byudjet")}:</p>
-                <strong>{initialBudget.sum.toLocaleString()} so'm / {initialBudget.dollar.toLocaleString()} $</strong>
+                <strong>{remaining("sum").toLocaleString()} so'm / {remaining("dollar").toLocaleString()} $</strong>
               </div>
               <div className="pr-form-group">
                 <label>
                   {budgetMode === "add"
                     ? `${t("qoshiladigan_miqdor") || "Qo'shiladigan miqdor"} (so'm)`
-                    : `${t("pr_qoshish_som")} (so'm)`}
+                    : budgetMode === "subtract"
+                      ? `${t("ayiriladigan_miqdor") || "Ayiriladigan miqdor"} (so'm)`
+                      : `${t("pr_qoshish_som")} (so'm)`}
                 </label>
-                <input type="number" value={budgetForm.sum} placeholder="0"
-                  onChange={(e) => setBudgetForm({ ...budgetForm, sum: e.target.value })} />
+                <input type="number" min="0" value={budgetForm.sum} placeholder="0"
+                  onChange={(e) => { setBudgetForm({ ...budgetForm, sum: e.target.value }); setBudgetError(""); }} />
               </div>
               <div className="pr-form-group">
                 <label>
                   {budgetMode === "add"
                     ? `${t("qoshiladigan_miqdor") || "Qo'shiladigan miqdor"} ($)`
-                    : `${t("pr_qoshish_dollar")} ($)`}
+                    : budgetMode === "subtract"
+                      ? `${t("ayiriladigan_miqdor") || "Ayiriladigan miqdor"} ($)`
+                      : `${t("pr_qoshish_dollar")} ($)`}
                 </label>
-                <input type="number" value={budgetForm.dollar} placeholder="0"
-                  onChange={(e) => setBudgetForm({ ...budgetForm, dollar: e.target.value })} />
+                <input type="number" min="0" value={budgetForm.dollar} placeholder="0"
+                  onChange={(e) => { setBudgetForm({ ...budgetForm, dollar: e.target.value }); setBudgetError(""); }} />
               </div>
 
               {(parseFloat(budgetForm.sum) > 0 || parseFloat(budgetForm.dollar) > 0) && (
@@ -740,16 +994,24 @@ function ProjectReport({ projectId, projectName, onBack }) {
                   <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich byudjet"}:</span>
                   <strong>
                     {budgetMode === "add"
-                      ? `${(initialBudget.sum + (parseFloat(budgetForm.sum) || 0)).toLocaleString()} so'm / ${(initialBudget.dollar + (parseFloat(budgetForm.dollar) || 0)).toLocaleString()} $`
-                      : `${(parseFloat(budgetForm.sum) || 0).toLocaleString()} so'm / ${(parseFloat(budgetForm.dollar) || 0).toLocaleString()} $`}
+                      ? `${((Number(initialBudget.sum) || 0) + (parseFloat(budgetForm.sum) || 0)).toLocaleString()} so'm / ${((Number(initialBudget.dollar) || 0) + (parseFloat(budgetForm.dollar) || 0)).toLocaleString()} $`
+                      : budgetMode === "subtract"
+                        ? `${(remaining("sum") - (parseFloat(budgetForm.sum) || 0)).toLocaleString()} so'm / ${(remaining("dollar") - (parseFloat(budgetForm.dollar) || 0)).toLocaleString()} $`
+                        : `${(parseFloat(budgetForm.sum) || 0).toLocaleString()} so'm / ${(parseFloat(budgetForm.dollar) || 0).toLocaleString()} $`}
                   </strong>
                 </div>
               )}
+              {budgetError && <p className="pr-budget-error" role="alert">{budgetError}</p>}
             </div>
             <div className="pr-modal-footer">
               <button className="pr-btn pr-btn-cancel" onClick={() => setBudgetModal(false)}>{t("bekorqilish")}</button>
-              <button className="pr-btn pr-btn-save" onClick={handleBudgetSave}>
-                {budgetMode === "add" ? (t("qoshish_btn") || "Qo'shish") : t("yangilash")}
+              <button className={`pr-btn pr-btn-save ${budgetMode === "subtract" ? "pr-btn-subtract" : ""}`} onClick={handleBudgetSave}
+                disabled={budgetMode !== "update" && !(Number(budgetForm.sum) > 0 || Number(budgetForm.dollar) > 0)}>
+                {budgetMode === "add"
+                  ? (t("qoshish_btn") || "Qo'shish")
+                  : budgetMode === "subtract"
+                    ? (t("byudjet_ayirish_tab") || "Byudjetdan ayirish")
+                    : t("yangilash")}
               </button>
             </div>
           </div>
@@ -779,6 +1041,31 @@ function ProjectReport({ projectId, projectName, onBack }) {
             <div className="pr-modal-footer">
               <button className="pr-btn pr-btn-cancel" onClick={() => setDeleteItem(null)}>{t("yo'q")}</button>
               <button className="pr-btn pr-btn-delete" onClick={handleDelete}>{t("ha")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editConfirmModal && editItem && (
+        <div className="pr-overlay pr-confirm-overlay" onClick={() => setEditConfirmModal(false)}>
+          <div className="pr-modal pr-modal-sm" role="alertdialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="pr-modal-header">
+              <h3>{t("pr_edit_confirm_title")}</h3>
+              <button className="pr-close-btn" type="button" onClick={() => setEditConfirmModal(false)} aria-label={t("Close")}>×</button>
+            </div>
+            <div className="pr-modal-body">
+              <p className="pr-confirm-message">{t("pr_edit_confirm_savol")}</p>
+              <div className="pr-confirm-item">
+                <strong>{form.name}</strong>
+                <span>
+                  {(parseFloat(form.amountPerUnit || 0) * parseFloat(form.quantity || 1)).toLocaleString()}
+                  {" "}{form.currency === "sum" ? t("som") : "$"}
+                </span>
+              </div>
+            </div>
+            <div className="pr-modal-footer">
+              <button className="pr-btn pr-btn-cancel" type="button" onClick={() => setEditConfirmModal(false)}>{t("bekorqilish")}</button>
+              <button className="pr-btn pr-btn-save" type="button" onClick={() => handleSave(true)}>{t("saqlash")}</button>
             </div>
           </div>
         </div>

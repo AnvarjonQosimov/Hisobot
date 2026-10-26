@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "assistantRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bossEmail", "order": "ASCENDING" },
+        { "fieldPath": "section", "order": "ASCENDING" },
+        { "fieldPath": "contextId", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

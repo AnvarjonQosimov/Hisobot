@@ -13,9 +13,8 @@ service cloud.firestore {
         && request.auth.token.email == "anvarqosimov153@gmail.com";
     }
 
-    function isBossFor(email) {
+    function isKnownBoss(email) {
       return hasVerifiedEmail()
-        && request.auth.token.email == email
         && (
           email == "anvarqosimov153@gmail.com"
           || email == "archoltinnisbatarch@gmail.com"
@@ -23,10 +22,32 @@ service cloud.firestore {
         );
     }
 
+    function isBossFor(email) {
+      return isKnownBoss(email)
+        && request.auth.token.email == email;
+    }
+
     function isWorkerFor(bossEmail) {
       return isBossFor(bossEmail)
         && exists(/databases/$(database)/documents/globalWorkerEmails/$(request.auth.token.email))
         && get(/databases/$(database)/documents/globalWorkerEmails/$(request.auth.token.email)).data.bossEmail == bossEmail;
+    }
+
+    function hasAssistantSectionAccess(bossEmail, section) {
+      let assistantPath = /databases/$(database)/documents/assistants/$(request.auth.token.email);
+      return hasVerifiedEmail()
+        && isKnownBoss(bossEmail)
+        && exists(assistantPath)
+        && get(assistantPath).data.bossEmail == bossEmail
+        && get(assistantPath).data.sections is list
+        && section in get(assistantPath).data.sections;
+    }
+
+    function canAccessAssistantSection(bossEmail, section) {
+      return (
+        isBossFor(bossEmail)
+        && request.auth.token.email == bossEmail
+      ) || hasAssistantSectionAccess(bossEmail, section);
     }
 
     function validWorkerAccess(data) {
@@ -70,6 +91,125 @@ service cloud.firestore {
         || (hasVerifiedEmail() && request.auth.token.email == accountEmail);
       allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
+    }
+
+    match /assistants/{assistantEmail} {
+      allow get: if isAdmin()
+        || (
+          hasVerifiedEmail()
+          && request.auth.token.email == assistantEmail
+        )
+        || (
+          isBossFor(resource.data.bossEmail)
+          && request.auth.token.email == resource.data.bossEmail
+        );
+      allow list: if isAdmin()
+        || (
+          isBossFor(resource.data.bossEmail)
+          && request.auth.token.email == resource.data.bossEmail
+        );
+      allow create: if isAdmin()
+        || (
+          isBossFor(request.resource.data.bossEmail)
+          && request.auth.token.email == request.resource.data.bossEmail
+          && request.resource.data.email == assistantEmail
+          && request.resource.data.sections is list
+          && request.resource.data.sections.size() > 0
+          && request.resource.data.sections.hasOnly(["workers", "office", "construction"])
+        );
+      allow update: if isAdmin()
+        || (
+          isBossFor(resource.data.bossEmail)
+          && request.auth.token.email == resource.data.bossEmail
+          && request.resource.data.bossEmail == resource.data.bossEmail
+          && request.resource.data.email == assistantEmail
+          && request.resource.data.sections is list
+          && request.resource.data.sections.size() > 0
+          && request.resource.data.sections.hasOnly(["workers", "office", "construction"])
+        );
+      allow delete: if isAdmin()
+        || (
+          isBossFor(resource.data.bossEmail)
+          && request.auth.token.email == resource.data.bossEmail
+        );
+    }
+
+    match /assistantRecords/{recordId} {
+      allow get, list: if isAdmin()
+        || canAccessAssistantSection(resource.data.bossEmail, resource.data.section);
+      allow create: if hasAssistantSectionAccess(
+          request.resource.data.bossEmail,
+          request.resource.data.section
+        )
+        && request.resource.data.createdByEmail == request.auth.token.email
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.contextId is string
+        && request.resource.data.payload is map
+        && (
+          (request.resource.data.section == "workers" && request.resource.data.type == "worker")
+          || (request.resource.data.section == "office" && request.resource.data.type == "officeExpense")
+          || (request.resource.data.section == "construction" && request.resource.data.type == "constructionExpense")
+        )
+        && request.resource.data.title is string
+        && request.resource.data.details is string
+        && request.resource.data.date is string
+        && request.resource.data.currency in ["sum", "dollar"];
+      allow update: if (
+          isAdmin()
+          || (
+            isBossFor(resource.data.bossEmail)
+            && request.auth.token.email == resource.data.bossEmail
+          )
+          || (
+            hasAssistantSectionAccess(resource.data.bossEmail, resource.data.section)
+            && resource.data.createdByEmail == request.auth.token.email
+            && resource.data.createdByUid == request.auth.uid
+          )
+        )
+        && request.resource.data.bossEmail == resource.data.bossEmail
+        && request.resource.data.section == resource.data.section
+        && request.resource.data.contextId == resource.data.contextId
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.payload is map
+        && request.resource.data.createdByEmail == resource.data.createdByEmail
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.title is string
+        && request.resource.data.details is string
+        && request.resource.data.date is string
+        && request.resource.data.currency in ["sum", "dollar"];
+      allow delete: if isAdmin()
+        || (
+          isBossFor(resource.data.bossEmail)
+          && request.auth.token.email == resource.data.bossEmail
+        )
+        || (
+          hasAssistantSectionAccess(resource.data.bossEmail, resource.data.section)
+          && resource.data.createdByEmail == request.auth.token.email
+          && resource.data.createdByUid == request.auth.uid
+        );
+    }
+
+    match /assistantSectionSnapshots/{snapshotId} {
+        allow get: if isAdmin()
+          || canAccessAssistantSection(resource.data.bossEmail, resource.data.section);
+        allow list: if isAdmin()
+          || (
+            isBossFor(resource.data.bossEmail)
+            && request.auth.token.email == resource.data.bossEmail
+          );
+        allow create, update: if isAdmin()
+          || (
+            isBossFor(request.resource.data.bossEmail)
+            && request.auth.token.email == request.resource.data.bossEmail
+            && request.resource.data.section in ["workers", "office", "construction"]
+            && request.resource.data.contextId is string
+          );
+        allow delete: if isAdmin()
+          || (
+            isBossFor(resource.data.bossEmail)
+            && request.auth.token.email == resource.data.bossEmail
+          );
     }
 
     match /cabinets/{bossEmail} {
@@ -213,4 +353,5 @@ service cloud.firestore {
       allow read, write: if false;
     }
   }
+
 }

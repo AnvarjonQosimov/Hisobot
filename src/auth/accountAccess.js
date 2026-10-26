@@ -8,6 +8,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { auth, db } from "../Firebase/Firebase";
+import { getAssistantAccess } from "./assistantAccess";
 
 export const ADMIN_EMAIL = "anvarqosimov153@gmail.com";
 export const LEGACY_ADMIN_EMAIL = "archoltinnisbatarch@gmail.com";
@@ -24,7 +25,12 @@ export const checkAccountAccess = async () => {
   }
   if (!email) return { allowed: false, admin: false };
   const account = await getDoc(doc(db, "managedAccounts", email));
-  return { allowed: account.exists(), admin: false };
+  if (account.exists()) return { allowed: true, admin: false };
+
+  const assistant = await getAssistantAccess(email);
+  return assistant
+    ? { allowed: true, admin: false, ...assistant }
+    : { allowed: false, admin: false };
 };
 
 export const getAdminDashboard = async () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import "../styles/Hisobot.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
@@ -13,6 +13,25 @@ import FloatingCalculator from "../components/FloatingCalculator";
 import Loading from "../components/Loading";
 import { AnimatePresence } from "framer-motion";
 import { saveBossCabinet } from "../auth/firestoreOwnership";
+import AssistantManager from "../components/AssistantManager";
+import { getBossSectionSnapshot, saveBossSectionSnapshot } from "../auth/assistantSnapshots";
+import {
+  createAssistantRecord,
+  deleteAssistantRecord,
+  subscribeAssistantRecords,
+  updateAssistantRecord,
+} from "../auth/assistantRecords";
+import { downloadReportExcel } from "../utils/exportReportExcel";
+
+const getStoredAssistantSections = () => {
+  try {
+    const sections = JSON.parse(localStorage.getItem("assistantSections") || "[]");
+    return Array.isArray(sections) ? sections : [];
+  } catch (error) {
+    console.error("Invalid assistant section data:", error);
+    return [];
+  }
+};
 
 const createWorkerObjectCopy = (worker) => ({
   ...worker,
@@ -37,6 +56,9 @@ const isEmptyWorkerObjectCopy = (worker) =>
 function Hisobot() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const isAssistant = localStorage.getItem("role") === "assistant";
+  const [assistantSections] = useState(getStoredAssistantSections);
+  const assistantBossEmail = localStorage.getItem("bossEmail")?.toLowerCase() || "";
 
   // State Definitions
   const [username, setUsername] = useState(localStorage.getItem("username")?.toLowerCase() || "");
@@ -78,6 +100,7 @@ function Hisobot() {
 
   // Persistence States
   const [workers, setWorkers] = useState([]);
+  const [assistantRecords, setAssistantRecords] = useState([]);
   const [totalBalance, setTotalBalance] = useState({ sum: 0, dollar: 0 });
   const [initialBalance, setInitialBalance] = useState({ sum: 0, dollar: 0 });
   const [balanceTransactions, setBalanceTransactions] = useState([]);
@@ -121,6 +144,16 @@ function Hisobot() {
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isConstructionExpanded, setIsConstructionExpanded] = useState(false);
+  const [assistantManagerOpen, setAssistantManagerOpen] = useState(false);
+  const pageExporterRef = useRef(null);
+  const [pageExporterReady, setPageExporterReady] = useState(false);
+  const registerPageExporter = useCallback((exporter) => {
+    pageExporterRef.current = exporter;
+    setPageExporterReady(Boolean(exporter));
+  }, []);
+  const [activeReportSection, setActiveReportSection] = useState(() =>
+    isAssistant ? assistantSections[0] || "" : "workers",
+  );
 
   // Dynamic Project Files State
   const [projectFiles, setProjectFiles] = useState([]);
@@ -151,9 +184,34 @@ function Hisobot() {
   const [age, setAge] = useState(i18n.language || "uz");
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
 
-  const currentWorkers = activeWorkerObjectId === null
+  const workerContextId = activeWorkerObjectId === null
+    ? "workers"
+    : `workerObject:${activeWorkerObjectId}`;
+  const savedWorkers = activeWorkerObjectId === null
     ? workers
     : workerObjects.find((object) => object.id === activeWorkerObjectId)?.workers || [];
+  const currentWorkers = [
+    ...savedWorkers,
+    ...assistantRecords
+      .filter((record) => record.type === "worker" && record.contextId === workerContextId)
+      .map((record) => ({
+        ...record.payload,
+        id: record.id,
+        assistantRecordId: record.id,
+        createdByEmail: record.createdByEmail,
+      })),
+  ];
+
+  useEffect(() => {
+    const ownerEmail = isAssistant ? assistantBossEmail : username;
+    if (!ownerEmail) return undefined;
+    return subscribeAssistantRecords(
+      ownerEmail,
+      "workers",
+      setAssistantRecords,
+      (error) => console.error("Failed to load assistant worker records:", error),
+    );
+  }, [isAssistant, assistantBossEmail, username]);
 
   const updateCurrentWorkers = (update) => {
     if (activeWorkerObjectId === null) {
@@ -196,6 +254,41 @@ function Hisobot() {
     currency === "sum" ? amount : amount * dollarRate;
   const convertToDollar = (amount, currency) =>
     currency === "dollar" ? amount : dollarRate > 0 ? amount / dollarRate : 0;
+
+  const handleExportCurrentPage = async () => {
+    try {
+      if (activeProjectId !== null || activeBranchId !== null) {
+        await pageExporterRef.current?.();
+        return;
+      }
+
+      const sumFor = (amountKey, currencyKey, currency) =>
+        currentWorkers
+          .filter((worker) => worker[currencyKey] === currency)
+          .reduce((sum, worker) => sum + parseAmount(worker[amountKey]), 0);
+      const paidCount = currentWorkers.filter((worker) => worker.isPaid).length;
+      const objectName = workerObjects.find((object) => object.id === activeWorkerObjectId)?.name;
+      const reportTitle = objectName || t("report_export_workers_title");
+
+      await downloadReportExcel({
+        fileName: `${reportTitle}_hisobot`,
+        title: reportTitle,
+        summary: [
+          [t("report_export_generated_at"), new Date()],
+          [t("report_export_worker_count"), currentWorkers.length],
+          [t("report_export_paid_count"), paidCount],
+          [t("report_export_unpaid_count"), currentWorkers.length - paidCount],
+          [t("report_export_total_due_sum"), sumFor("amountToReceive", "currencyToReceive", "sum")],
+          [t("report_export_total_due_dollar"), sumFor("amountToReceive", "currencyToReceive", "dollar")],
+          [t("report_export_received_sum"), sumFor("amountAlreadyReceived", "currencyAlreadyReceived", "sum")],
+          [t("report_export_received_dollar"), sumFor("amountAlreadyReceived", "currencyAlreadyReceived", "dollar")],
+        ],
+      });
+    } catch (exportError) {
+      console.error("Failed to export report to Excel:", exportError);
+      window.alert(t("report_export_failed"));
+    }
+  };
 
   const getTotalInMode = (sumValue, dollarValue) => {
     if (currencyDisplayMode === "sum") {
@@ -442,6 +535,7 @@ function Hisobot() {
     setUsername(storedUsername);
 
     // 1. Initial Load from Local
+    if (!isAssistant) {
     const sw = localStorage.getItem(`workers_${storedUsername}`);
     if (sw) setWorkers(JSON.parse(sw));
     const sb = localStorage.getItem(`totalBalance_${storedUsername}`);
@@ -464,11 +558,36 @@ const scdm = localStorage.getItem(`currencyDisplayMode_${storedUsername}`);
 if (scdm) setCurrencyDisplayMode(scdm);
 const sdr = localStorage.getItem(`dollarRate_${storedUsername}`);
 if (sdr) setDollarRate(JSON.parse(sdr));
+    }
 
     // 3. Fetch from Cloud
     const loadCloud = async () => {
       try {
         console.log("Fetching from cloud for:", storedUsername);
+        if (isAssistant) {
+          const snapshots = await Promise.all(
+            assistantSections.map((section) =>
+              getBossSectionSnapshot(assistantBossEmail, section),
+            ),
+          );
+          assistantSections.forEach((section, index) => {
+            const data = snapshots[index];
+            if (!data) return;
+            if (section === "workers") {
+              if (Array.isArray(data.workers)) setWorkers(data.workers);
+              if (data.totalBalance) setTotalBalance(data.totalBalance);
+              if (data.initialBalance) setInitialBalance(data.initialBalance);
+              if (Array.isArray(data.balanceTransactions)) setBalanceTransactions(data.balanceTransactions);
+              if (Array.isArray(data.deletedBalanceTransactions)) setDeletedBalanceTransactions(data.deletedBalanceTransactions);
+              if (Array.isArray(data.workerObjects)) setWorkerObjects(data.workerObjects);
+            } else if (section === "office" && Array.isArray(data.officeBranches)) {
+              setOfficeBranches(data.officeBranches);
+            } else if (section === "construction" && Array.isArray(data.projectFiles)) {
+              setProjectFiles(data.projectFiles);
+            }
+          });
+          return;
+        }
         const snap = await getDoc(doc(db, "cabinets", storedUsername));
         if (snap.exists()) {
           const d = snap.data();
@@ -497,7 +616,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     };
     
     loadCloud();
-  }, [navigate]);
+  }, [navigate, isAssistant, assistantBossEmail, assistantSections]);
 
   useEffect(() => {
     if (!cloudLoadComplete) return;
@@ -528,7 +647,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
   // 1. Local Save Effect (Immediate)
   useEffect(() => {
-    if (!username || !cloudLoadComplete) return;
+    if (!username || !cloudLoadComplete || isAssistant) return;
     localStorage.setItem(`workers_${username}`, JSON.stringify(workers));
     localStorage.setItem(`totalBalance_${username}`, JSON.stringify(totalBalance));
     localStorage.setItem(`initialBalance_${username}`, JSON.stringify(initialBalance));
@@ -540,11 +659,11 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
     localStorage.setItem(`currencyDisplayMode_${username}`, currencyDisplayMode);
   localStorage.setItem(`dollarRate_${username}`, JSON.stringify(dollarRate));
-  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, dollarRate, cloudLoadComplete]);
+  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, dollarRate, cloudLoadComplete, isAssistant]);
 
   // 2. Cloud Save Effect (Synced)
   useEffect(() => {
-    if (!username || !cloudLoadComplete) return;
+    if (!username || !cloudLoadComplete || isAssistant) return;
     
     // Preserve display preferences even when this cabinet has no report data yet.
     const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0 && balanceTransactions.length === 0 && deletedBalanceTransactions.length === 0;
@@ -555,15 +674,53 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         console.log("Syncing to cloud...");
         if (isTotallyEmpty) {
           await saveBossCabinet(username, { currencyDisplayMode, workers });
-          return;
+        } else {
+          await saveBossCabinet(username, {
+            workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, globalWorkerEmail, officeBranches, workerObjects, currencyDisplayMode
+          });
         }
-        await saveBossCabinet(username, {
-          workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, globalWorkerEmail, officeBranches, workerObjects, currencyDisplayMode
-        });
+        await Promise.all([
+          saveBossSectionSnapshot(username, "workers", {
+            workers,
+            workerObjects,
+            totalBalance,
+            initialBalance,
+            balanceTransactions,
+            deletedBalanceTransactions,
+          }),
+          saveBossSectionSnapshot(username, "office", { officeBranches }),
+          saveBossSectionSnapshot(username, "construction", { projectFiles }),
+          ...officeBranches.map((branch) =>
+            saveBossSectionSnapshot(username, "office", {
+              expenses: JSON.parse(
+                localStorage.getItem(`branch_${branch.id}_expenses_${username}`) || "[]",
+              ),
+              budget: JSON.parse(
+                localStorage.getItem(`branch_${branch.id}_budget_${username}`) || '{"sum":0,"dollar":0}',
+              ),
+              initialBudget: JSON.parse(
+                localStorage.getItem(`branch_${branch.id}_initBudget_${username}`) || '{"sum":0,"dollar":0}',
+              ),
+            }, `branch:${branch.id}`),
+          ),
+          ...projectFiles.map((project) =>
+            saveBossSectionSnapshot(username, "construction", {
+              expenses: JSON.parse(
+                localStorage.getItem(`project_${project.id}_expenses_${username}`) || "[]",
+              ),
+              budget: JSON.parse(
+                localStorage.getItem(`project_${project.id}_budget_${username}`) || '{"sum":0,"dollar":0}',
+              ),
+              initialBudget: JSON.parse(
+                localStorage.getItem(`project_${project.id}_initBudget_${username}`) || '{"sum":0,"dollar":0}',
+              ),
+            }, `project:${project.id}`),
+          ),
+        ]);
       } catch (e) { console.error("Cloud save failed", e); }
     };
     saveCloud();
-  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, cloudLoadComplete]);
+  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, cloudLoadComplete, isAssistant]);
 
   // --- END SYNC LOGIC ---
 
@@ -686,6 +843,77 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     const finalPrevPercent = isOtherPrevWorkPercent
       ? (customPrevWorkPercent && !customPrevWorkPercent.includes('%') ? `${customPrevWorkPercent}%` : customPrevWorkPercent)
       : prevWorkPercent;
+
+    const currentWorker = editMode
+      ? currentWorkers.find((worker) => worker.id === editingWorkerId)
+      : null;
+    if (editMode && currentWorker?.assistantRecordId) {
+      if (isAssistant && currentWorker.createdByEmail !== username) return;
+      const currentWorkerData = { ...currentWorker };
+      delete currentWorkerData.assistantRecordId;
+      delete currentWorkerData.createdByEmail;
+      const assistantWorker = {
+        ...currentWorkerData,
+        id: currentWorker?.id || Date.now(),
+        workerName,
+        amountToReceive,
+        currencyToReceive,
+        dateToGive,
+        amountAlreadyReceived,
+        currencyAlreadyReceived,
+        dateAlreadyReceived,
+        currentWork: finalWork,
+        workPercent: finalPercent,
+        prevWork: finalPrevWork,
+        prevWorkPercent: finalPrevPercent,
+        createdAt: currentWorker?.createdAt || new Date().toISOString(),
+        isPaid: currentWorker?.isPaid || false,
+        history: currentWorker?.history || [],
+        workerCode: "",
+      };
+      try {
+        await updateAssistantRecord(currentWorker.assistantRecordId, "worker", assistantWorker);
+        handleAddWorkerModalClose();
+      } catch (error) {
+        console.error("Failed to update assistant worker record:", error);
+        window.alert(t("assistant_action_failed"));
+      }
+      return;
+    }
+    if (isAssistant) {
+      const assistantWorker = {
+        id: Date.now(),
+        workerName,
+        amountToReceive,
+        currencyToReceive,
+        dateToGive,
+        amountAlreadyReceived,
+        currencyAlreadyReceived,
+        dateAlreadyReceived,
+        currentWork: finalWork,
+        workPercent: finalPercent,
+        prevWork: finalPrevWork,
+        prevWorkPercent: finalPrevPercent,
+        createdAt: new Date().toISOString(),
+        isPaid: false,
+        history: [],
+        workerCode: "",
+      };
+      try {
+        await createAssistantRecord(
+          assistantBossEmail,
+          "workers",
+          workerContextId,
+          "worker",
+          assistantWorker,
+        );
+        handleAddWorkerModalClose();
+      } catch (error) {
+        console.error("Failed to save assistant worker record:", error);
+        window.alert(t("assistant_action_failed"));
+      }
+      return;
+    }
 
     if (editMode) {
       saveForUndo();
@@ -881,8 +1109,26 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
   const confirmDeleteWorker = () => {
     if (deleteWorkerId) {
-      saveForUndo(); // Save state before deletion
-      updateCurrentWorkers(currentWorkers.filter((w) => w.id !== deleteWorkerId));
+      if (isAssistant) {
+        const worker = currentWorkers.find((item) => item.id === deleteWorkerId);
+        if (worker?.assistantRecordId && worker.createdByEmail === username) {
+          deleteAssistantRecord(worker.assistantRecordId).catch((error) => {
+            console.error("Failed to delete assistant worker record:", error);
+            window.alert(t("assistant_action_failed"));
+          });
+        }
+      } else {
+        const worker = currentWorkers.find((item) => item.id === deleteWorkerId);
+        if (worker?.assistantRecordId) {
+          deleteAssistantRecord(worker.assistantRecordId).catch((error) => {
+            console.error("Failed to delete assistant worker record:", error);
+            window.alert(t("assistant_action_failed"));
+          });
+        } else {
+          saveForUndo(); // Save state before deletion
+          updateCurrentWorkers(currentWorkers.filter((w) => w.id !== deleteWorkerId));
+        }
+      }
       setDeleteWorkerId(null);
     }
   };
@@ -943,6 +1189,21 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     if (!worker) return;
 
     const newIsPaid = !worker.isPaid;
+    if (worker.assistantRecordId) {
+      if (!isAssistant || worker.createdByEmail === username) {
+        const payload = { ...worker };
+        delete payload.assistantRecordId;
+        delete payload.createdByEmail;
+        updateAssistantRecord(worker.assistantRecordId, "worker", {
+          ...payload,
+          isPaid: newIsPaid,
+        }).catch((error) => console.error("Failed to update assistant worker record:", error));
+      }
+      return;
+    }
+    if (isAssistant) {
+      return;
+    }
 
     // Update balance: if marking paid, subtract. If unmarking, add back.
     const amount = parseFloat(worker.amountToReceive || 0);
@@ -1299,13 +1560,19 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     }
   };
 
-  const hasBossAccess = localStorage.getItem("role") === "boss"
+  const hasBossAccess = (localStorage.getItem("role") === "boss" || isAssistant)
     && Boolean(username)
     && auth.currentUser?.email?.toLowerCase() === username;
 
   return (
-    <div className="Hisobot">
+    <div className={`Hisobot ${isAssistant ? "assistant-role" : ""}`}>
       {hasBossAccess ? ( <> {/* Left sidebar open button */}
+      {assistantManagerOpen && (
+        <AssistantManager
+          bossEmail={username}
+          onClose={() => setAssistantManagerOpen(false)}
+        />
+      )}
       <button
         className="mobile-menu-btn"
         onClick={() => setIsSidebarOpen(true)}
@@ -1332,7 +1599,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           <div className="leftTop">
             <h1 onClick={() => setIsSidebarOpen(false)}>OfficeReport</h1>
             {/* <p>{username}</p> */}
-            <p>BOSS</p>
+            <p>{isAssistant ? t("assistant_role_label") : "BOSS"}</p>
             {isOffline && (
               <div style={{ color: '#ffa500', fontSize: '10px', marginTop: '5px' }}>
                 ⚠️ {t("Working Offline")}
@@ -1345,12 +1612,19 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               <h3>{t("Kalkulator")}</h3>
             </div>
 
+            {(!isAssistant || assistantSections.includes("workers")) && (
             <div className={`QurilishXarajatlari ${isWorkersExpanded ? "expanded" : ""}`}>
-              <h2 onClick={() => setIsWorkersExpanded(!isWorkersExpanded)}>
+              <h2 onClick={() => {
+                setActiveReportSection("workers");
+                setActiveProjectId(null);
+                setActiveBranchId(null);
+                setActiveWorkerObjectId(null);
+                setIsWorkersExpanded(!isWorkersExpanded);
+              }}>
                 {t("Ishchilar hisoboti") || "Ishchilar hisoboti"} <span>{">"}</span>
               </h2>
               <div className="project-list-container">
-                <h4 onClick={() => { setFileModalType("object"); setIsFileModalOpen(true); }}>+ {t("ob'ekt") || "Ob'ekt"}</h4>
+                {!isAssistant && <h4 onClick={() => { setFileModalType("object"); setIsFileModalOpen(true); }}>+ {t("ob'ekt") || "Ob'ekt"}</h4>}
                 <div className="project-items">
                   <div
                     className={`project-sidebar-item ${activeProjectId === null && activeBranchId === null && activeWorkerObjectId === null ? "active" : ""}`}
@@ -1358,6 +1632,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       setActiveProjectId(null);
                       setActiveBranchId(null);
                       setActiveWorkerObjectId(null);
+                      setActiveReportSection("workers");
                       setIsSidebarOpen(false);
                     }}
                   >
@@ -1371,11 +1646,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         setActiveWorkerObjectId(obj.id);
                         setActiveProjectId(null);
                         setActiveBranchId(null);
+                        setActiveReportSection("workers");
                         setIsSidebarOpen(false);
                       }}
                     >
                       <span className="project-name">{obj.name}</span>
-                      <button
+                      {!isAssistant && <button
                         className="delete-project-btn"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1383,19 +1659,27 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         }}
                       >
                         🗑️
-                      </button>
+                      </button>}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+            )}
 
+            {(!isAssistant || assistantSections.includes("office")) && (
             <div className={`QurilishXarajatlari ${isOfficeExpanded ? "expanded" : ""}`}>
-              <h2 onClick={() => setIsOfficeExpanded(!isOfficeExpanded)}>
+              <h2 onClick={() => {
+                setActiveReportSection("office");
+                setActiveProjectId(null);
+                setActiveBranchId(null);
+                setActiveWorkerObjectId(null);
+                setIsOfficeExpanded(!isOfficeExpanded);
+              }}>
                 {t("o'fisxarajatlari")} <span>{">"}</span>
               </h2>
               <div className="project-list-container">
-                <h4 onClick={() => { setFileModalType("branch"); setIsFileModalOpen(true); }}>+ {t("filial") || "Filial"}</h4>
+                {!isAssistant && <h4 onClick={() => { setFileModalType("branch"); setIsFileModalOpen(true); }}>+ {t("filial") || "Filial"}</h4>}
                 <div className="project-items">
                   {officeBranches.map((branch) => (
                     <div
@@ -1405,11 +1689,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         setActiveBranchId(branch.id);
                         setActiveProjectId(null);
                         setActiveWorkerObjectId(null);
+                        setActiveReportSection("office");
                         setIsSidebarOpen(false);
                       }}
                     >
                       <span className="project-name">{branch.name}</span>
-                      <button
+                      {!isAssistant && <button
                         className="delete-project-btn"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1417,19 +1702,27 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         }}
                       >
                         🗑️
-                      </button>
+                      </button>}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+            )}
 
+            {(!isAssistant || assistantSections.includes("construction")) && (
             <div className={`QurilishXarajatlari ${isConstructionExpanded ? "expanded" : ""}`}>
-              <h2 onClick={() => setIsConstructionExpanded(!isConstructionExpanded)}>
+              <h2 onClick={() => {
+                setActiveReportSection("construction");
+                setActiveProjectId(null);
+                setActiveBranchId(null);
+                setActiveWorkerObjectId(null);
+                setIsConstructionExpanded(!isConstructionExpanded);
+              }}>
                 {t("qurilishxarajatlari")} <span>{">"}</span>
               </h2>
               <div className="project-list-container">
-                <h4 onClick={() => { setFileModalType("project"); setIsFileModalOpen(true); }}>+ Fayl</h4>
+                {!isAssistant && <h4 onClick={() => { setFileModalType("project"); setIsFileModalOpen(true); }}>+ Fayl</h4>}
                 <div className="project-items">
                   {projectFiles.map((project) => (
                     <div
@@ -1439,11 +1732,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         setActiveProjectId(project.id);
                         setActiveBranchId(null);
                         setActiveWorkerObjectId(null);
+                        setActiveReportSection("construction");
                         setIsSidebarOpen(false);
                       }}
                     >
                       <span className="project-name">{project.name}</span>
-                      <button
+                      {!isAssistant && <button
                         className="delete-project-btn"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1451,14 +1745,37 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         }}
                       >
                         🗑️
-                      </button>
+                      </button>}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+            )}
 
-            <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "25px" }}>
+            {!isAssistant && <button
+              type="button"
+              className="assistant-manage-button"
+              onClick={() => setAssistantManagerOpen(true)}
+            >
+              {t("assistant_manage_button")}
+            </button>}
+            {!isAssistant && (
+              <button
+                type="button"
+                className="assistant-export-button"
+                onClick={handleExportCurrentPage}
+                disabled={
+                  activeProjectId !== null || activeBranchId !== null
+                    ? !pageExporterReady
+                    : !cloudLoadComplete
+                }
+              >
+                {t("report_export_button")}
+              </button>
+            )}
+
+            {!isAssistant && <div className="global-email-section" style={{ padding: "10px 0", marginBottom: "25px" }}>
               <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>{t("global_worker_email") || "Ishchilar uchun umumiy email"}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 
@@ -1519,7 +1836,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   {t("saqlash") || "Saqlash"}
                 </button>
               </div>
-            </div>
+            </div>}
           </div>
           <div className="leftBottom">
             <div className="logout-btn-container" onClick={() => setLogoutDialog(true)}>
@@ -1565,23 +1882,39 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         <ProjectReport
           projectId={activeProjectId}
           projectName={projectFiles.find(p => p.id === activeProjectId)?.name}
+          bossEmail={isAssistant ? assistantBossEmail : username}
+          dollarRate={dollarRate}
+          readOnly={isAssistant}
+          onRegisterExport={!isAssistant ? registerPageExporter : undefined}
           onBack={() => setActiveProjectId(null)}
         />
       ) : activeBranchId !== null ? ( 
         <BranchReport
           branchId={activeBranchId}
           branchName={officeBranches.find(b => b.id === activeBranchId)?.name}
+          bossEmail={isAssistant ? assistantBossEmail : username}
+          dollarRate={dollarRate}
+          readOnly={isAssistant}
+          onRegisterExport={!isAssistant ? registerPageExporter : undefined}
           onBack={() => setActiveBranchId(null)}
         />
+      ) : isAssistant && activeReportSection !== "workers" ? (
+        <div className="HisobotRight assistant-section-placeholder">
+          <p>{t("assistant_choose_branch_or_project")}</p>
+        </div>
       ) : (
         <div className="HisobotRight">
           <div className="rightTop">
+            {(!isAssistant || assistantSections.includes("workers")) && (
             <h3 className="addH3" onClick={handleAddWorkerClick}>
               + {t("qo'shish")}
             </h3>
+            )}
+            {!isAssistant && (
             <h3 className="addH3" onClick={handleBalansClick}>
               + {t("balans")}
             </h3>
+            )}
             <div className="ql">
               <div className="qoshishLine"></div>
             </div>
@@ -1678,6 +2011,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               return (
                 <div className="worker-list">
                   {filtered.map((worker) => {
+                    const canManageWorker = !isAssistant || (
+                      worker.assistantRecordId && worker.createdByEmail === username
+                    );
                     const toReceiveAmount = parseAmount(worker.amountToReceive);
                     const receivedAmount = parseAmount(worker.amountAlreadyReceived);
                     const toReceiveDisplay =
@@ -1697,7 +2033,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                     <div
                       key={worker.id}
                       className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}
-                      onClick={() => handleOpenDetail(worker)}
+                      onClick={isAssistant || worker.assistantRecordId ? undefined : () => handleOpenDetail(worker)}
                     >
                       <div className="worker-item-main">
                         <div className="worker-info">
@@ -1707,8 +2043,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                             checked={worker.isPaid}
                             onChange={() => handleTogglePaid(worker.id)}
                             onClick={(e) => e.stopPropagation()}
+                            disabled={!canManageWorker}
                           />
                           <div className="name-date">
+                            {worker.createdByEmail && (
+                              <small className="assistant-author-label">{worker.createdByEmail}</small>
+                            )}
                             <h3 style={{ display: 'flex', alignItems: 'center' }}>
                               {worker.workerName}
                               <span style={{ fontSize: "14px", marginLeft: "10px", lineHeight: 1 }} title={worker.workerCode ? "Has Access Code" : "No Access Code"}>
@@ -1745,7 +2085,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         </div>
 
                         <div className="worker-actions">
-                          <>
+                          {!isAssistant && !worker.assistantRecordId && <>
                               <button
                                 className="month-btn"
                                 onClick={(e) => {
@@ -1775,8 +2115,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                               >
                                 📜
                               </button>
-                          </>
-                          <button
+                          </>}
+                          {canManageWorker && <button
                             className="edit-btn"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1785,8 +2125,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                             title={t("tahrirlash") || "Tahrirlash"}
                           >
                             ✏️
-                          </button>
-                          <button
+                          </button>}
+                          {canManageWorker && <button
                             className="delete-btn"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1795,7 +2135,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                             title={t("o'chirish") || "O'chirish"}
                           >
                             🗑️
-                          </button>
+                          </button>}
                         </div>
                       </div>
 

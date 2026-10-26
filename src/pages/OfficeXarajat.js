@@ -30,6 +30,7 @@ function OfficeXarajat() {
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceCurrency, setBalanceCurrency] = useState("sum");
   const [balanceMode, setBalanceMode] = useState("add");
+  const [balanceError, setBalanceError] = useState("");
 
   // Persistence States
   const [expenses, setExpenses] = useState([]);
@@ -279,6 +280,7 @@ function OfficeXarajat() {
     setBalanceAmount("");
     setBalanceCurrency("sum");
     setBalanceMode("add");
+    setBalanceError("");
     setMiniCalcOpen(false);
     setCalcDisplay("0");
     setCalcPrevious(null);
@@ -509,13 +511,14 @@ function OfficeXarajat() {
 
   const handleBalansClick = () => {
     setBalanceMode("add");
+    setBalanceError("");
     setBalansQoshish(true);
   };
 
   const handleAddBalans = () => {
-    saveForUndo();
     const addAmount = parseFloat(balanceAmount || 0);
-    if (!addAmount || isNaN(addAmount)) return;
+    if (!Number.isFinite(addAmount) || addAmount <= 0) return;
+    saveForUndo();
 
     setInitialBalance((prev) => ({
       ...prev,
@@ -531,8 +534,9 @@ function OfficeXarajat() {
   };
 
   const handleUpdateBalans = () => {
-    saveForUndo();
     const newAmount = parseFloat(balanceAmount || 0);
+    if (!Number.isFinite(newAmount) || newAmount < 0) return;
+    saveForUndo();
 
     const totalSpent = expenses.reduce((acc, curr) => {
       if (curr.currencyToPay !== balanceCurrency) return acc;
@@ -563,6 +567,22 @@ function OfficeXarajat() {
       [balanceCurrency]: newAmount - totalSpent,
     }));
 
+    handleBalansModalClose();
+  };
+
+  const handleSubtractBalans = () => {
+    const subtractAmount = Number(balanceAmount);
+    const currentBalance = Number(totalBalance[balanceCurrency]) || 0;
+    if (!Number.isFinite(subtractAmount) || subtractAmount <= 0) return;
+    if (subtractAmount > currentBalance) {
+      setBalanceError(t("balance_insufficient") || "Insufficient balance.");
+      return;
+    }
+    saveForUndo();
+    setTotalBalance((prev) => ({
+      ...prev,
+      [balanceCurrency]: (Number(prev[balanceCurrency]) || 0) - subtractAmount,
+    }));
     handleBalansModalClose();
   };
 
@@ -1485,12 +1505,16 @@ function OfficeXarajat() {
                 <h2>
                   {balanceMode === "add"
                     ? (t("balans_qoshish_tab") || "Balansga qo'shish")
-                    : (t("balansyangilash") || "Balansni yangilash")}
+                    : balanceMode === "subtract"
+                      ? (t("balans_ayirish_tab") || "Balansdan ayirish")
+                      : (t("balansyangilash") || "Balansni yangilash")}
                 </h2>
                 <p style={{ fontSize: "13px", color: "rgb(146,151,223)", marginTop: "4px" }}>
                   {balanceMode === "add"
                     ? (t("balans_qoshish_desc") || "Mavjud balans miqdoriga qo'shish")
-                    : (t("yangibalansmiqdorinikiriting") || "Yangi balans miqdorini kiriting")}
+                    : balanceMode === "subtract"
+                      ? (t("balans_ayirish_desc") || "Joriy balansdan summa ayirish")
+                      : (t("yangibalansmiqdorinikiriting") || "Yangi balans miqdorini kiriting")}
                 </p>
               </div>
               <button className="close-btn" onClick={handleBalansModalClose}>
@@ -1498,19 +1522,26 @@ function OfficeXarajat() {
               </button>
             </div>
             <div className="modal-body">
-              {/* TABS FOR ADD / UPDATE */}
+              {/* Balance operations */}
               <div className="balance-tabs-container">
                 <button
                   type="button"
                   className={`balance-tab ${balanceMode === "add" ? "active tab-add" : ""}`}
-                  onClick={() => setBalanceMode("add")}
+                  onClick={() => { setBalanceMode("add"); setBalanceError(""); }}
                 >
                   ➕ {t("balans_qoshish_tab") || "Balansga qo'shish"}
                 </button>
                 <button
                   type="button"
+                  className={`balance-tab ${balanceMode === "subtract" ? "active tab-subtract" : ""}`}
+                  onClick={() => { setBalanceMode("subtract"); setBalanceError(""); }}
+                >
+                  ➖ {t("balans_ayirish_tab") || "Balansdan ayirish"}
+                </button>
+                <button
+                  type="button"
                   className={`balance-tab ${balanceMode === "update" ? "active" : ""}`}
-                  onClick={() => setBalanceMode("update")}
+                  onClick={() => { setBalanceMode("update"); setBalanceError(""); }}
                 >
                   🔄 {t("balans_yangilash_tab") || "Balansni yangilash"}
                 </button>
@@ -1538,13 +1569,16 @@ function OfficeXarajat() {
                   <label>
                     {balanceMode === "add"
                       ? (t("qoshiladigan_miqdor") || "Qo'shiladigan miqdor")
-                      : (t("balansmiqdori") || "Balans miqdori")}
+                      : balanceMode === "subtract"
+                        ? (t("ayiriladigan_miqdor") || "Ayiriladigan miqdor")
+                        : (t("balansmiqdori") || "Balans miqdori")}
                   </label>
                   <div className="input-wrapper">
                     <input
                       type="number"
+                      min="0"
                       value={balanceAmount}
-                      onChange={(e) => setBalanceAmount(e.target.value)}
+                      onChange={(e) => { setBalanceAmount(e.target.value); setBalanceError(""); }}
                       placeholder="0"
                       autoFocus
                     />
@@ -1560,7 +1594,7 @@ function OfficeXarajat() {
                   <label>{t("valyuta")}</label>
                   <select
                     value={balanceCurrency}
-                    onChange={(e) => setBalanceCurrency(e.target.value)}
+                    onChange={(e) => { setBalanceCurrency(e.target.value); setBalanceError(""); }}
                     className="modal-select"
                   >
                     <option value="sum">{t("som")}</option>
@@ -1585,6 +1619,15 @@ function OfficeXarajat() {
                     </strong>
                   </div>
                 )}
+                {parseFloat(balanceAmount) > 0 && balanceMode === "subtract" && (
+                  <div className="balance-preview-box preview-subtract">
+                    <span>{t("yangi_qolgan_balans") || "Yangi qolgan balans"}:</span>
+                    <strong>
+                      {((parseFloat(totalBalance[balanceCurrency]) || 0) - parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                    </strong>
+                  </div>
+                )}
+                {balanceError && <p className="balance-error" role="alert">{balanceError}</p>}
               </div>
             </div>
             <div className="modal-footer">
@@ -1592,17 +1635,23 @@ function OfficeXarajat() {
                 {t("bekorqilish")}
               </button>
               <button
-                className={`btn ${balanceMode === "add" ? "add" : "update"} ${!balanceAmount ? "disabled" : ""}`}
+                className={`btn ${balanceMode === "add" ? "add" : balanceMode === "subtract" ? "subtract" : "update"} ${!balanceAmount || !Number.isFinite(Number(balanceAmount)) || (balanceMode !== "update" && Number(balanceAmount) <= 0) ? "disabled" : ""}`}
                 onClick={
                   balanceAmount
-                    ? (balanceMode === "add" ? handleAddBalans : handleUpdateBalans)
+                    ? (balanceMode === "add"
+                      ? handleAddBalans
+                      : balanceMode === "subtract"
+                        ? handleSubtractBalans
+                        : handleUpdateBalans)
                     : null
                 }
-                disabled={!balanceAmount}
+                disabled={!balanceAmount || !Number.isFinite(Number(balanceAmount)) || (balanceMode !== "update" && Number(balanceAmount) <= 0)}
               >
                 {balanceMode === "add"
                   ? (t("qoshish_btn") || "Qo'shish")
-                  : (t("yangilash") || "Yangilash")}
+                  : balanceMode === "subtract"
+                    ? (t("balans_ayirish_tab") || "Balansdan ayirish")
+                    : (t("yangilash") || "Yangilash")}
               </button>
             </div>
           </div>
