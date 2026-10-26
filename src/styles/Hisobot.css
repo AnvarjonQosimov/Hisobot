@@ -1518,14 +1518,14 @@
     border-right: none;
     border-radius: 10px 10px 0 0 !important;
     color: rgb(204, 194, 255);
-    padding: 14px 8px;
-    font-size: 18px;
+    padding: 15px 11px;
+    font-size: 19px;
     backdrop-filter: blur(5px);
     writing-mode: vertical-rl;
     letter-spacing: 2px;
     line-height: 1;
     rotate: -90deg;
-    margin-right: -16px;
+    margin-right: -10px;
 }
 
 .right-panel-close-btn {
