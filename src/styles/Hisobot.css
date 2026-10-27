@@ -963,7 +963,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999;
+  z-index: 10000;
 }
 
 /* Container */
@@ -979,6 +979,8 @@
   animation: modalFade 0.25s ease;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
+  z-index: 1005 !important;
+  position: absolute !important;
 }
 
 /* Header */
@@ -2324,6 +2326,7 @@
 /* Export Modal Styles */
 .export-modal {
   max-width: 520px;
+  display: flex;
 }
 
 .export-options-grid {
