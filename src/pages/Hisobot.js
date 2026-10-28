@@ -690,16 +690,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     if (!username || !cloudLoadComplete || isAssistant) return;
     
     // Preserve display preferences even when this cabinet has no report data yet.
-    // const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0 && balanceTransactions.length === 0 && deletedBalanceTransactions.length === 0;
-    const isTotallyEmpty =
-  workers.length === 0 &&
-  workerObjects.length === 0 &&
-  officeBranches.length === 0 &&
-  totalBalance.sum === 0 &&
-  totalBalance.dollar === 0 &&
-  projectFiles.length === 0 &&
-  balanceTransactions.length === 0 &&
-  deletedBalanceTransactions.length === 0;
+    const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0 && balanceTransactions.length === 0 && deletedBalanceTransactions.length === 0;
 
     // Cloud Sync
     const saveCloud = async () => {
