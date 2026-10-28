@@ -653,12 +653,34 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             return { ...object, workers: workers.map(createWorkerObjectCopy) };
           }
 
-          const migratedWorkers = object.workers.map((objectWorker) => {
-            const sourceWorker = workers.find((worker) => worker.id === objectWorker.id);
-            if (!sourceWorker || !isEmptyWorkerObjectCopy(objectWorker)) return objectWorker;
-            hasLegacyObjects = true;
-            return createWorkerObjectCopy(sourceWorker);
-          });
+          // const migratedWorkers = object.workers.map((objectWorker) => {
+          //   const sourceWorker = workers.find((worker) => worker.id === objectWorker.id);
+          //   if (!sourceWorker || !isEmptyWorkerObjectCopy(objectWorker)) return objectWorker;
+          //   hasLegacyObjects = true;
+          //   return createWorkerObjectCopy(sourceWorker);
+          // });
+        
+const migratedWorkers = object.workers.map((objectWorker) => {
+  const sourceWorker = workers.find(
+    (worker) => worker.id === objectWorker.id
+  );
+
+  if (!sourceWorker || !isEmptyWorkerObjectCopy(objectWorker)) {
+    return objectWorker;
+  }
+
+  const migratedWorker = createWorkerObjectCopy(sourceWorker);
+
+  if (
+    JSON.stringify(migratedWorker) === JSON.stringify(objectWorker)
+  ) {
+    return objectWorker;
+  }
+
+  hasLegacyObjects = true;
+  return migratedWorker;
+});
+
 
           return migratedWorkers.some((worker, index) => worker !== object.workers[index])
             ? { ...object, workers: migratedWorkers }
