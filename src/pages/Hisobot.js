@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import "../styles/Hisobot.css";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
@@ -256,6 +256,13 @@ function Hisobot() {
     currency === "sum" ? amount : amount * dollarRate;
   const convertToDollar = (amount, currency) =>
     currency === "dollar" ? amount : dollarRate > 0 ? amount / dollarRate : 0;
+  // Returns the workerObject name that contains the given workerId, or null
+  const getWorkerObjectName = (workerId) => {
+    const obj = workerObjects.find((o) =>
+      Array.isArray(o.workers) && o.workers.some((w) => w.id === workerId)
+    );
+    return obj ? obj.name : null;
+  };
 
   const getWorkerSummary = (workersList) => {
     const list = Array.isArray(workersList) ? workersList : [];
@@ -2077,6 +2084,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                               <strong>
                                 {worker.currentWork || t("yo'q")} ({worker.workPercent || "0%"})
                               </strong>
+                              {(() => { const objName = getWorkerObjectName(worker.id); return objName ? <small style={{ display: 'block', fontWeight: '400', fontSize: '11px', color: 'rgba(146,151,223,0.85)', marginTop: '2px' }}>{objName}</small> : null; })()}
                             </div>
                             <div className="val-group">
                               <p>{t("olishikerak")}:</p>
@@ -2866,7 +2874,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 {/* PREVIEW OF STANDING SUM + ADDED AMOUNT */}
                 {parseFloat(balanceAmount) > 0 && balanceMode === "add" && (
                   <div className="balance-preview-box">
-                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <span>{t("yangi_boshlangich_balans") || "Yangi Umumiy olingan summa"}:</span>
                     <strong>
                       {((parseFloat(initialBalance[balanceCurrency]) || 0) + parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
                     </strong>
@@ -2874,7 +2882,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 )}
                 {parseFloat(balanceAmount) > 0 && balanceMode === "subtract" && (
                   <div className="balance-preview-box preview-subtract">
-                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <span>{t("yangi_boshlangich_balans") || "Yangi Umumiy olingan summa"}:</span>
                     <strong>
                       {((parseFloat(initialBalance[balanceCurrency]) || 0) - parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
                     </strong>
@@ -2882,7 +2890,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 )}
                 {parseFloat(balanceAmount) > 0 && balanceMode === "update" && (
                   <div className="balance-preview-box preview-update">
-                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <span>{t("yangi_boshlangich_balans") || "Yangi Umumiy olingan summa"}:</span>
                     <strong>
                       {parseFloat(balanceAmount).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
                     </strong>
@@ -3516,6 +3524,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   <div className="work-field">
                     <label>{t("qilayotganishi")}:</label>
                     <span style={{ color: "#fff", fontWeight: "600" }}>{selectedWorker.currentWork || t("yo'q")}</span>
+                    {(() => { const objName = getWorkerObjectName(selectedWorker.id); return objName ? <small style={{ display: 'block', fontWeight: '400', fontSize: '11px', color: 'rgba(146,151,223,0.85)', marginTop: '2px' }}>{objName}</small> : null; })()}
                   </div>
                   <div className="work-field">
                     <label>{t("qilinayotganishfoizi")}:</label>

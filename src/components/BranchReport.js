@@ -437,7 +437,7 @@ function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, rea
             <p>{unpaidAmount("sum").toLocaleString()} {t("som")} / {unpaidAmount("dollar").toLocaleString()} $</p>
           </div>
           <div className="statistic1">
-            <h3>{t("Boshlang'ich balans")}:</h3>
+            <h3>{t("Umumiy olingan summa")}:</h3>
             <p>{initialBudget.sum.toLocaleString()} {t("som")} / {initialBudget.dollar.toLocaleString()} $</p>
           </div>
         </div>

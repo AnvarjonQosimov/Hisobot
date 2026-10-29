@@ -717,7 +717,7 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
 
             {/* Initial budget */}
             <div className="statistic1">
-              <h3>{t("Boshlang'ich balans")}:</h3>
+              <h3>{t("Umumiy olingan summa")}:</h3>
               <p>{initialBudget.sum.toLocaleString()} {t("som")} / {initialBudget.dollar.toLocaleString()} $</p>
             </div>
 

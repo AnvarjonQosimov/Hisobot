@@ -1302,7 +1302,7 @@ function OfficeXarajat() {
             <div className="statistic">
               <h2>{t("statistika")}</h2>
               <div className="statistic1">
-                <h3>{t("Boshlang'ich balans")}:</h3>
+                <h3>{t("Umumiy olingan summa")}:</h3>
                 <p>
                   {initialBalance.sum.toLocaleString()} so'm /{" "}
                   {initialBalance.dollar.toLocaleString()} $
@@ -1696,7 +1696,7 @@ function OfficeXarajat() {
                 {/* PREVIEW OF STANDING SUM + ADDED AMOUNT */}
                 {parseFloat(balanceAmount) > 0 && balanceMode === "add" && (
                   <div className="balance-preview-box">
-                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <span>{t("yangi_boshlangich_balans") || "Yangi Umumiy olingan summa"}:</span>
                     <strong>
                       {((parseFloat(initialBalance[balanceCurrency]) || 0) + parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
                     </strong>
@@ -1704,7 +1704,7 @@ function OfficeXarajat() {
                 )}
                 {parseFloat(balanceAmount) > 0 && balanceMode === "update" && (
                   <div className="balance-preview-box preview-update">
-                    <span>{t("yangi_boshlangich_balans") || "Yangi boshlang'ich balans"}:</span>
+                    <span>{t("yangi_boshlangich_balans") || "Yangi Umumiy olingan summa"}:</span>
                     <strong>
                       {parseFloat(balanceAmount).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
                     </strong>
