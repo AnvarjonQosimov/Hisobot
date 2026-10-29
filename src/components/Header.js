@@ -26,6 +26,10 @@ function Header() {
     setBurgerOpen(false);
   };
 
+  if (location.pathname === "/hisobot") {
+    return null;
+  }
+
   if (isDashboard) {
     return (
       <div className="dashboard-language-switcher">

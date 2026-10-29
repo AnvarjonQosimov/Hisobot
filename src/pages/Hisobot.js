@@ -2160,7 +2160,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                               <div key={idx} className="history-item">
                                 <span>{h.date}</span>
                                 <span>
-                                  {h.amount} {h.currency === "sum" ? "so'm" : "$"}
+                                  {h.amount}{h.currency === "sum" ? "so'm" : "$"}
                                 </span>
                                 <span className="h-type">
                                   {h.type === "archived"
