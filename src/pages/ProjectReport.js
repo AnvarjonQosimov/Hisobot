@@ -143,13 +143,16 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
 
   useEffect(() => {
     if (!username || readOnly || loadedProjectId !== projectId) return;
-    saveBossSectionSnapshot(bossEmail || username, "construction", {
-      expenses,
-      budget,
-      initialBudget,
-    }, `project:${projectId}`).catch((saveError) => {
-      console.error("Failed to publish construction report snapshot:", saveError);
-    });
+    const timer = setTimeout(() => {
+      saveBossSectionSnapshot(bossEmail || username, "construction", {
+        expenses,
+        budget,
+        initialBudget,
+      }, `project:${projectId}`).catch((saveError) => {
+        console.error("Failed to publish construction report snapshot:", saveError);
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [username, readOnly, loadedProjectId, projectId, bossEmail, expenses, budget, initialBudget]);
 
   // Computed stats

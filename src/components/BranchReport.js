@@ -100,13 +100,16 @@ function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, rea
     localStorage.setItem(expKey, JSON.stringify(expenses));
     localStorage.setItem(budgetKey, JSON.stringify(budget));
     localStorage.setItem(initBudgetKey, JSON.stringify(initialBudget));
-    saveBossSectionSnapshot(bossEmail || username, "office", {
-      expenses,
-      budget,
-      initialBudget,
-    }, `branch:${branchId}`).catch((saveError) => {
-      console.error("Failed to publish branch report snapshot:", saveError);
-    });
+    const timer = setTimeout(() => {
+      saveBossSectionSnapshot(bossEmail || username, "office", {
+        expenses,
+        budget,
+        initialBudget,
+      }, `branch:${branchId}`).catch((saveError) => {
+        console.error("Failed to publish branch report snapshot:", saveError);
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [expenses, budget, initialBudget, username, dataLoaded, readOnly, bossEmail, branchId, loadedBranchId, expKey, budgetKey, initBudgetKey]);
 
   useEffect(() => {

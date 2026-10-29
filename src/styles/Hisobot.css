@@ -2,10 +2,12 @@
     min-height: 100vh;
     width: 100%;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    z-index: 9999;
-    position: absolute;
+    z-index: 1;
+    position: relative;
+    top: 0;
+    left: 0;
     background:
         radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 30%),
         linear-gradient(135deg, #020617 0%, #111827 45%, #0f172a 100%);
@@ -1802,9 +1804,9 @@
     .rightTop {
         margin: 0;
         height: auto;
-        padding: 20px 15px;
+        padding: 15px 15px 15px 60px;
         flex-wrap: wrap;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 10px;
     }
 
@@ -1842,7 +1844,8 @@
 @media (max-width: 480px) {
     .rightTop {
         gap: 8px;
-        padding: 15px 10px;
+        padding: 12px 10px 12px 55px;
+        justify-content: flex-start;
     }
 
     .addH3 {

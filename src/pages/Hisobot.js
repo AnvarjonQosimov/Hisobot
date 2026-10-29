@@ -40,18 +40,16 @@ const createWorkerObjectCopy = (worker) => ({
     : [],
 });
 
-const isEmptyWorkerObjectCopy = (worker) =>
-  !worker.amountToReceive &&
-  !worker.dateToGive &&
-  !worker.amountAlreadyReceived &&
-  !worker.dateAlreadyReceived &&
-  !worker.currentWork &&
-  !worker.workPercent &&
-  !worker.prevWork &&
-  !worker.prevWorkPercent &&
-  !worker.workerCode &&
-  !worker.isPaid &&
-  (!Array.isArray(worker.history) || worker.history.length === 0);
+const normalizeWorkerObjects = (rawObjects, currentWorkersList = []) => {
+  if (!Array.isArray(rawObjects)) return [];
+  const baseWorkers = Array.isArray(currentWorkersList) ? currentWorkersList : [];
+  return rawObjects.map((obj) => ({
+    ...obj,
+    workers: Array.isArray(obj.workers)
+      ? obj.workers
+      : baseWorkers.map(createWorkerObjectCopy),
+  }));
+};
 
 function Hisobot() {
   const navigate = useNavigate();
@@ -182,6 +180,7 @@ function Hisobot() {
   const [emailError, setEmailError] = useState("");
   const [syncStatus, setSyncStatus] = useState("synced"); // synced, syncing, offline
   const [cloudLoadComplete, setCloudLoadComplete] = useState(false);
+  const isInitialCloudLoadRef = useRef(true);
 
   // Language State
   const [age, setAge] = useState(i18n.language || "uz");
@@ -575,7 +574,13 @@ function Hisobot() {
     const sob = localStorage.getItem(`officeBranches_${storedUsername}`);
     if (sob) setOfficeBranches(JSON.parse(sob));
     const swo = localStorage.getItem(`workerObjects_${storedUsername}`);
-    if (swo) setWorkerObjects(JSON.parse(swo));
+    if (swo) {
+      try {
+        const parsed = JSON.parse(swo);
+        const localWorkers = sw ? JSON.parse(sw) : [];
+        setWorkerObjects(normalizeWorkerObjects(parsed, localWorkers));
+      } catch (_) {}
+    }
     const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
 if (sge) { setGlobalWorkerEmail(sge); setSavedGlobalWorkerEmail(sge); }
 const scdm = localStorage.getItem(`currencyDisplayMode_${storedUsername}`);
@@ -603,7 +608,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               if (data.initialBalance) setInitialBalance(data.initialBalance);
               if (Array.isArray(data.balanceTransactions)) setBalanceTransactions(data.balanceTransactions);
               if (Array.isArray(data.deletedBalanceTransactions)) setDeletedBalanceTransactions(data.deletedBalanceTransactions);
-              if (Array.isArray(data.workerObjects)) setWorkerObjects(data.workerObjects);
+              if (Array.isArray(data.workerObjects)) setWorkerObjects(normalizeWorkerObjects(data.workerObjects, data.workers || []));
             } else if (section === "office" && Array.isArray(data.officeBranches)) {
               setOfficeBranches(data.officeBranches);
             } else if (section === "construction" && Array.isArray(data.projectFiles)) {
@@ -626,7 +631,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             setSavedGlobalWorkerEmail(d.globalWorkerEmail); 
           }
           if (d.officeBranches?.length) setOfficeBranches(d.officeBranches);
-          if (d.workerObjects?.length) setWorkerObjects(d.workerObjects);
+          if (d.workerObjects?.length) setWorkerObjects(normalizeWorkerObjects(d.workerObjects, d.workers || []));
           if (["combined", "sum", "dollar"].includes(d.currencyDisplayMode)) {
             setCurrencyDisplayMode(d.currencyDisplayMode);
           }
@@ -642,32 +647,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     loadCloud();
   }, [navigate, isAssistant, assistantBossEmail, assistantSections]);
 
-  useEffect(() => {
-    if (!cloudLoadComplete) return;
-
-    setWorkerObjects((currentObjects) => {
-      let hasLegacyObjects = false;
-      const migratedObjects = currentObjects.map((object) => {
-          if (!Array.isArray(object.workers)) {
-            hasLegacyObjects = true;
-            return { ...object, workers: workers.map(createWorkerObjectCopy) };
-          }
-
-          const migratedWorkers = object.workers.map((objectWorker) => {
-            const sourceWorker = workers.find((worker) => worker.id === objectWorker.id);
-            if (!sourceWorker || !isEmptyWorkerObjectCopy(objectWorker)) return objectWorker;
-            hasLegacyObjects = true;
-            return createWorkerObjectCopy(sourceWorker);
-          });
-
-          return migratedWorkers.some((worker, index) => worker !== object.workers[index])
-            ? { ...object, workers: migratedWorkers }
-            : object;
-        });
-
-      return hasLegacyObjects ? migratedObjects : currentObjects;
-    });
-  }, [cloudLoadComplete, workers, workerObjects]);
+  // Legacy workerObjects migration now handled on initial load
 
   // 1. Local Save Effect (Immediate)
   useEffect(() => {
@@ -685,17 +665,21 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   localStorage.setItem(`dollarRate_${username}`, JSON.stringify(dollarRate));
   }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, dollarRate, cloudLoadComplete, isAssistant]);
 
-  // 2. Cloud Save Effect (Synced)
+  // 2. Cloud Save Effect (Synced & Debounced)
   useEffect(() => {
     if (!username || !cloudLoadComplete || isAssistant) return;
     
-    // Preserve display preferences even when this cabinet has no report data yet.
+    // Skip saving immediately upon initial cloud load
+    if (isInitialCloudLoadRef.current) {
+      isInitialCloudLoadRef.current = false;
+      return;
+    }
+
     const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0 && balanceTransactions.length === 0 && deletedBalanceTransactions.length === 0;
 
-    // Cloud Sync
-    const saveCloud = async () => {
+    const timer = setTimeout(async () => {
       try {
-        console.log("Syncing to cloud...");
+        console.log("Debounced syncing to cloud...");
         if (isTotallyEmpty) {
           await saveBossCabinet(username, { currencyDisplayMode, workers });
         } else {
@@ -714,36 +698,14 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           }),
           saveBossSectionSnapshot(username, "office", { officeBranches }),
           saveBossSectionSnapshot(username, "construction", { projectFiles }),
-          ...officeBranches.map((branch) =>
-            saveBossSectionSnapshot(username, "office", {
-              expenses: JSON.parse(
-                localStorage.getItem(`branch_${branch.id}_expenses_${username}`) || "[]",
-              ),
-              budget: JSON.parse(
-                localStorage.getItem(`branch_${branch.id}_budget_${username}`) || '{"sum":0,"dollar":0}',
-              ),
-              initialBudget: JSON.parse(
-                localStorage.getItem(`branch_${branch.id}_initBudget_${username}`) || '{"sum":0,"dollar":0}',
-              ),
-            }, `branch:${branch.id}`),
-          ),
-          ...projectFiles.map((project) =>
-            saveBossSectionSnapshot(username, "construction", {
-              expenses: JSON.parse(
-                localStorage.getItem(`project_${project.id}_expenses_${username}`) || "[]",
-              ),
-              budget: JSON.parse(
-                localStorage.getItem(`project_${project.id}_budget_${username}`) || '{"sum":0,"dollar":0}',
-              ),
-              initialBudget: JSON.parse(
-                localStorage.getItem(`project_${project.id}_initBudget_${username}`) || '{"sum":0,"dollar":0}',
-              ),
-            }, `project:${project.id}`),
-          ),
         ]);
-      } catch (e) { console.error("Cloud save failed", e); }
-    };
-    saveCloud();
+        console.log("Cloud sync successful");
+      } catch (e) {
+        console.error("Cloud save failed", e);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
   }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, cloudLoadComplete, isAssistant]);
 
   // --- END SYNC LOGIC ---

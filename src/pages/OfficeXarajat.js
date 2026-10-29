@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "../styles/OfficeXarajat.css";
 import "../styles/ProjectReport.css";
 import { useTranslation } from "react-i18next";
@@ -81,6 +81,7 @@ function OfficeXarajat() {
 
   const [isOffline, setIsOffline] = useState(!window.navigator.onLine);
   const [cloudLoadComplete, setCloudLoadComplete] = useState(false);
+  const isInitialCloudLoadRef = useRef(true);
   const [globalWorkerEmail, setGlobalWorkerEmail] = useState("");
   const [savedGlobalWorkerEmail, setSavedGlobalWorkerEmail] = useState("");
   const [emailError, setEmailError] = useState(false);
@@ -186,27 +187,32 @@ function OfficeXarajat() {
     localStorage.setItem(`globalEmail_${username}`, globalWorkerEmail);
   }, [expenses, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail, cloudLoadComplete]);
 
-  // 2. Cloud Save Effect (Synced)
+  // 2. Cloud Save Effect (Synced & Debounced)
   useEffect(() => {
     if (!username || !cloudLoadComplete) return;
     
-    // Safety: Don't save if everything is empty and we just started
+    // Skip saving immediately upon initial cloud load
+    if (isInitialCloudLoadRef.current) {
+      isInitialCloudLoadRef.current = false;
+      return;
+    }
+
     const isTotallyEmpty = expenses.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0;
     if (isTotallyEmpty) {
        console.log("Skipping empty office save...");
        return;
     }
 
-    // Cloud Sync
-    const save = async () => {
+    const timer = setTimeout(async () => {
       try {
-        console.log("Syncing office data to cloud...");
+        console.log("Debounced syncing office data to cloud...");
         await saveBossCabinet(username, {
           officeExpenses: expenses, officeTotalBalance: totalBalance, officeInitialBalance: initialBalance, projectFiles: projectFiles, globalWorkerEmail
         });
       } catch (e) { console.error("Office sync failed", e); }
-    };
-    save();
+    }, 2500);
+
+    return () => clearTimeout(timer);
   }, [expenses, totalBalance, initialBalance, projectFiles, username, globalWorkerEmail, cloudLoadComplete]);
 
   // --- END SYNC LOGIC ---
