@@ -31,6 +31,22 @@ body {
   overflow-x: hidden;
 }
 
+.modal-overlay,
+.pr-overlay,
+.assistant-overlay,
+.assistant-edit-overlay {
+  z-index: 2147483000 !important;
+}
+
+.confirm-overlay,
+.pr-confirm-overlay,
+.assistant-confirm-overlay,
+.admin-confirm-overlay,
+.calc-confirm-overlay {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Outfit', sans-serif;
 }

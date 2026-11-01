@@ -1259,8 +1259,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     setNewProjectConfirmId(null);
   };
 
-  const handleDeleteHistoryProject = (workerId, index) => {
-    setDeleteHistoryData({ workerId, index });
+  const handleDeleteHistoryProject = (workerId, index, objectId = null) => {
+    setDeleteHistoryData({ workerId, index, objectId });
   };
 
   const handleEditWorkerClick = (worker) => {
@@ -1371,26 +1371,45 @@ if (sdr) setDollarRate(JSON.parse(sdr));
   const confirmDeleteHistory = () => {
     if (deleteHistoryData) {
       saveForUndo();
-      const { workerId, index } = deleteHistoryData;
+      const { workerId, index, objectId } = deleteHistoryData;
 
-      updateCurrentWorkers(
-        currentWorkers.map((w) => {
-          if (w.id === workerId) {
-            const newHistory = [...(w.history || [])];
+      if (objectId) {
+        setWorkerObjects((currentObjects) =>
+          currentObjects.map((object) => {
+            if (String(object.id) !== String(objectId)) return object;
+            const workers = Array.isArray(object.workers) ? object.workers : [];
+            return {
+              ...object,
+              workers: workers.map((worker) => {
+                if (String(worker.id) !== String(workerId)) return worker;
+                const history = Array.isArray(worker.history) ? [...worker.history] : [];
+                if (Number.isInteger(index) && index >= 0 && index < history.length) {
+                  history.splice(index, 1);
+                }
+                return { ...worker, history };
+              }),
+            };
+          }),
+        );
+      } else {
+        updateCurrentWorkers(
+          currentWorkers.map((w) => {
+            if (w.id === workerId) {
+              const newHistory = [...(w.history || [])];
+              newHistory.splice(index, 1);
+              return { ...w, history: newHistory };
+            }
+            return w;
+          }),
+        );
+
+        if (selectedWorker && selectedWorker.id === workerId) {
+          setSelectedWorker((prev) => {
+            const newHistory = [...(prev.history || [])];
             newHistory.splice(index, 1);
-            return { ...w, history: newHistory };
-          }
-          return w;
-        }),
-      );
-
-      // Update selectedWorker if it's currently open
-      if (selectedWorker && selectedWorker.id === workerId) {
-        setSelectedWorker((prev) => {
-          const newHistory = [...(prev.history || [])];
-          newHistory.splice(index, 1);
-          return { ...prev, history: newHistory };
-        });
+            return { ...prev, history: newHistory };
+          });
+        }
       }
 
       setDeleteHistoryData(null);
@@ -3829,13 +3848,15 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                     if (activeWorkerObjectId === null) {
                       const completedObjectNames = [
                         ...getWorkerObjectWorkHistory(selectedWorker.id)
-                          .filter((item) => !item.isCurrent)
                           .map((item) => item.objectName),
                         ...(selectedWorker.history || [])
                           .filter((item) =>
                             (item.type === "project_completed" || item.type === "archived") &&
                             item.objectName,
                           )
+                          .map((item) => item.objectName),
+                        ...(selectedWorker.objectWorkHistory || [])
+                          .filter((item) => item.objectName)
                           .map((item) => item.objectName),
                       ].filter((name, index, names) => name && names.indexOf(name) === index);
 
@@ -3873,7 +3894,11 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                             <button
                               className="delete-history-btn"
                               onClick={() =>
-                                handleDeleteHistoryProject(selectedWorker.id, item.historyIndex)
+                                handleDeleteHistoryProject(
+                                  selectedWorker.id,
+                                  item.historyIndex,
+                                  activeWorkerObjectId,
+                                )
                               }
                               title={t("ochirish_btn")}
                             >

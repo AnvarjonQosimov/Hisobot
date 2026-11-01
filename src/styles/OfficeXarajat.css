@@ -5,7 +5,6 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    z-index: 1;
     position: relative;
     top: 0;
     left: 0;
@@ -215,7 +214,7 @@
     height: 100%;
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
-    z-index: 999;
+    z-index: 2147483646;
 }
 
 /* Modal Styles */
@@ -229,7 +228,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1001;
+    z-index: 2147483647;
     backdrop-filter: blur(2px);
     animation: fadeIn 0.3s ease;
 }

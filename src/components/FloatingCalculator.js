@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Maximize2, RotateCcw, History as HistoryIcon, Trash2 } from 'lucide-react';
 import '../styles/FloatingCalculator.css';
@@ -218,48 +219,51 @@ const FloatingCalculator = ({ isOpen, onClose }) => {
       }} />
 
       {/* Deletion Confirmation Modal */}
-      <AnimatePresence>
-        {itemToDelete !== null && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="calc-confirm-overlay"
-          >
+      {createPortal(
+        <AnimatePresence>
+          {itemToDelete !== null && (
             <motion.div 
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="calc-confirm-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="calc-confirm-overlay"
             >
-              <p>{itemToDelete === 'all' ? t("Barcha tarixni tozalamoqchimisiz?") : t("Ushbu yozuvni o'chirmoqchimisiz?")}</p>
-              <div className="calc-confirm-buttons">
-                <button 
-                  className="calc-btn-cancel" 
-                  onClick={() => setItemToDelete(null)}
-                >
-                  {t("yo'q")}
-                </button>
-                <button 
-                  className="calc-btn-confirm" 
-                  onClick={() => {
-                    if (itemToDelete === 'all') {
-                      setHistory([]);
-                    } else {
-                      const newHistory = [...history];
-                      newHistory.splice(itemToDelete, 1);
-                      setHistory(newHistory);
-                    }
-                    setItemToDelete(null);
-                  }}
-                >
-                  {t("ha")}
-                </button>
-              </div>
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.9 }}
+                className="calc-confirm-modal"
+              >
+                <p>{itemToDelete === 'all' ? t("Barcha tarixni tozalamoqchimisiz?") : t("Ushbu yozuvni o'chirmoqchimisiz?")}</p>
+                <div className="calc-confirm-buttons">
+                  <button
+                    className="calc-btn-cancel"
+                    onClick={() => setItemToDelete(null)}
+                  >
+                    {t("yo'q")}
+                  </button>
+                  <button
+                    className="calc-btn-confirm"
+                    onClick={() => {
+                      if (itemToDelete === 'all') {
+                        setHistory([]);
+                      } else {
+                        const newHistory = [...history];
+                        newHistory.splice(itemToDelete, 1);
+                        setHistory(newHistory);
+                      }
+                      setItemToDelete(null);
+                    }}
+                  >
+                    {t("ha")}
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </motion.div>
   );
 };
