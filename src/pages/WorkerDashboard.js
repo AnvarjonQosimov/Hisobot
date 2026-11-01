@@ -588,87 +588,45 @@ setIsDetailModalOpen(true);
 
           <div className="project-history-list">
 
-            {(
-              !worker.history ||
-              worker.history.filter(
-                h =>
-                  h.type === "project_completed" ||
-                  h.type === "archived"
-              ).length === 0
-            ) ? (
+            {(() => {
+              const projectHistory = [
+                ...(worker.objectWorkHistory || []),
+                ...(worker.history || []).filter(
+                  (item) => item.type === "project_completed" || item.type === "archived",
+                ),
+              ].filter(
+                (item, index, items) =>
+                  items.findIndex((candidate) =>
+                    candidate.work === item.work &&
+                    candidate.objectName === item.objectName &&
+                    candidate.date === item.date &&
+                    candidate.percent === item.percent,
+                  ) === index,
+              );
 
-              <p className="no-history">
-                {t("tarix_mavjud_emas")}
-              </p>
+              if (projectHistory.length === 0) {
+                return <p className="no-history">{t("tarix_mavjud_emas")}</p>;
+              }
 
-            ) : (
-
-              worker.history
-
-                .map((h, idx) => ({
-                  ...h,
-                  originalIdx: idx
-                }))
-
-                .filter(
-                  h =>
-                    h.type === "project_completed" ||
-                    h.type === "archived"
-                )
-
-                .reverse()
-
-                .map((h) => (
-
-                  <div
-                    key={h.originalIdx}
-                    className="project-history-item"
-                  >
-
-                    <div className="history-main">
-
-                      <div className="history-text">
-
-                        <strong>
-                          {h.work ||
-                            t("noma'lum_ish")}
-                        </strong>
-
-                        <span>
-                          {h.percent || "100%"}
-                        </span>
-
-                      </div>
-
+              return projectHistory.slice().reverse().map((item, index) => (
+                <div key={`${item.objectName || "work"}-${item.date || "work"}-${index}`} className="project-history-item">
+                  <div className="history-main">
+                    <div className="history-text">
+                      <strong>{item.work || t("noma'lum_ish")}</strong>
+                      <span>{item.percent || "100%"}</span>
+                      {item.objectName && (
+                        <span className="worker-object-name">{item.objectName}</span>
+                      )}
                     </div>
-
-
-                    <div className="history-details">
-
-                      <small>
-                        {h.date}
-                      </small>
-
-                      <small>
-                        {h.amount}{" "}
-                        {h.currency === "sum"
-                          ? t("som")
-                          : "$"}
-
-                        {" / "}
-
-                        {h.received}{" "}
-                        {h.receivedCurrency === "sum"
-                          ? t("som")
-                          : "$"}
-                      </small>
-
-                    </div>
-
                   </div>
-
-                ))
-            )}
+                  {item.date && (
+                    <div className="history-details">
+                      <small>{item.date}</small>
+                    </div>
+                  )}
+                </div>
+              ));
+            })()}
 
           </div>
 

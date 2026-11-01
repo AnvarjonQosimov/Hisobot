@@ -11,8 +11,22 @@ import {
 import { normalizeEmail } from "../auth/assistantAccess";
 import { auth } from "../Firebase/Firebase";
 import { downloadReportExcel } from "../utils/exportReportExcel";
+import {
+  convertCurrencyAmount,
+  formatMoneyAmount,
+  formatMoneyTotals,
+} from "../utils/formatCurrency";
 
-function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, readOnly = false, onBack, onRegisterExport }) {
+function BranchReport({
+  branchId,
+  branchName,
+  bossEmail,
+  dollarRate = 12000,
+  currencyDisplayMode = "combined",
+  readOnly = false,
+  onBack,
+  onRegisterExport,
+}) {
   const { t } = useTranslation();
   const username = localStorage.getItem("username") || "";
   const [expenses, setExpenses] = useState([]);
@@ -230,6 +244,10 @@ function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, rea
   const highestExpense = (currency) => displayedExpenses
     .filter(e => e.currency === currency)
     .sort((a, b) => (parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0))[0];
+  const formatAmount = (amount, currency) =>
+    formatMoneyAmount(amount, currency, currencyDisplayMode, dollarRate, t("som"));
+  const formatTotals = (sumAmount, dollarAmount) =>
+    formatMoneyTotals(sumAmount, dollarAmount, currencyDisplayMode, dollarRate, t("som"));
 
   useEffect(() => {
     if (!onRegisterExport) return undefined;
@@ -380,7 +398,7 @@ function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, rea
                   </div>
                 </div>
                 <div className="pr-item-right">
-                  <strong>{parseFloat(item.amount).toLocaleString()} {item.currency === "sum" ? "so'm" : "$"}</strong>
+                  <strong>{formatAmount(item.amount, item.currency)}</strong>
                   <div className="pr-item-actions">
                     {canManageItem && <>
                       <button
@@ -414,7 +432,7 @@ function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, rea
           <h2>{t("statistika")}</h2>
           <div className="statistic1">
             <h3>{t("pr_byudjet_qoldiq")}:</h3>
-            <p>{remainingBudget("sum").toLocaleString()} {t("som")} / {remainingBudget("dollar").toLocaleString()} $</p>
+            <p>{formatTotals(remainingBudget("sum"), remainingBudget("dollar"))}</p>
           </div>
           <div className="statistic2">
             <h3>{t("pr_jami_yozuvlar")}:</h3>
@@ -422,23 +440,43 @@ function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, rea
           </div>
           <div className="statistic3">
             <h3>{t("pr_eng_katta_xarajat")}:</h3>
-            <p>{highestExpense("sum") ? `${highestExpense("sum").name}: ${parseFloat(highestExpense("sum").amount).toLocaleString()} ${t("som")}` : t("yo'q")} / {highestExpense("dollar") ? `${highestExpense("dollar").name}: ${parseFloat(highestExpense("dollar").amount).toLocaleString()} $` : t("yo'q")}</p>
+            <p>{(() => {
+              if (currencyDisplayMode !== "combined") {
+                const highest = displayedExpenses.reduce((currentHighest, expense) => {
+                  const amount = convertCurrencyAmount(
+                    expense.amount,
+                    expense.currency,
+                    currencyDisplayMode,
+                    dollarRate,
+                  );
+                  return !currentHighest || amount > currentHighest.amount
+                    ? { expense, amount }
+                    : currentHighest;
+                }, null);
+                return highest
+                  ? `${highest.expense.name}: ${formatAmount(highest.amount, currencyDisplayMode)}`
+                  : t("yo'q");
+              }
+              const sumHigh = highestExpense("sum");
+              const dollarHigh = highestExpense("dollar");
+              return `${sumHigh ? `${sumHigh.name}: ${formatAmount(sumHigh.amount, "sum")}` : t("yo'q")} / ${dollarHigh ? `${dollarHigh.name}: ${formatAmount(dollarHigh.amount, "dollar")}` : t("yo'q")}`;
+            })()}</p>
           </div>
           <div className="statistic4">
             <h3>{t("pr_jami_xarajat")}:</h3>
-            <p>{totalAmount("sum").toLocaleString()} {t("som")} / {totalAmount("dollar").toLocaleString()} $</p>
+            <p>{formatTotals(totalAmount("sum"), totalAmount("dollar"))}</p>
           </div>
           <div className="statistic5">
             <h3>{t("pr_tolangan")}:</h3>
-            <p>{paidAmount("sum").toLocaleString()} {t("som")} / {paidAmount("dollar").toLocaleString()} $</p>
+            <p>{formatTotals(paidAmount("sum"), paidAmount("dollar"))}</p>
           </div>
           <div className="statistic6">
             <h3>{t("pr_tolov_kutilmoqda")}:</h3>
-            <p>{unpaidAmount("sum").toLocaleString()} {t("som")} / {unpaidAmount("dollar").toLocaleString()} $</p>
+            <p>{formatTotals(unpaidAmount("sum"), unpaidAmount("dollar"))}</p>
           </div>
           <div className="statistic1">
             <h3>{t("Umumiy olingan summa")}:</h3>
-            <p>{initialBudget.sum.toLocaleString()} {t("som")} / {initialBudget.dollar.toLocaleString()} $</p>
+            <p>{formatTotals(initialBudget.sum, initialBudget.dollar)}</p>
           </div>
         </div>
       </div>
@@ -565,7 +603,7 @@ function BranchReport({ branchId, branchName, bossEmail, dollarRate = 12000, rea
 
                 <div className="pr-budget-current">
                   <p>{t("pr_joriy_byudjet")}:</p>
-                  <strong>{remainingBudget("sum").toLocaleString()} so'm / {remainingBudget("dollar").toLocaleString()} $</strong>
+                  <strong>{formatTotals(remainingBudget("sum"), remainingBudget("dollar"))}</strong>
                 </div>
 
                 <div className="pr-form-group">

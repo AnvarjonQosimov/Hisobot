@@ -40,11 +40,39 @@ const createWorkerObjectCopy = (worker) => ({
     : [],
 });
 
-const normalizeWorkerObjects = (rawObjects, currentWorkersList = []) => {
+const createNewWorkerObjectCopy = (worker) => ({
+  ...worker,
+  amountToReceive: "0",
+  currencyToReceive: "sum",
+  dateToGive: "",
+  amountAlreadyReceived: "0",
+  currencyAlreadyReceived: "sum",
+  dateAlreadyReceived: "",
+  currentWork: "",
+  workPercent: "",
+  prevWork: "",
+  prevWorkPercent: "",
+  isPaid: false,
+  history: [],
+});
+
+const normalizeWorkerObjects = (
+  rawObjects,
+  currentWorkersList = [],
+  balanceDefaults = {},
+) => {
   if (!Array.isArray(rawObjects)) return [];
   const baseWorkers = Array.isArray(currentWorkersList) ? currentWorkersList : [];
   return rawObjects.map((obj) => ({
     ...obj,
+    totalBalance: obj.totalBalance || balanceDefaults.totalBalance || { sum: 0, dollar: 0 },
+    initialBalance: obj.initialBalance || balanceDefaults.initialBalance || { sum: 0, dollar: 0 },
+    balanceTransactions: Array.isArray(obj.balanceTransactions)
+      ? obj.balanceTransactions
+      : balanceDefaults.balanceTransactions || [],
+    deletedBalanceTransactions: Array.isArray(obj.deletedBalanceTransactions)
+      ? obj.deletedBalanceTransactions
+      : balanceDefaults.deletedBalanceTransactions || [],
     workers: Array.isArray(obj.workers)
       ? obj.workers
       : baseWorkers.map(createWorkerObjectCopy),
@@ -147,6 +175,8 @@ function Hisobot() {
   const [assistantManagerOpen, setAssistantManagerOpen] = useState(false);
   const pageExporterRef = useRef(null);
   const [pageExporterReady, setPageExporterReady] = useState(false);
+  const lastCloudPayloadRef = useRef(null);
+  const lastCloudSectionPayloadsRef = useRef({});
   const registerPageExporter = useCallback((exporter) => {
     pageExporterRef.current = exporter;
     setPageExporterReady(Boolean(exporter));
@@ -181,6 +211,7 @@ function Hisobot() {
   const [syncStatus, setSyncStatus] = useState("synced"); // synced, syncing, offline
   const [cloudLoadComplete, setCloudLoadComplete] = useState(false);
   const isInitialCloudLoadRef = useRef(true);
+  const initialDataLoadStartedRef = useRef(false);
 
   // Language State
   const [age, setAge] = useState(i18n.language || "uz");
@@ -203,6 +234,107 @@ function Hisobot() {
         createdByEmail: record.createdByEmail,
       })),
   ];
+
+  const activeWorkerObject = workerObjects.find(
+    (object) => object.id === activeWorkerObjectId,
+  );
+  const activeTotalBalance = activeWorkerObject?.totalBalance || totalBalance;
+  const activeInitialBalance = activeWorkerObject?.initialBalance || initialBalance;
+  const activeBalanceTransactions = activeWorkerObject?.balanceTransactions || balanceTransactions;
+  const activeDeletedBalanceTransactions =
+    activeWorkerObject?.deletedBalanceTransactions || deletedBalanceTransactions;
+
+  const updateScopedBalanceState = (key, rootSetter, update, fallback) => {
+    if (activeWorkerObjectId === null) {
+      rootSetter(update);
+      return;
+    }
+
+    setWorkerObjects((objects) =>
+      objects.map((object) => {
+        if (object.id !== activeWorkerObjectId) return object;
+        const previousValue = object[key] ?? fallback;
+        return {
+          ...object,
+          [key]: typeof update === "function" ? update(previousValue) : update,
+        };
+      }),
+    );
+  };
+  const updateScopedTotalBalance = (update) =>
+    updateScopedBalanceState("totalBalance", setTotalBalance, update, { sum: 0, dollar: 0 });
+  const updateScopedInitialBalance = (update) =>
+    updateScopedBalanceState("initialBalance", setInitialBalance, update, { sum: 0, dollar: 0 });
+  const updateScopedBalanceTransactions = (update) =>
+    updateScopedBalanceState("balanceTransactions", setBalanceTransactions, update, []);
+  const updateScopedDeletedBalanceTransactions = (update) =>
+    updateScopedBalanceState(
+      "deletedBalanceTransactions",
+      setDeletedBalanceTransactions,
+      update,
+      [],
+    );
+
+  const getWorkerObjectWorkHistory = (workerId, objectId = null) =>
+    workerObjects
+      .filter((workerObject) => objectId === null || workerObject.id === objectId)
+      .flatMap((workerObject) => {
+      const objectWorker = (Array.isArray(workerObject.workers) ? workerObject.workers : []).find(
+        (worker) => String(worker.id) === String(workerId),
+      );
+      if (!objectWorker) return [];
+
+      const rootWorker = workers.find((worker) => String(worker.id) === String(workerId));
+      const rootHistoryKeys = new Set(
+        (rootWorker?.history || [])
+          .filter((item) => item.type === "project_completed" || item.type === "archived")
+          .map((item) => JSON.stringify([
+            item.type,
+            item.date,
+            item.work,
+            item.percent,
+            item.amount,
+            item.received,
+            item.currency,
+            item.receivedCurrency,
+          ])),
+      );
+      const history = (Array.isArray(objectWorker.history) ? objectWorker.history : [])
+        .map((item, historyIndex) => ({ ...item, historyIndex }))
+        .filter(
+          (item) =>
+            (item.type === "project_completed" || item.type === "archived") &&
+            (item.objectName ||
+              !rootHistoryKeys.has(JSON.stringify([
+                item.type,
+                item.date,
+                item.work,
+                item.percent,
+                item.amount,
+                item.received,
+                item.currency,
+                item.receivedCurrency,
+              ]))),
+        )
+        .map((item) => ({
+          ...item,
+          objectName: item.objectName || workerObject.name,
+          workerObjectId: workerObject.id,
+        }));
+
+      if (!objectWorker.currentWork) return history;
+      return [
+        ...history,
+        {
+          work: objectWorker.currentWork,
+          percent: objectWorker.workPercent || "0%",
+          objectName: workerObject.name,
+          type: "current",
+          isCurrent: true,
+          workerObjectId: workerObject.id,
+        },
+      ];
+      });
 
   useEffect(() => {
     const ownerEmail = isAssistant ? assistantBossEmail : username;
@@ -259,7 +391,8 @@ function Hisobot() {
   // Returns the workerObject name that contains the given workerId, or null
   const getWorkerObjectName = (workerId) => {
     const obj = workerObjects.find((o) =>
-      Array.isArray(o.workers) && o.workers.some((w) => w.id === workerId)
+      Array.isArray(o.workers) &&
+      o.workers.some((w) => String(w.id) === String(workerId))
     );
     return obj ? obj.name : null;
   };
@@ -282,6 +415,33 @@ function Hisobot() {
       [t("report_export_received_sum"), sumForList("amountAlreadyReceived", "currencyAlreadyReceived", "sum")],
       [t("report_export_received_dollar"), sumForList("amountAlreadyReceived", "currencyAlreadyReceived", "dollar")],
     ];
+  };
+
+  const handleCurrencyDisplayModeChange = (mode) => {
+    setCurrencyDisplayMode(mode);
+    if (!username) return;
+
+    localStorage.setItem(`currencyDisplayMode_${username}`, mode);
+    if (!isAssistant) {
+      saveBossCabinet(username, { currencyDisplayMode: mode }).catch((error) => {
+        console.error("Failed to save currency display mode:", error);
+      });
+    }
+  };
+
+  const handleDollarRateChange = (value) => {
+    const rate = parseFloat(value) || 0;
+    setDollarRate(rate);
+    if (username) {
+      localStorage.setItem(`dollarRate_${username}`, JSON.stringify(rate));
+    }
+  };
+
+  const handleDollarRateCommit = () => {
+    if (!username || isAssistant || dollarRate <= 0) return;
+    saveBossCabinet(username, { dollarRate }).catch((error) => {
+      console.error("Failed to save dollar exchange rate:", error);
+    });
   };
 
   const handleExportCurrentPage = () => {
@@ -335,16 +495,16 @@ function Hisobot() {
 
   const getInitialBalanceDisplay = () => {
     if (currencyDisplayMode === "combined") {
-      return `${initialBalance.sum.toLocaleString()} ${t("som")} / ${initialBalance.dollar.toLocaleString()} $`;
+      return `${activeInitialBalance.sum.toLocaleString()} ${t("som")} / ${activeInitialBalance.dollar.toLocaleString()} $`;
     }
-    return formatModeAmount(getTotalInMode(initialBalance.sum, initialBalance.dollar), currencyDisplayMode);
+    return formatModeAmount(getTotalInMode(activeInitialBalance.sum, activeInitialBalance.dollar), currencyDisplayMode);
   };
 
   const getTotalBalanceDisplay = () => {
     if (currencyDisplayMode === "combined") {
-      return `${totalBalance.sum.toLocaleString()} ${t("som")} / ${totalBalance.dollar.toLocaleString()} $`;
+      return `${activeTotalBalance.sum.toLocaleString()} ${t("som")} / ${activeTotalBalance.dollar.toLocaleString()} $`;
     }
-    return formatModeAmount(getTotalInMode(totalBalance.sum, totalBalance.dollar), currencyDisplayMode);
+    return formatModeAmount(getTotalInMode(activeTotalBalance.sum, activeTotalBalance.dollar), currencyDisplayMode);
   };
 
   const getBalanceTransactionEffect = (transaction) => ({
@@ -353,18 +513,18 @@ function Hisobot() {
 
   const adjustBalanceForTransaction = (transaction, multiplier) => {
     const effect = getBalanceTransactionEffect(transaction);
-    setInitialBalance((prev) => ({
+    updateScopedInitialBalance((prev) => ({
       ...prev,
       [transaction.currency]: (parseFloat(prev[transaction.currency]) || 0) + effect[transaction.currency] * multiplier,
     }));
-    setTotalBalance((prev) => ({
+    updateScopedTotalBalance((prev) => ({
       ...prev,
       [transaction.currency]: (parseFloat(prev[transaction.currency]) || 0) + effect[transaction.currency] * multiplier,
     }));
   };
 
   const getLastBalanceTransaction = () =>
-    [...balanceTransactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    [...activeBalanceTransactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
 
   const formatBalanceTransaction = (transaction) =>
     `${transaction.type === "subtract" ? "−" : "+"}${parseFloat(transaction.amount || 0).toLocaleString()} ${transaction.currency === "sum" ? t("som") : "$"}`;
@@ -560,6 +720,9 @@ function Hisobot() {
       navigate("/login", { replace: true });
       return;
     }
+    if (initialDataLoadStartedRef.current) return;
+    initialDataLoadStartedRef.current = true;
+
     const storedUsername = signedInEmail;
     localStorage.setItem("username", storedUsername);
     setUsername(storedUsername);
@@ -585,7 +748,12 @@ function Hisobot() {
       try {
         const parsed = JSON.parse(swo);
         const localWorkers = sw ? JSON.parse(sw) : [];
-        setWorkerObjects(normalizeWorkerObjects(parsed, localWorkers));
+        setWorkerObjects(normalizeWorkerObjects(parsed, localWorkers, {
+          totalBalance: sb ? JSON.parse(sb) : { sum: 0, dollar: 0 },
+          initialBalance: sib ? JSON.parse(sib) : { sum: 0, dollar: 0 },
+          balanceTransactions: sbt ? JSON.parse(sbt) : [],
+          deletedBalanceTransactions: sdbt ? JSON.parse(sdbt) : [],
+        }));
       } catch (_) {}
     }
     const sge = localStorage.getItem(`globalEmail_${storedUsername}`);
@@ -615,7 +783,16 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               if (data.initialBalance) setInitialBalance(data.initialBalance);
               if (Array.isArray(data.balanceTransactions)) setBalanceTransactions(data.balanceTransactions);
               if (Array.isArray(data.deletedBalanceTransactions)) setDeletedBalanceTransactions(data.deletedBalanceTransactions);
-              if (Array.isArray(data.workerObjects)) setWorkerObjects(normalizeWorkerObjects(data.workerObjects, data.workers || []));
+              if (Array.isArray(data.workerObjects)) setWorkerObjects(normalizeWorkerObjects(
+                data.workerObjects,
+                data.workers || [],
+                {
+                  totalBalance: data.totalBalance,
+                  initialBalance: data.initialBalance,
+                  balanceTransactions: data.balanceTransactions,
+                  deletedBalanceTransactions: data.deletedBalanceTransactions,
+                },
+              ));
             } else if (section === "office" && Array.isArray(data.officeBranches)) {
               setOfficeBranches(data.officeBranches);
             } else if (section === "construction" && Array.isArray(data.projectFiles)) {
@@ -638,9 +815,21 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             setSavedGlobalWorkerEmail(d.globalWorkerEmail); 
           }
           if (d.officeBranches?.length) setOfficeBranches(d.officeBranches);
-          if (d.workerObjects?.length) setWorkerObjects(normalizeWorkerObjects(d.workerObjects, d.workers || []));
+          if (d.workerObjects?.length) setWorkerObjects(normalizeWorkerObjects(
+            d.workerObjects,
+            d.workers || [],
+            {
+              totalBalance: d.totalBalance,
+              initialBalance: d.initialBalance,
+              balanceTransactions: d.balanceTransactions,
+              deletedBalanceTransactions: d.deletedBalanceTransactions,
+            },
+          ));
           if (["combined", "sum", "dollar"].includes(d.currencyDisplayMode)) {
             setCurrencyDisplayMode(d.currencyDisplayMode);
+          }
+          if (Number.isFinite(Number(d.dollarRate)) && Number(d.dollarRate) > 0) {
+            setDollarRate(Number(d.dollarRate));
           }
         }
       } catch (e) { 
@@ -682,38 +871,81 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       return;
     }
 
-    const isTotallyEmpty = workers.length === 0 && totalBalance.sum === 0 && totalBalance.dollar === 0 && projectFiles.length === 0 && balanceTransactions.length === 0 && deletedBalanceTransactions.length === 0;
+    const cloudPayload = {
+    workers,
+    totalBalance,
+    initialBalance,
+    balanceTransactions,
+    deletedBalanceTransactions,
+    projectFiles,
+    globalWorkerEmail,
+    officeBranches,
+    workerObjects,
+    currencyDisplayMode,
+    dollarRate,
+    username,
+    };
+    const cloudPayloadSignature = JSON.stringify(cloudPayload);
+    if (lastCloudPayloadRef.current === cloudPayloadSignature) return;
 
     const timer = setTimeout(async () => {
-      try {
-        console.log("Debounced syncing to cloud...");
-        if (isTotallyEmpty) {
-          await saveBossCabinet(username, { currencyDisplayMode, workers });
-        } else {
-          await saveBossCabinet(username, {
-            workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, globalWorkerEmail, officeBranches, workerObjects, currencyDisplayMode
-          });
-        }
-        await Promise.all([
-          saveBossSectionSnapshot(username, "workers", {
-            workers,
-            workerObjects,
-            totalBalance,
-            initialBalance,
-            balanceTransactions,
-            deletedBalanceTransactions,
-          }),
-          saveBossSectionSnapshot(username, "office", { officeBranches }),
-          saveBossSectionSnapshot(username, "construction", { projectFiles }),
-        ]);
-        console.log("Cloud sync successful");
-      } catch (e) {
-        console.error("Cloud save failed", e);
+    if (lastCloudPayloadRef.current === cloudPayloadSignature) return;
+    lastCloudPayloadRef.current = cloudPayloadSignature;
+    try {
+      console.log("Debounced syncing to cloud...");
+      await saveBossCabinet(username, {
+        workers,
+        totalBalance,
+        initialBalance,
+        balanceTransactions,
+        deletedBalanceTransactions,
+        projectFiles,
+        globalWorkerEmail,
+        officeBranches,
+        workerObjects,
+        currencyDisplayMode,
+        dollarRate,
+      });
+
+      const sectionPayloads = [
+        ["workers", {
+          workers,
+          workerObjects,
+          totalBalance,
+          initialBalance,
+          balanceTransactions,
+          deletedBalanceTransactions,
+        }],
+        ["office", { officeBranches }],
+        ["construction", { projectFiles }],
+      ].map(([section, data]) => ({
+        section,
+        data,
+        signature: JSON.stringify(data),
+      }));
+      const changedSections = sectionPayloads.filter(
+        ({ section, signature }) =>
+          lastCloudSectionPayloadsRef.current[section] !== signature,
+      );
+      await Promise.all(
+        changedSections.map(({ section, data }) =>
+          saveBossSectionSnapshot(username, section, data),
+        ),
+      );
+      changedSections.forEach(({ section, signature }) => {
+        lastCloudSectionPayloadsRef.current[section] = signature;
+      });
+      console.log("Cloud sync successful");
+    } catch (e) {
+      if (lastCloudPayloadRef.current === cloudPayloadSignature) {
+        lastCloudPayloadRef.current = null;
       }
+      console.error("Cloud save failed", e);
+    }
     }, 2500);
 
     return () => clearTimeout(timer);
-  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, cloudLoadComplete, isAssistant]);
+  }, [workers, totalBalance, initialBalance, balanceTransactions, deletedBalanceTransactions, projectFiles, officeBranches, workerObjects, username, globalWorkerEmail, currencyDisplayMode, dollarRate, cloudLoadComplete, isAssistant]);
 
   // --- END SYNC LOGIC ---
 
@@ -776,10 +1008,10 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     setUndoState({
       workers: JSON.parse(JSON.stringify(currentWorkers)),
       workerObjectId: activeWorkerObjectId,
-      totalBalance: { ...totalBalance },
-      initialBalance: { ...initialBalance },
-      balanceTransactions: JSON.parse(JSON.stringify(balanceTransactions)),
-      deletedBalanceTransactions: JSON.parse(JSON.stringify(deletedBalanceTransactions)),
+      totalBalance: { ...activeTotalBalance },
+      initialBalance: { ...activeInitialBalance },
+      balanceTransactions: JSON.parse(JSON.stringify(activeBalanceTransactions)),
+      deletedBalanceTransactions: JSON.parse(JSON.stringify(activeDeletedBalanceTransactions)),
     });
   };
 
@@ -795,15 +1027,24 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       setWorkerObjects((currentObjects) =>
         currentObjects.map((object) =>
           object.id === undoState.workerObjectId
-            ? { ...object, workers: undoState.workers }
+            ? {
+                ...object,
+                workers: undoState.workers,
+                totalBalance: undoState.totalBalance,
+                initialBalance: undoState.initialBalance,
+                balanceTransactions: undoState.balanceTransactions || [],
+                deletedBalanceTransactions: undoState.deletedBalanceTransactions || [],
+              }
             : object,
         ),
       );
     }
-    setTotalBalance(undoState.totalBalance);
-    setInitialBalance(undoState.initialBalance);
-    setBalanceTransactions(undoState.balanceTransactions || []);
-    setDeletedBalanceTransactions(undoState.deletedBalanceTransactions || []);
+    if (undoState.workerObjectId === null) {
+      setTotalBalance(undoState.totalBalance);
+      setInitialBalance(undoState.initialBalance);
+      setBalanceTransactions(undoState.balanceTransactions || []);
+      setDeletedBalanceTransactions(undoState.deletedBalanceTransactions || []);
+    }
     setUndoState(null);
     setShowPerformUndoConfirm(false);
   };
@@ -1001,6 +1242,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         receivedCurrency: w.currencyAlreadyReceived,
         work: w.currentWork,
         percent: w.workPercent,
+        objectName: workerObjects.find((object) => object.id === activeWorkerObjectId)?.name || "",
         type: "project_completed"
       };
 
@@ -1017,8 +1259,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     setNewProjectConfirmId(null);
   };
 
-  const handleDeleteHistoryProject = (workerId, idx) => {
-    setDeleteHistoryData({ workerId, index: idx });
+  const handleDeleteHistoryProject = (workerId, index) => {
+    setDeleteHistoryData({ workerId, index });
   };
 
   const handleEditWorkerClick = (worker) => {
@@ -1202,12 +1444,10 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     const amount = parseFloat(worker.amountToReceive || 0);
     const currency = worker.currencyToReceive;
 
-    if (activeWorkerObjectId === null) {
-      setTotalBalance((prev) => ({
-        ...prev,
-        [currency]: newIsPaid ? prev[currency] - amount : prev[currency] + amount,
-      }));
-    }
+    updateScopedTotalBalance((prev) => ({
+      ...prev,
+      [currency]: newIsPaid ? prev[currency] - amount : prev[currency] + amount,
+    }));
 
     updateCurrentWorkers(
       currentWorkers.map((w) => (w.id === id ? { ...w, isPaid: newIsPaid } : w)),
@@ -1228,6 +1468,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           type: "project_completed", // Standard type for history list in detail modal
           work: w.currentWork || t("yo'q"),
           percent: w.workPercent || "0%",
+          objectName: workerObjects.find((object) => object.id === activeWorkerObjectId)?.name || "",
           received: w.amountAlreadyReceived || "0",
           receivedCurrency: w.currencyAlreadyReceived || "sum",
         };
@@ -1265,7 +1506,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     if (!Number.isFinite(addAmount) || addAmount <= 0) return;
     saveForUndo();
 
-    setBalanceTransactions((prev) => [{
+    updateScopedBalanceTransactions((prev) => [{
       id: Date.now(),
       type: "add",
       amount: addAmount,
@@ -1273,12 +1514,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       createdAt: new Date().toISOString(),
     }, ...prev]);
 
-    setInitialBalance((prev) => ({
+    updateScopedInitialBalance((prev) => ({
       ...prev,
       [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) + addAmount,
     }));
 
-    setTotalBalance((prev) => ({
+    updateScopedTotalBalance((prev) => ({
       ...prev,
       [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) + addAmount,
     }));
@@ -1291,7 +1532,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     if (!Number.isFinite(subtractAmount) || subtractAmount <= 0) return;
     saveForUndo();
 
-    setBalanceTransactions((prev) => [{
+    updateScopedBalanceTransactions((prev) => [{
       id: Date.now(),
       type: "subtract",
       amount: subtractAmount,
@@ -1299,12 +1540,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       createdAt: new Date().toISOString(),
     }, ...prev]);
 
-    setInitialBalance((prev) => ({
+    updateScopedInitialBalance((prev) => ({
       ...prev,
       [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) - subtractAmount,
     }));
 
-    setTotalBalance((prev) => ({
+    updateScopedTotalBalance((prev) => ({
       ...prev,
       [balanceCurrency]: (parseFloat(prev[balanceCurrency]) || 0) - subtractAmount,
     }));
@@ -1314,7 +1555,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
 
   const confirmEditBalanceTransaction = () => {
     if (!editingBalanceTransaction) return;
-    const oldTransaction = balanceTransactions.find((item) => item.id === editingBalanceTransaction.id);
+    const oldTransaction = activeBalanceTransactions.find((item) => item.id === editingBalanceTransaction.id);
     const newAmount = parseFloat(editingBalanceTransaction.amount);
     if (!oldTransaction || !Number.isFinite(newAmount) || newAmount <= 0) return;
 
@@ -1329,33 +1570,35 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       editedAt: new Date().toISOString(),
     };
     adjustBalanceForTransaction(revisedTransaction, 1);
-    setBalanceTransactions((prev) => prev.map((item) => item.id === revisedTransaction.id ? revisedTransaction : item));
+    updateScopedBalanceTransactions((prev) => prev.map((item) => item.id === revisedTransaction.id ? revisedTransaction : item));
     setShowBalanceEditConfirm(false);
     setEditingBalanceTransaction(null);
   };
 
   const moveBalanceTransactionToTrash = (id) => {
-    const transaction = balanceTransactions.find((item) => item.id === id);
+    const transaction = activeBalanceTransactions.find((item) => item.id === id);
     if (!transaction) return;
     saveForUndo();
     adjustBalanceForTransaction(transaction, -1);
-    setBalanceTransactions((prev) => prev.filter((item) => item.id !== id));
-    setDeletedBalanceTransactions((prev) => [{ ...transaction, deletedAt: new Date().toISOString() }, ...prev]);
+    updateScopedBalanceTransactions((prev) => prev.filter((item) => item.id !== id));
+    updateScopedDeletedBalanceTransactions((prev) => [{ ...transaction, deletedAt: new Date().toISOString() }, ...prev]);
   };
 
   const restoreBalanceTransaction = (id) => {
-    const transaction = deletedBalanceTransactions.find((item) => item.id === id);
+    const transaction = activeDeletedBalanceTransactions.find((item) => item.id === id);
     if (!transaction) return;
     saveForUndo();
     adjustBalanceForTransaction(transaction, 1);
     const restoredTransaction = { ...transaction };
     delete restoredTransaction.deletedAt;
-    setBalanceTransactions((prev) => [restoredTransaction, ...prev]);
-    setDeletedBalanceTransactions((prev) => prev.filter((item) => item.id !== id));
+    updateScopedBalanceTransactions((prev) => [restoredTransaction, ...prev]);
+    updateScopedDeletedBalanceTransactions((prev) => prev.filter((item) => item.id !== id));
   };
 
   const confirmPermanentlyDeleteBalanceTransaction = () => {
-    setDeletedBalanceTransactions((prev) => prev.filter((item) => item.id !== permanentlyDeletingBalanceId));
+    updateScopedDeletedBalanceTransactions((prev) =>
+      prev.filter((item) => item.id !== permanentlyDeletingBalanceId),
+    );
     setPermanentlyDeletingBalanceId(null);
   };
 
@@ -1374,7 +1617,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     const newAmount = parseFloat(balanceAmount || 0);
 
     // Calculate total expenses so far (current + paid last month + history)
-    const totalExpenses = workers.reduce((acc, curr) => {
+    const totalExpenses = currentWorkers.reduce((acc, curr) => {
       if (curr.currencyToReceive !== balanceCurrency) {
         // Skip different currencies if they don't match the current balance being updated
         return acc;
@@ -1395,13 +1638,13 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     }, 0);
 
     // Reset initial balance: set the new one and preserve the other currency
-    setInitialBalance((prev) => ({
+    updateScopedInitialBalance((prev) => ({
       ...prev,
       [balanceCurrency]: newAmount,
     }));
 
     // Reset total balance: set the new one (minus expenses) and preserve the other currency
-    setTotalBalance((prev) => ({
+    updateScopedTotalBalance((prev) => ({
       ...prev,
       [balanceCurrency]: newAmount - totalExpenses,
     }));
@@ -1536,13 +1779,21 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     } else if (fileModalType === "object") {
       setWorkerObjects([
         ...workerObjects,
-        { ...newItem, workers: workers.map(createWorkerObjectCopy) },
+        {
+          ...newItem,
+          workers: workers.map(createNewWorkerObjectCopy),
+          totalBalance: { sum: 0, dollar: 0 },
+          initialBalance: { sum: 0, dollar: 0 },
+          balanceTransactions: [],
+          deletedBalanceTransactions: [],
+        },
       ]);
       setActiveWorkerObjectId(newItem.id);
       setActiveProjectId(null);
       setActiveBranchId(null);
       setActiveReportSection("workers");
       setIsReportSelectionActive(true);
+      setChartPeriod("week");
     }
 
     setNewFileName("");
@@ -1637,6 +1888,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       setActiveWorkerObjectId(null);
                       setActiveReportSection("workers");
                       setIsReportSelectionActive(true);
+                      setChartPeriod("week");
                       setIsSidebarOpen(false);
                     }}
                   >
@@ -1652,6 +1904,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         setActiveBranchId(null);
                         setActiveReportSection("workers");
                         setIsReportSelectionActive(true);
+                        setChartPeriod("week");
                         setIsSidebarOpen(false);
                       }}
                     >
@@ -1899,6 +2152,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           projectName={projectFiles.find(p => p.id === activeProjectId)?.name}
           bossEmail={isAssistant ? assistantBossEmail : username}
           dollarRate={dollarRate}
+          currencyDisplayMode={currencyDisplayMode}
           readOnly={isAssistant}
           onRegisterExport={!isAssistant ? registerPageExporter : undefined}
           onBack={() => { setActiveProjectId(null); setIsReportSelectionActive(false); }}
@@ -1909,6 +2163,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
           branchName={officeBranches.find(b => b.id === activeBranchId)?.name}
           bossEmail={isAssistant ? assistantBossEmail : username}
           dollarRate={dollarRate}
+          currencyDisplayMode={currencyDisplayMode}
           readOnly={isAssistant}
           onRegisterExport={!isAssistant ? registerPageExporter : undefined}
           onBack={() => { setActiveBranchId(null); setIsReportSelectionActive(false); }}
@@ -2045,7 +2300,6 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         : currencyDisplayMode === "dollar"
                         ? `${convertToDollar(receivedAmount, worker.currencyAlreadyReceived).toLocaleString()} $`
                         : `${receivedAmount.toLocaleString()} ${worker.currencyAlreadyReceived === "sum" ? t("som") : "$"}`;
-
                     return (
                     <div
                       key={worker.id}
@@ -2081,11 +2335,25 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                         <div className="worker-values">
                             <div className="val-group-procent">
                               <p>{t("qilayotganishi")}</p>
+                            {activeWorkerObjectId === null ? (
+                              <div className="worker-object-work-list">
+                                {[...new Set(
+                                  getWorkerObjectWorkHistory(worker.id)
+                                    .filter((item) => !item.isCurrent)
+                                    .map((item) => item.objectName)
+                                    .filter(Boolean),
+                                )].map((objectName) => (
+                                  <span className="worker-object-name" key={objectName}>
+                                    {objectName}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
                               <strong>
                                 {worker.currentWork || t("yo'q")} ({worker.workPercent || "0%"})
                               </strong>
-                              {(() => { const objName = getWorkerObjectName(worker.id); return objName ? <small style={{ display: 'block', fontWeight: '400', fontSize: '11px', color: 'rgba(146,151,223,0.85)', marginTop: '2px' }}>{objName}</small> : null; })()}
-                            </div>
+                            )}
+                          </div>
                             <div className="val-group">
                               <p>{t("olishikerak")}:</p>
                               <strong className="to-receive">{toReceiveDisplay}</strong>
@@ -2876,7 +3144,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   <div className="balance-preview-box">
                     <span>{t("yangi_boshlangich_balans") || "Yangi Umumiy olingan summa"}:</span>
                     <strong>
-                      {((parseFloat(initialBalance[balanceCurrency]) || 0) + parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                      {((parseFloat(activeInitialBalance[balanceCurrency]) || 0) + parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
                     </strong>
                   </div>
                 )}
@@ -2884,7 +3152,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   <div className="balance-preview-box preview-subtract">
                     <span>{t("yangi_boshlangich_balans") || "Yangi Umumiy olingan summa"}:</span>
                     <strong>
-                      {((parseFloat(initialBalance[balanceCurrency]) || 0) - parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
+                      {((parseFloat(activeInitialBalance[balanceCurrency]) || 0) - parseFloat(balanceAmount)).toLocaleString()} {balanceCurrency === "sum" ? t("som") : "$"}
                     </strong>
                   </div>
                 )}
@@ -2935,14 +3203,14 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             </div>
             <div className="balance-history-tabs">
               <button className={balanceHistoryTab === "active" ? "active" : ""} onClick={() => setBalanceHistoryTab("active")}>
-                {t("balance_history_tab")} ({balanceTransactions.length})
+                {t("balance_history_tab")} ({activeBalanceTransactions.length})
               </button>
               <button className={balanceHistoryTab === "trash" ? "active" : ""} onClick={() => setBalanceHistoryTab("trash")}>
-                🗑️ {t("balance_trash_tab")} ({deletedBalanceTransactions.length})
+                🗑️ {t("balance_trash_tab")} ({activeDeletedBalanceTransactions.length})
               </button>
             </div>
             <div className="balance-history-list">
-              {(balanceHistoryTab === "active" ? balanceTransactions : deletedBalanceTransactions)
+              {(balanceHistoryTab === "active" ? activeBalanceTransactions : activeDeletedBalanceTransactions)
                 .slice()
                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
                 .map((transaction) => {
@@ -2977,7 +3245,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                     </div>
                   );
                 })}
-              {(balanceHistoryTab === "active" ? balanceTransactions : deletedBalanceTransactions).length === 0 && (
+              {(balanceHistoryTab === "active" ? activeBalanceTransactions : activeDeletedBalanceTransactions).length === 0 && (
                 <p className="balance-history-empty">{t("balance_history_empty")}</p>
               )}
             </div>
@@ -3317,19 +3585,19 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 <label>{t("valyuta")}</label>
                 <button
                   className={`filter-btn ${currencyDisplayMode === "sum" ? "active" : ""}`}
-                  onClick={() => setCurrencyDisplayMode("sum")}
+                  onClick={() => handleCurrencyDisplayModeChange("sum")}
                 >
                   {t("currency_mode_sum_short")}
                 </button>
                 <button
                   className={`filter-btn ${currencyDisplayMode === "dollar" ? "active" : ""}`}
-                  onClick={() => setCurrencyDisplayMode("dollar")}
+                  onClick={() => handleCurrencyDisplayModeChange("dollar")}
                 >
                   {t("currency_mode_dollar_short")}
                 </button>
                 <button
                   className={`filter-btn ${currencyDisplayMode === "combined" ? "active" : ""}`}
-                  onClick={() => setCurrencyDisplayMode("combined")}
+                  onClick={() => handleCurrencyDisplayModeChange("combined")}
                 >
                   {t("currency_mode_combined_short")}
                 </button>
@@ -3340,7 +3608,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       type="number"
                       className="rate-input"
                       value={dollarRate}
-                      onChange={(e) => setDollarRate(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleDollarRateChange(e.target.value)}
+                      onBlur={handleDollarRateCommit}
                     />
                   </div>
                 )}
@@ -3370,19 +3639,19 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 <div className="rate-row">
                   <button
                     className={`filter-btn ${currencyDisplayMode === "sum" ? "active" : ""}`}
-                    onClick={() => setCurrencyDisplayMode("sum")}
+                    onClick={() => handleCurrencyDisplayModeChange("sum")}
                   >
                     {t("currency_mode_sum_short")}
                   </button>
                   <button
                     className={`filter-btn ${currencyDisplayMode === "dollar" ? "active" : ""}`}
-                    onClick={() => setCurrencyDisplayMode("dollar")}
+                    onClick={() => handleCurrencyDisplayModeChange("dollar")}
                   >
                     {t("currency_mode_dollar_short")}
                   </button>
                   <button
                     className={`filter-btn ${currencyDisplayMode === "combined" ? "active" : ""}`}
-                    onClick={() => setCurrencyDisplayMode("combined")}
+                    onClick={() => handleCurrencyDisplayModeChange("combined")}
                   >
                     {t("currency_mode_combined_short")}
                   </button>
@@ -3394,7 +3663,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                       type="number"
                       className="rate-input"
                       value={dollarRate}
-                      onChange={(e) => setDollarRate(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleDollarRateChange(e.target.value)}
+                      onBlur={handleDollarRateCommit}
                     />
                   </div>
                 )}
@@ -3555,37 +3825,68 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               <div className="aboutBottom">
                 <h3>{t("loyiha_tarixi")}</h3>
                 <div className="project-history-list">
-                  {(!selectedWorker.history || selectedWorker.history.filter(h => h.type === "project_completed").length === 0) ? (
-                    <p className="no-history">{t("tarix_mavjud_emas")}</p>
-                  ) : (
-                    selectedWorker.history
-                      .map((h, idx) => ({ ...h, originalIdx: idx }))
-                      .filter(h => h.type === "project_completed" || h.type === "archived")
-                      .reverse()
-                      .map((h) => (
-                        <div key={h.originalIdx} className="project-history-item">
-                          <div className="history-main">
-                            <div className="history-text">
-                              <strong>{h.work || t("noma'lum_ish")}</strong>
-                              <span>{h.percent || "100%"}</span>
-                            </div>
+                  {(() => {
+                    if (activeWorkerObjectId === null) {
+                      const completedObjectNames = [
+                        ...getWorkerObjectWorkHistory(selectedWorker.id)
+                          .filter((item) => !item.isCurrent)
+                          .map((item) => item.objectName),
+                        ...(selectedWorker.history || [])
+                          .filter((item) =>
+                            (item.type === "project_completed" || item.type === "archived") &&
+                            item.objectName,
+                          )
+                          .map((item) => item.objectName),
+                      ].filter((name, index, names) => name && names.indexOf(name) === index);
+
+                      if (completedObjectNames.length === 0) {
+                        return <p className="no-history">{t("tarix_mavjud_emas")}</p>;
+                      }
+
+                      return completedObjectNames.map((objectName) => (
+                        <div key={objectName} className="project-history-item">
+                          <span className="worker-object-name">{objectName}</span>
+                        </div>
+                      ));
+                    }
+
+                    const objectHistory = getWorkerObjectWorkHistory(
+                      selectedWorker.id,
+                      activeWorkerObjectId,
+                    );
+
+                    if (objectHistory.length === 0) {
+                      return <p className="no-history">{t("tarix_mavjud_emas")}</p>;
+                    }
+
+                    return objectHistory.slice().reverse().map((item, index) => (
+                      <div key={`${item.date || "work"}-${item.historyIndex ?? index}`} className="project-history-item">
+                        <div className="history-main">
+                          <div className="history-text">
+                            <strong>
+                              {item.work || t("noma'lum_ish")}
+                            </strong>
+                            <span>{item.percent || "100%"}</span>
+                            <span className="worker-object-name">{item.objectName}</span>
+                          </div>
+                          {!item.isCurrent && !isAssistant && (
                             <button
                               className="delete-history-btn"
-                              onClick={() => handleDeleteHistoryProject(selectedWorker.id, h.originalIdx)}
+                              onClick={() =>
+                                handleDeleteHistoryProject(selectedWorker.id, item.historyIndex)
+                              }
                               title={t("ochirish_btn")}
                             >
                               ✕
                             </button>
-                          </div>
-                          <div className="history-details">
-                            <small>{h.date}</small>
-                            <small>
-                              {h.amount} {h.currency === "sum" ? t("som") : "$"} / {h.received} {h.receivedCurrency === "sum" ? t("som") : "$"}
-                            </small>
-                          </div>
+                          )}
                         </div>
-                      ))
-                  )}
+                        <div className="history-details">
+                          {item.date && <small>{item.date}</small>}
+                        </div>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             </div>

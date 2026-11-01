@@ -12,6 +12,18 @@ import { auth, db } from "../Firebase/Firebase";
 export const getWorkerDataId = (bossEmail, workerId) =>
   encodeURIComponent(`${bossEmail.toLowerCase()}:${String(workerId)}`);
 
+const getProjectHistoryKey = (item) =>
+  JSON.stringify([
+    item.type,
+    item.date,
+    item.work,
+    item.percent,
+    item.amount,
+    item.received,
+    item.currency,
+    item.receivedCurrency,
+  ]);
+
 export const saveBossCabinet = async (bossEmail, data) => {
   const user = auth.currentUser;
   const ownerEmail = user?.email?.toLowerCase();
@@ -32,17 +44,74 @@ export const saveBossCabinet = async (bossEmail, data) => {
   );
 
   if (Array.isArray(data.workers)) {
-    await syncBossWorkerData(user, ownerEmail, data.workers);
+    await syncBossWorkerData(
+      user,
+      ownerEmail,
+      data.workers,
+      Array.isArray(data.workerObjects) ? data.workerObjects : [],
+    );
   }
 };
 
-const syncBossWorkerData = async (user, ownerEmail, workers) => {
+const syncBossWorkerData = async (user, ownerEmail, workers, workerObjects) => {
   const currentWorkers = new Map();
+  const objectWorkByWorkerId = new Map();
+  const rootWorkerIds = new Set();
+
   workers.forEach((worker) => {
     if (worker?.id === undefined || worker?.id === null) {
       throw new Error("A worker record is missing its ID.");
     }
-    currentWorkers.set(String(worker.id), worker);
+    const workerId = String(worker.id);
+    currentWorkers.set(workerId, worker);
+    rootWorkerIds.add(workerId);
+  });
+
+  workerObjects.forEach((workerObject) => {
+    if (!Array.isArray(workerObject.workers)) return;
+
+    workerObject.workers.forEach((worker) => {
+      if (worker?.id === undefined || worker?.id === null) {
+        throw new Error("A worker object record is missing its worker ID.");
+      }
+
+      const workerId = String(worker.id);
+      if (!currentWorkers.has(workerId)) currentWorkers.set(workerId, worker);
+
+      const rootHistoryKeys = new Set(
+        rootWorkerIds.has(workerId)
+          ? (currentWorkers.get(workerId).history || [])
+              .filter((item) => item.type === "project_completed" || item.type === "archived")
+              .map(getProjectHistoryKey)
+          : [],
+      );
+      const objectWork = [
+        ...(Array.isArray(worker.history) ? worker.history : [])
+          .filter(
+            (item) =>
+              (item.type === "project_completed" || item.type === "archived") &&
+              (item.objectName || !rootHistoryKeys.has(getProjectHistoryKey(item))),
+          )
+          .map((item) => ({
+            ...item,
+            objectName: item.objectName || workerObject.name,
+          })),
+        ...(worker.currentWork
+          ? [{
+              work: worker.currentWork,
+              percent: worker.workPercent || "0%",
+              objectName: workerObject.name,
+              type: "current",
+              isCurrent: true,
+            }]
+          : []),
+      ];
+
+      objectWorkByWorkerId.set(workerId, [
+        ...(objectWorkByWorkerId.get(workerId) || []),
+        ...objectWork,
+      ]);
+    });
   });
 
   const existingSnapshot = await getDocs(
@@ -64,6 +133,7 @@ const syncBossWorkerData = async (user, ownerEmail, workers) => {
     const id = getWorkerDataId(ownerEmail, workerId);
     const workerData = { ...worker };
     delete workerData.workerCode;
+    workerData.objectWorkHistory = objectWorkByWorkerId.get(workerId) || [];
     const workerDocument = {
       bossEmail: ownerEmail,
       ownerEmail,

@@ -11,10 +11,24 @@ import {
 } from "../auth/assistantRecords";
 import { normalizeEmail } from "../auth/assistantAccess";
 import { downloadReportExcel } from "../utils/exportReportExcel";
+import {
+  convertCurrencyAmount,
+  formatMoneyAmount,
+  formatMoneyTotals,
+} from "../utils/formatCurrency";
 
 const CATEGORIES = ["hammasi", "material", "ishchi", "texnika", "boshqa"];
 
-function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, readOnly = false, onBack, onRegisterExport }) {
+function ProjectReport({
+  projectId,
+  projectName,
+  bossEmail,
+  dollarRate = 12000,
+  currencyDisplayMode = "combined",
+  readOnly = false,
+  onBack,
+  onRegisterExport,
+}) {
   const { t } = useTranslation();
 
   const [username, setUsername] = useState("");
@@ -170,6 +184,10 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
       .reduce((acc, e) => acc + parseFloat(e.amountPerUnit || 0) * parseFloat(e.quantity || 1), 0);
 
   const remaining = (currency) => (Number(budget[currency]) || 0) - assistantExpenseAmount(currency);
+  const formatAmount = (amount, currency) =>
+    formatMoneyAmount(amount, currency, currencyDisplayMode, dollarRate, t("som"));
+  const formatTotals = (sumAmount, dollarAmount) =>
+    formatMoneyTotals(sumAmount, dollarAmount, currencyDisplayMode, dollarRate, t("som"));
 
   const catStats = ["material", "ishchi", "texnika", "boshqa"].map((cat) => {
     const items = displayedExpenses.filter((e) => e.category === cat);
@@ -640,7 +658,7 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
                   </div>
                   <div className="pr-item-right">
                     <div className="pr-item-amount">
-                      <strong>{itemTotal.toLocaleString()} {item.currency === "sum" ? t("som") : "$"}</strong>
+                      <strong>{formatAmount(itemTotal, item.currency)}</strong>
                       {parseFloat(item.quantity) > 1 && (
                         <span className="pr-item-per-unit">
                           ({parseFloat(item.amountPerUnit).toLocaleString()}/{item.unit})
@@ -673,7 +691,7 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
             <div className="statistic1">
             <h3>{t("pr_byudjet_qoldiq")}:</h3>
             <p className={remaining("sum") < 0 || remaining("dollar") < 0 ? "negative-balance" : ""}>
-              {remaining("sum").toLocaleString()} {t("som")} / {remaining("dollar").toLocaleString()} $
+              {formatTotals(remaining("sum"), remaining("dollar"))}
             </p>
           </div>
 
@@ -695,9 +713,25 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
                     .filter((e) => e.currency === "dollar")
                     .sort((a, b) => (parseFloat(b.amountPerUnit) || 0) - (parseFloat(a.amountPerUnit) || 0))[0];
 
-                  const sumText = sumHigh ? `${sumHigh.name}: ${parseFloat(sumHigh.amountPerUnit).toLocaleString()} ${t("som")}` : t("yo'q");
-                  const dolText = dolHigh ? `${dolHigh.name}: ${parseFloat(dolHigh.amountPerUnit).toLocaleString()} $` : t("yo'q");
+                  if (currencyDisplayMode !== "combined") {
+                    const highest = displayedExpenses.reduce((currentHighest, expense) => {
+                      const amount = convertCurrencyAmount(
+                        expense.amountPerUnit,
+                        expense.currency,
+                        currencyDisplayMode,
+                        dollarRate,
+                      );
+                      return !currentHighest || amount > currentHighest.amount
+                        ? { expense, amount }
+                        : currentHighest;
+                    }, null);
+                    return highest
+                      ? `${highest.expense.name}: ${formatAmount(highest.amount, currencyDisplayMode)}`
+                      : t("yo'q");
+                  }
 
+                  const sumText = sumHigh ? `${sumHigh.name}: ${formatAmount(sumHigh.amountPerUnit, "sum")}` : t("yo'q");
+                  const dolText = dolHigh ? `${dolHigh.name}: ${formatAmount(dolHigh.amountPerUnit, "dollar")}` : t("yo'q");
                   return `${sumText} / ${dolText}`;
                 })()}
               </p>
@@ -706,19 +740,19 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
             {/* Total expenses */}
             <div className="statistic4">
               <h3>{t("pr_jami_xarajat")}:</h3>
-              <p>{totalAmount("sum").toLocaleString()} {t("som")} / {totalAmount("dollar").toLocaleString()} $</p>
+              <p>{formatTotals(totalAmount("sum"), totalAmount("dollar"))}</p>
             </div>
 
             {/* Paid expenses */}
             <div className="statistic5">
               <h3>{t("pr_tolangan")}:</h3>
-              <p>{paidAmount("sum").toLocaleString()} {t("som")} / {paidAmount("dollar").toLocaleString()} $</p>
+              <p>{formatTotals(paidAmount("sum"), paidAmount("dollar"))}</p>
             </div>
 
             {/* Initial budget */}
             <div className="statistic1">
               <h3>{t("Umumiy olingan summa")}:</h3>
-              <p>{initialBudget.sum.toLocaleString()} {t("som")} / {initialBudget.dollar.toLocaleString()} $</p>
+              <p>{formatTotals(initialBudget.sum, initialBudget.dollar)}</p>
             </div>
 
             {/* Category breakdown */}
@@ -728,8 +762,11 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
                 <div key={cat} className="statistic1" style={{ width: "100%" }}>
                   <h3>{catIcon(cat)} {catLabel(cat)} <span style={{ color: "rgba(180,170,255,0.5)", fontSize: "12px" }}>({count})</span></h3>
                   <p style={{ flexDirection: "column", height: "auto", padding: "10px", width: "100%", boxSizing: "border-box" }}>
-                    {sumTotal > 0 && <span style={{ margin: "5px 0" }}>{sumTotal.toLocaleString()} {t("som")}</span>}
-                    {dolTotal > 0 && <span style={{ margin: "5px 0" }}>{dolTotal.toLocaleString()} $</span>}
+                    {(sumTotal > 0 || dolTotal > 0) && (
+                      <span style={{ margin: "5px 0" }}>
+                        {formatTotals(sumTotal, dolTotal)}
+                      </span>
+                    )}
                     {sumTotal === 0 && dolTotal === 0 && <span style={{ color: "rgba(200,190,255,0.3)", fontSize: "12px" }}>—</span>}
                   </p>
                 </div>
@@ -967,7 +1004,7 @@ function ProjectReport({ projectId, projectName, bossEmail, dollarRate = 12000, 
 
               <div className="pr-budget-current">
                 <p>{t("pr_joriy_byudjet")}:</p>
-                <strong>{remaining("sum").toLocaleString()} so'm / {remaining("dollar").toLocaleString()} $</strong>
+                <strong>{formatTotals(remaining("sum"), remaining("dollar"))}</strong>
               </div>
               <div className="pr-form-group">
                 <label>
