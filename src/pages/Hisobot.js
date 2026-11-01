@@ -396,6 +396,17 @@ function Hisobot() {
     );
     return obj ? obj.name : null;
   };
+  const getWorkerObjectCurrentWork = (workerId) => {
+    for (const object of workerObjects) {
+      const objectWorker = (Array.isArray(object.workers) ? object.workers : []).find(
+        (worker) => String(worker.id) === String(workerId) && worker.currentWork,
+      );
+      if (objectWorker) {
+        return { work: objectWorker.currentWork, objectName: object.name };
+      }
+    }
+    return null;
+  };
 
   const getWorkerSummary = (workersList) => {
     const list = Array.isArray(workersList) ? workersList : [];
@@ -1770,6 +1781,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         amountAlreadyReceived &&
         dateAlreadyReceived
       );
+  const isAllWorkersAdd = activeWorkerObjectId === null && !editMode;
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
@@ -2800,6 +2812,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   />
                 </div>
 
+                {!isAllWorkersAdd && (
+                  <>
                 <div className="row">
                   <div className="input-group">
                     <label>{t("olishikerak")}</label>
@@ -2987,6 +3001,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 </div>
 
 
+                  </>
+                )}
               </div>
             </div>
 
@@ -3815,8 +3831,21 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   </div>
                   <div className="work-field">
                     <label>{t("qilayotganishi")}:</label>
-                    <span style={{ color: "#fff", fontWeight: "600" }}>{selectedWorker.currentWork || t("yo'q")}</span>
-                    {(() => { const objName = getWorkerObjectName(selectedWorker.id); return objName ? <small style={{ display: 'block', fontWeight: '400', fontSize: '11px', color: 'rgba(146,151,223,0.85)', marginTop: '2px' }}>{objName}</small> : null; })()}
+                    {(() => {
+                      const objectWork = getWorkerObjectCurrentWork(selectedWorker.id);
+                      const currentWork = selectedWorker.currentWork || objectWork?.work;
+                      const objectName = objectWork?.objectName || getWorkerObjectName(selectedWorker.id);
+                      return (
+                        <>
+                          <span style={{ color: "#fff", fontWeight: "600" }}>{currentWork || t("yo'q")}</span>
+                          {objectName && (
+                            <small style={{ display: 'block', fontWeight: '400', fontSize: '11px', color: 'rgba(146,151,223,0.85)', marginTop: '2px' }}>
+                              {objectName}
+                            </small>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className="work-field">
                     <label>{t("qilinayotganishfoizi")}:</label>
