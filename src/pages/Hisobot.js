@@ -2126,9 +2126,13 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             </div>}
           </div>
           <div className="leftBottom">
-            <div className="logout-btn-container" onClick={() => setLogoutDialog(true)}>
-              <h3>{t("chiqish")}</h3>
-            </div>
+            <button
+              className="logout-btn-container"
+              type="button"
+              onClick={() => setLogoutDialog(true)}
+            >
+              <span>{t("chiqish")}</span>
+            </button>
             <div className="translation">
               <select
                 className="translationSelect"

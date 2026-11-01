@@ -18,9 +18,13 @@
     align-items: center;
     justify-content: start;
     width: 280px;
+    min-width: 280px;
+    max-width: 280px;
+    flex: 0 0 280px;
     height: 100%;
     position: fixed;
     padding: 0 0 0 30px;
+    box-sizing: border-box;
     background: linear-gradient(180deg, rgba(2, 6, 23, 0.95), rgba(15, 23, 42, 0.92));
     backdrop-filter: blur(18px);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -33,7 +37,8 @@
     color: rgb(204, 194, 255);
     height: 95%;
     min-height: 0;
-    width: 99%;
+    width: 100%;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -196,21 +201,33 @@
 .leftBottom{
     display: flex;
     align-items: center;
-    justify-content: start;
+    justify-content: space-between;
+    gap: 12px;
     width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    padding-right: 16px;
+    box-sizing: border-box;
 }
 
 .logout-btn-container {
-    width: 70% !important;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     justify-content: start;
     cursor: pointer;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
 }
 
-.leftBottom h3 {
+.logout-btn-container span {
     background: linear-gradient(135deg, rgba(255, 60, 60, 0.2) 0%, rgba(200, 30, 30, 0.3) 100%);
-    width: 50% !important; /* Take full width of the 85% container */
+    width: 100%;
+    min-width: 0;
     padding: 0 15px;
     border-radius: 12px;
     height: 40px;
@@ -222,13 +239,15 @@
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     margin: 0;
     color: rgb(255, 180, 180);
-    pointer-events: none; /* Let the container handle clicks */
     font-size: 14px;
     font-weight: 500;
     box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
 }
 
-.logout-btn-container:hover h3 {
+.logout-btn-container:hover span {
     transform: translateX(5px);
     background: linear-gradient(135deg, rgba(255, 60, 60, 0.3) 0%, rgba(232, 74, 74, 0.5) 100%);
     box-shadow: 0 6px 20px rgba(255, 60, 60, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2);
@@ -236,7 +255,7 @@
     color: #fff;
 }
 
-.logout-btn-container:active h3 {
+.logout-btn-container:active span {
     transform: translateX(2px);
 }
 
@@ -1556,8 +1575,10 @@
 .translation{
     display: flex;
     align-items: center;
-    justify-content: end;
-    width: 15%;
+    justify-content: center;
+    width: 72px;
+    min-width: 72px;
+    flex: 0 0 72px;
     z-index: 10;
 }
 
@@ -1565,6 +1586,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 100%;
     padding: 7px 15px;
     border: 1px solid rgba(161, 161, 241, 0.5);
     background-color: rgba(161, 161, 241, 0.5);
@@ -1753,8 +1775,10 @@
     .translation{
         display: flex;
         align-items: center;
-        justify-content: end;
-        width: 15%;
+        justify-content: center;
+        width: 72px;
+        min-width: 72px;
+        flex: 0 0 72px;
         margin-top: 0;
     }
 
