@@ -2342,31 +2342,33 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                     >
                       <div className="worker-item-main">
                         <div className="worker-info">
-                          <input
-                            type="checkbox"
-                            className="paid-checkbox"
-                            checked={worker.isPaid}
-                            onChange={() => handleTogglePaid(worker.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            disabled={!canManageWorker}
-                          />
+                          {activeWorkerObjectId !== null && (
+                            <input
+                              type="checkbox"
+                              className="paid-checkbox"
+                              checked={worker.isPaid}
+                              onChange={() => handleTogglePaid(worker.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              disabled={!canManageWorker}
+                            />
+                          )}
                           <div className="name-date">
-                            {worker.createdByEmail && (
+                            {activeWorkerObjectId !== null && worker.createdByEmail && (
                               <small className="assistant-author-label">{worker.createdByEmail}</small>
                             )}
                             <h3 style={{ display: 'flex', alignItems: 'center' }}>
                               {worker.workerName}
-                              <span style={{ fontSize: "14px", marginLeft: "10px", lineHeight: 1 }} title={worker.workerCode ? "Has Access Code" : "No Access Code"}>
-                                {worker.workerCode ? "🟢" : "🔴"}
-                              </span>
+                              <span
+                                className={`worker-access-status ${worker.workerCode ? "has-access-code" : "no-access-code"}`}
+                                title={worker.workerCode ? "Has Access Code" : "No Access Code"}
+                                aria-label={worker.workerCode ? "Has access code" : "No access code"}
+                              />
                             </h3>
-                            <span>
-                              {new Date(worker.createdAt).toLocaleDateString()}
-                            </span>
+                            <span>{new Date(worker.createdAt).toLocaleDateString()}</span>
                           </div>
                         </div>
 
-                        <div className="worker-values">
+                        {activeWorkerObjectId !== null && <div className="worker-values">
                             <div className="val-group-procent">
                               <p>{t("qilayotganishi")}</p>
                             {activeWorkerObjectId === null ? (
@@ -2402,10 +2404,10 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                                 {t("olgan")}: {worker.dateAlreadyReceived}
                               </span>
                             </div>
-                        </div>
+                        </div>}
 
                         <div className="worker-actions">
-                          {!isAssistant && !worker.assistantRecordId && <>
+                          {activeWorkerObjectId !== null && !isAssistant && !worker.assistantRecordId && <>
                               <button
                                 className="month-btn"
                                 onClick={(e) => {

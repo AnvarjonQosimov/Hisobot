@@ -725,6 +725,26 @@
     font-size: 1.1rem;
     color: #fff;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.worker-access-status {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    border-radius: 50%;
+}
+
+.worker-access-status.has-access-code {
+    background: linear-gradient(135deg, #7df5b0, #22c55e);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+}
+
+.worker-access-status.no-access-code {
+    background: linear-gradient(135deg, #ff8585, #ef4444);
 }
 
 .name-date span {
