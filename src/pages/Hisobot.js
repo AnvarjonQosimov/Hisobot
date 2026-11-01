@@ -2156,7 +2156,6 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             </div>
           </div>
         </div>
-        <div className="leftLine"></div>
       </div>
 
       {(isSidebarOpen || isRightPanelOpen) && (
