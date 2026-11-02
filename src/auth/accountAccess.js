@@ -11,7 +11,6 @@ import { auth, db } from "../Firebase/Firebase";
 import { getAssistantAccess } from "./assistantAccess";
 
 export const ADMIN_EMAIL = "anvarqosimov153@gmail.com";
-export const LEGACY_ADMIN_EMAIL = "archoltinnisbatarch@gmail.com";
 
 export const isAdminEmail = (email) => email?.toLowerCase() === ADMIN_EMAIL;
 
@@ -19,9 +18,6 @@ export const checkAccountAccess = async () => {
   const email = auth.currentUser?.email?.toLowerCase();
   if (email === ADMIN_EMAIL) {
     return { allowed: true, admin: true };
-  }
-  if (email === LEGACY_ADMIN_EMAIL) {
-    return { allowed: true, admin: false };
   }
   if (!email) return { allowed: false, admin: false };
   const account = await getDoc(doc(db, "managedAccounts", email));
@@ -60,7 +56,6 @@ export const getAdminDashboard = async () => {
   });
   const bossEmails = new Set([
     ADMIN_EMAIL,
-    LEGACY_ADMIN_EMAIL,
     ...managedAccountEntries.map((account) => account.email),
   ]);
   const bossEmailsList = [...bossEmails];
@@ -95,7 +90,7 @@ export const getAdminDashboard = async () => {
         hasWorkerEmail: Boolean(cabinet.globalWorkerEmail?.trim()),
         workerEmail: cabinet.globalWorkerEmail?.trim() || "",
         workerCount: workerEmailsByBoss.get(email) || 0,
-        administrator: email === ADMIN_EMAIL || email === LEGACY_ADMIN_EMAIL,
+        administrator: email === ADMIN_EMAIL,
       };
     })
     .sort((a, b) => a.email.localeCompare(b.email));
@@ -135,7 +130,7 @@ export const removeManagedAccount = async (email, accountId = email) => {
     throw new Error("Только администратор может удалять аккаунты.");
   }
   const normalizedEmail = email.trim().toLowerCase();
-  if (normalizedEmail === ADMIN_EMAIL || normalizedEmail === LEGACY_ADMIN_EMAIL) {
+  if (normalizedEmail === ADMIN_EMAIL) {
     throw new Error("Нельзя удалить аккаунт администратора.");
   }
   await deleteDoc(doc(db, "managedAccounts", accountId));
@@ -153,9 +148,7 @@ export const updateManagedAccount = async (currentEmail, nextEmail, currentAccou
   }
   if (
     normalizedCurrentEmail === ADMIN_EMAIL ||
-    normalizedCurrentEmail === LEGACY_ADMIN_EMAIL ||
-    normalizedNextEmail === ADMIN_EMAIL ||
-    normalizedNextEmail === LEGACY_ADMIN_EMAIL
+    normalizedNextEmail === ADMIN_EMAIL
   ) {
     throw new Error("Нельзя изменять аккаунты администратора.");
   }

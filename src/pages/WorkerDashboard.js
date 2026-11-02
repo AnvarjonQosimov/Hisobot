@@ -30,7 +30,6 @@ const [loading, setLoading] = useState(true);
 const [workerLoadError, setWorkerLoadError] = useState("");
 const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 const [logoutDialog, setLogoutDialog] = useState(false);
-const [expandedHistory, setExpandedHistory] = useState([]);
 const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
 useEffect(() => {
@@ -82,25 +81,6 @@ setIsDetailModalOpen(true);
 
   // Stats Period
   const [chartPeriod, setChartPeriod] = useState("week");
-
-  // const handleTogglePaid = (id) => {
-  //   if (!worker) return;
-  //   const newIsPaid = !worker.isPaid;
-  //   const newWorkerDetails = { ...worker, isPaid: newIsPaid };
-  //   setWorker(newWorkerDetails);
-
-  //   const updatedWorkers = fullWorkers.map(w => w.id === worker.id ? newWorkerDetails : w);
-  //   setFullWorkers(updatedWorkers);
-  //   saveToCloud(updatedWorkers);
-  // };
-
-  const handleTogglePaid = () => {};
-
-  const toggleHistory = (id) => {
-    setExpandedHistory((prev) =>
-      prev.includes(id) ? prev.filter((hid) => hid !== id) : [...prev, id],
-    );
-  };
 
   const confirmLogout = async () => {
     try {
@@ -280,13 +260,6 @@ setIsDetailModalOpen(true);
 >
                 <div className="worker-item-main">
                   <div className="worker-info" style={{ width: '25%' }}>
-                    <input
-  type="checkbox"
-  className="paid-checkbox"
-  checked={!!worker.isPaid}
-  readOnly
-  onClick={(e) => e.stopPropagation()}
-/>
                     <div className="name-date">
                       <h3>{worker.workerName}</h3>
                       <span>{new Date(worker.createdAt).toLocaleDateString()}</span>
@@ -324,44 +297,7 @@ setIsDetailModalOpen(true);
                     </div>
                   </div>
 
-                  <div className="worker-actions" style={{ width: '20%', justifyContent: 'flex-end' }}>
-                    <button
-                      className="history-toggle-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleHistory(worker.id);
-                      }}
-                      title={t("tarixni_korish") || "Tarixni ko'rish"}
-                    >
-                      📜
-                    </button>
-                    {/* Hiding other controls like delete and month rotate for a worker account to prevent destructive acts. They can still mark paid. */}
-                  </div>
                 </div>
-
-                {/* History Section */}
-                {expandedHistory.includes(worker.id) && (
-                  <div className="history-section">
-                    <h4>{t("to'lovlartarixi")}:</h4>
-                    {(worker.history || []).length === 0 ? (
-                      <p className="no-history">{t("tarix_mavjud_emas")}</p>
-                    ) : (
-                      worker.history.map((h, idx) => (
-                        <div key={idx} className="history-item">
-                          <span>{h.date}</span>
-                          <span>
-                            {h.amount} {h.currency === "sum" ? "so'm" : "$"}
-                          </span>
-                          <span className="h-type">
-                            {h.type === "archived"
-                              ? t("arxivlandi")
-                              : t("tolandi")}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Circular stats below the card */}

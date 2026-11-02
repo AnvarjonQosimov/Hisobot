@@ -31,6 +31,10 @@ function Header() {
   }
 
   if (isDashboard) {
+    if (location.pathname === "/workerdashboard" || location.pathname === "/worker-auth") {
+      return null;
+    }
+
     return (
       <div className="dashboard-language-switcher">
         <FiGlobe aria-hidden="true" />

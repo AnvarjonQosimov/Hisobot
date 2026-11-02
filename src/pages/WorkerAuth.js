@@ -29,10 +29,11 @@ function WorkerAuth() {
 
     setLoading(true);
     setError("");
+    let authStep = "invite-code lookup";
 
     try {
       const codeRef = doc(db, "inviteCodes", workerCode.trim());
-      
+
       let codeSnap;
       try {
         codeSnap = await getDoc(codeRef);
@@ -51,6 +52,7 @@ function WorkerAuth() {
         if (!auth.currentUser) {
           throw new Error("The worker account is no longer authenticated.");
         }
+        authStep = "worker access save";
         await setDoc(doc(db, "workerAccess", workerEmail), {
           bossEmail: codeData.bossEmail,
           workerId: codeData.workerId,
@@ -68,9 +70,15 @@ function WorkerAuth() {
         setError(t("Noto'g'ri kod! Parolni tekshiring."));
       }
     } catch (err) {
-      console.error(err);
+      console.error(`Worker sign-in failed during ${authStep}:`, err);
       if (err.code === 'unavailable') {
         setError(t("Internet ulanishida xatolik! Tarmoqni tekshiring."));
+      } else if (err.code === "permission-denied") {
+        setError(
+          authStep === "invite-code lookup"
+            ? t("Ishchi kodi qoidalar tomonidan rad etildi. Ishchi emaili boss sahifasida ro'yxatdan o'tganini, kod to'g'riligini va yangilangan Firebase Rules e'lon qilinganini tekshiring.")
+            : t("Ishchi ruxsatini saqlash rad etildi. Firebase Rules yangilanganini tekshiring."),
+        );
       } else {
         setError(t("Ulanishda xatolik yuz berdi."));
       }
