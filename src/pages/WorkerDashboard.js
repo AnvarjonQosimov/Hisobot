@@ -497,17 +497,18 @@ setIsDetailModalOpen(true);
         {/* СТАТУС ОПЛАТЫ */}
         <div
           className="payment-status"
+          data-paid={worker.isPaid ? "true" : "false"}
           style={{
             marginTop: "20px",
             padding: "15px 20px",
             borderRadius: "10px"
           }}
         >
-          <span>
+          <span className="payment-status-label">
             {t("to'langan") || "Оплата"}:
           </span>
 
-          <strong>
+          <strong className="payment-status-value">
             {worker.isPaid
               ? `✓ ${t("worker_paid_status")}`
               : `○ ${t("worker_unpaid_status")}`}
