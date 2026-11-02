@@ -507,22 +507,28 @@
 .filterIshchilar{
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    height: 30px;
+    justify-content: flex-start;
+    gap: 8px;
+    height: 40px;
     margin-top: 0px;
-    width: 210px !important;
+    width: 280px !important;
+    flex: 0 0 280px;
     margin-left: 20px;
 }
 
 .filterIshchilar h3{
     font-size: 13px !important;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 1px solid rgba(161, 161, 241, 0.5);
-    padding: 10px 15px;
+    padding: 10px 12px;
     border-radius: 10px;
     cursor: pointer;
+    white-space: nowrap;
+    box-sizing: border-box;
 }
 
 .currency-open-btn{
