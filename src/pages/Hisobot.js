@@ -105,7 +105,7 @@ function Hisobot() {
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all"); // all, recent, high
+  const [activeFilter, setActiveFilter] = useState("all"); // all, oldest, high
   const [currencyDisplayMode, setCurrencyDisplayMode] = useState("combined"); // combined, sum, dollar
   const [dollarRate, setDollarRate] = useState(12000);
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
@@ -2233,12 +2233,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             />
             <div className="filterIshchilar desktop-only-filter">
               <h3
-                className={activeFilter === "recent" ? "active-filter" : ""}
+                className={activeFilter === "oldest" ? "active-filter" : ""}
                 onClick={() =>
-                  setActiveFilter(activeFilter === "recent" ? "all" : "recent")
+                  setActiveFilter(activeFilter === "oldest" ? "all" : "oldest")
                 }
               >
-                {t("yangi")}
+                {t("first_added_workers")}
               </h3>
               <h3
                 className={activeFilter === "high" ? "active-filter" : ""}
@@ -2289,9 +2289,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 w.workerName.toLowerCase().includes(searchTerm.toLowerCase()),
               );
 
-              if (activeFilter === "recent") {
+              if (activeFilter === "oldest") {
                 filtered = [...filtered]
-                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                  .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
                   .slice(0, 5);
               } else if (activeFilter === "high") {
                 filtered = filtered.filter((w) => {
@@ -3601,15 +3601,15 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               <div className="filter-options">
                 <label>{t("Saralash turi")}</label>
                 <button
-                  className={`filter-btn ${activeFilter === "recent" ? "active" : ""}`}
+                  className={`filter-btn ${activeFilter === "oldest" ? "active" : ""}`}
                   onClick={() => {
                     setActiveFilter(
-                      activeFilter === "recent" ? "all" : "recent",
+                      activeFilter === "oldest" ? "all" : "oldest",
                     );
                     setIsFilterModalOpen(false);
                   }}
                 >
-                  {t("Yangi qo'shilganlar")}
+                  {t("first_added_workers")}
                 </button>
                 <button
                   className={`filter-btn ${activeFilter === "high" ? "active" : ""}`}
@@ -3644,13 +3644,19 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 {currencyDisplayMode !== "combined" && (
                   <div className="rate-row mobile-rate-row">
                     <label>{t("dollar_rate_short")}</label>
-                    <input
-                      type="number"
-                      className="rate-input"
-                      value={dollarRate}
-                      onChange={(e) => handleDollarRateChange(e.target.value)}
-                      onBlur={handleDollarRateCommit}
-                    />
+                    <div className="rate-input-wrap">
+                      <input
+                        type="number"
+                        className="rate-input"
+                        min="1"
+                        inputMode="decimal"
+                        aria-label={t("dollar_rate_short")}
+                        value={dollarRate}
+                        onChange={(e) => handleDollarRateChange(e.target.value)}
+                        onBlur={handleDollarRateCommit}
+                      />
+                      <span>UZS / USD</span>
+                    </div>
                   </div>
                 )}
               </div>

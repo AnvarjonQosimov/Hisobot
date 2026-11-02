@@ -12,6 +12,41 @@
     background-color: transparent;
 }
 
+.WorkerDashboard .rightTop {
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.WorkerDashboard .worker-currency-open-btn {
+    flex: 0 0 auto;
+    margin: 0 12px 0 auto;
+}
+
+.WorkerDashboard .currency-modal-body .rate-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.WorkerDashboard .currency-modal-body .rate-row .filter-btn {
+    width: 100%;
+    min-width: 0;
+}
+
+.WorkerDashboard .currency-modal-body .rate-row > label {
+    color: rgba(226, 222, 255, 0.88);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.WorkerDashboard .rate-input-wrap {
+    padding: 10px;
+    border: 1px solid rgba(161, 161, 241, 0.18);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(161, 161, 241, 0.08), rgba(0, 4, 45, 0.42));
+}
+
 .WorkerDashboard .payment-status {
     display: flex;
     align-items: center;
@@ -48,6 +83,21 @@
 }
 
 @media (max-width: 480px) {
+    .WorkerDashboard .rightTop {
+        padding: 0 12px;
+    }
+
+    .WorkerDashboard .rightTop h2 {
+        margin-left: 8px !important;
+        font-size: 16px;
+    }
+
+    .WorkerDashboard .worker-currency-open-btn {
+        margin-right: 0;
+        min-width: 66px;
+        padding: 8px 10px;
+    }
+
     .WorkerDashboard .payment-status {
         align-items: flex-start;
         flex-direction: column;

@@ -2206,6 +2206,63 @@
     color: white;
 }
 
+.filter-options .mobile-rate-row {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin-top: 6px;
+    padding: 14px;
+    border: 1px solid rgba(161, 161, 241, 0.18);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(161, 161, 241, 0.08), rgba(0, 4, 45, 0.42));
+}
+
+.filter-options .mobile-rate-row > label {
+    margin: 0;
+    color: rgba(226, 222, 255, 0.88);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.rate-input-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.rate-input-wrap input.rate-input {
+    width: 100%;
+    min-width: 0;
+    height: 46px;
+    padding: 0 98px 0 14px;
+    border: 1px solid rgba(161, 161, 241, 0.32);
+    border-radius: 11px;
+    outline: none;
+    box-sizing: border-box;
+    background: rgba(2, 6, 23, 0.78);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rate-input-wrap input.rate-input:focus {
+    border-color: rgb(129, 140, 248);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.rate-input-wrap > span {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    color: rgba(204, 194, 255, 0.66);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+}
+
 @media(max-width: 434px){
     .addH3{
         width: 100px !important;

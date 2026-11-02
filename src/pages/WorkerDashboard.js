@@ -31,6 +31,16 @@ const [workerLoadError, setWorkerLoadError] = useState("");
 const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 const [logoutDialog, setLogoutDialog] = useState(false);
 const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+const currencySettingsEmail = auth.currentUser?.email?.toLowerCase() || "";
+const [currencyDisplayMode, setCurrencyDisplayMode] = useState(() => {
+  const savedMode = localStorage.getItem(`workerCurrencyDisplayMode_${currencySettingsEmail}`);
+  return ["combined", "sum", "dollar"].includes(savedMode) ? savedMode : "combined";
+});
+const [dollarRate, setDollarRate] = useState(() => {
+  const savedRate = Number(localStorage.getItem(`workerDollarRate_${currencySettingsEmail}`));
+  return savedRate > 0 ? String(savedRate) : "12000";
+});
+const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
 
 useEffect(() => {
   const role = localStorage.getItem("role");
@@ -78,6 +88,31 @@ if (!worker) return;
 
 setIsDetailModalOpen(true);
 };
+
+  const handleCurrencyDisplayModeChange = (mode) => {
+    setCurrencyDisplayMode(mode);
+    localStorage.setItem(`workerCurrencyDisplayMode_${currencySettingsEmail}`, mode);
+  };
+
+  const handleDollarRateChange = (value) => {
+    setDollarRate(value);
+    localStorage.setItem(`workerDollarRate_${currencySettingsEmail}`, value);
+  };
+
+  const formatWorkerAmount = (value, currency) => {
+    const amount = Number.parseFloat(value) || 0;
+    const rate = Number.parseFloat(dollarRate);
+    const currencyLabel = currency === "sum" ? t("som") : "$";
+
+    if (currencyDisplayMode === "combined" || rate <= 0) {
+      return `${amount.toLocaleString()} ${currencyLabel}`;
+    }
+
+    const convertedAmount = currencyDisplayMode === "sum"
+      ? currency === "sum" ? amount : amount * rate
+      : currency === "dollar" ? amount : amount / rate;
+    return `${convertedAmount.toLocaleString()} ${currencyDisplayMode === "sum" ? t("som") : "$"}`;
+  };
 
   // Stats Period
   const [chartPeriod, setChartPeriod] = useState("week");
@@ -244,6 +279,13 @@ setIsDetailModalOpen(true);
       <div className="HisobotRight" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="rightTop">
           <h2 style={{ color: "#fff", marginLeft: "30px", marginTop: "20px" }}>{t("Ishchining Shaxsiy Paneli")}</h2>
+          <button
+            type="button"
+            className="currency-open-btn worker-currency-open-btn"
+            onClick={() => setIsCurrencyModalOpen(true)}
+          >
+            {t("valyuta")}
+          </button>
         </div>
 
         <div className="rightBottom" style={{ flex: 1, padding: "30px" }}>
@@ -276,8 +318,7 @@ setIsDetailModalOpen(true);
                     <div className="val-group">
                       <p>{t("olishikerak")}:</p>
                       <strong className="to-receive">
-                        {worker.amountToReceive}{" "}
-                        {worker.currencyToReceive === "sum" ? "so'm" : "$"}
+                        {formatWorkerAmount(worker.amountToReceive, worker.currencyToReceive)}
                       </strong>
                       <span className="small-date">
                         {t("sana")}: {worker.dateToGive}
@@ -286,10 +327,7 @@ setIsDetailModalOpen(true);
                     <div className="val-group">
                       <p>{t("olgansumma")}:</p>
                       <strong className="received">
-                        {worker.amountAlreadyReceived}{" "}
-                        {worker.currencyAlreadyReceived === "sum"
-                          ? "so'm"
-                          : "$"}
+                        {formatWorkerAmount(worker.amountAlreadyReceived, worker.currencyAlreadyReceived)}
                       </strong>
                       <span className="small-date">
                         {t("olgan")}: {worker.dateAlreadyReceived}
@@ -408,10 +446,7 @@ setIsDetailModalOpen(true);
               <p>{t("olishikerak")}:</p>
 
               <strong className="to-receive">
-                {worker.amountToReceive}{" "}
-                {worker.currencyToReceive === "sum"
-                  ? t("som")
-                  : "$"}
+                {formatWorkerAmount(worker.amountToReceive, worker.currencyToReceive)}
               </strong>
 
               <span className="small-date">
@@ -454,10 +489,7 @@ setIsDetailModalOpen(true);
               <p>{t("olgansumma")}:</p>
 
               <strong className="received">
-                {worker.amountAlreadyReceived}{" "}
-                {worker.currencyAlreadyReceived === "sum"
-                  ? t("som")
-                  : "$"}
+                {formatWorkerAmount(worker.amountAlreadyReceived, worker.currencyAlreadyReceived)}
               </strong>
 
               <span className="small-date">
@@ -589,6 +621,93 @@ setIsDetailModalOpen(true);
     </div>
   </div>
 )}
+
+      {isCurrencyModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setIsCurrencyModalOpen(false)}
+        >
+          <div
+            className="modal-container currency-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <h2>{t("valyuta")}</h2>
+                <p className="modal-description">{t("currency_popup_description")}</p>
+              </div>
+              <button
+                type="button"
+                className="close-btn"
+                onClick={() => setIsCurrencyModalOpen(false)}
+                aria-label={t("yopish")}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body filter-modal-body">
+              <div className="currency-modal-body">
+                <div className="rate-row">
+                  <button
+                    type="button"
+                    className={`filter-btn ${currencyDisplayMode === "sum" ? "active" : ""}`}
+                    onClick={() => handleCurrencyDisplayModeChange("sum")}
+                  >
+                    {t("currency_mode_sum_short")}
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-btn ${currencyDisplayMode === "dollar" ? "active" : ""}`}
+                    onClick={() => handleCurrencyDisplayModeChange("dollar")}
+                  >
+                    {t("currency_mode_dollar_short")}
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-btn ${currencyDisplayMode === "combined" ? "active" : ""}`}
+                    onClick={() => handleCurrencyDisplayModeChange("combined")}
+                  >
+                    {t("currency_mode_combined_short")}
+                  </button>
+                </div>
+                {currencyDisplayMode !== "combined" && (
+                  <div className="rate-row">
+                    <label htmlFor="worker-dollar-rate">{t("dollar_rate_short")}</label>
+                    <div className="rate-input-wrap">
+                      <input
+                        id="worker-dollar-rate"
+                        type="number"
+                        className="rate-input"
+                        min="1"
+                        inputMode="decimal"
+                        value={dollarRate}
+                        onChange={(event) => handleDollarRateChange(event.target.value)}
+                      />
+                      <span>UZS / USD</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn cancel"
+                onClick={() => setIsCurrencyModalOpen(false)}
+              >
+                {t("bekor_qilish_btn")}
+              </button>
+              <button
+                type="button"
+                className="btn add"
+                onClick={() => setIsCurrencyModalOpen(false)}
+              >
+                {t("saqlash_btn")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {logoutDialog && (
         <div className="confirm-overlay" onClick={() => setLogoutDialog(false)}>
