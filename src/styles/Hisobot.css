@@ -581,6 +581,10 @@
     overflow: hidden;
 }
 
+.rightTop > .undo-group {
+    margin-left: 12px;
+}
+
 .undo-btn {
     display: flex;
     align-items: center;
