@@ -108,7 +108,6 @@ function Hisobot() {
   const [activeFilter, setActiveFilter] = useState("all"); // all, oldest, high
   const [currencyDisplayMode, setCurrencyDisplayMode] = useState("combined"); // combined, sum, dollar
   const [dollarRate, setDollarRate] = useState(12000);
-  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -2224,40 +2223,8 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             <div className="ql">
               <div className="qoshishLine"></div>
             </div>
-            <input
-              className="searchWorker desktop-only-filter"
-              type="search"
-              placeholder={t("hisobot_qidiruv_placeholder")}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <div className="filterIshchilar desktop-only-filter">
-              <h3
-                className={activeFilter === "oldest" ? "active-filter" : ""}
-                onClick={() =>
-                  setActiveFilter(activeFilter === "oldest" ? "all" : "oldest")
-                }
-              >
-                {t("first_added_workers")}
-              </h3>
-              <h3
-                className={activeFilter === "high" ? "active-filter" : ""}
-                onClick={() =>
-                  setActiveFilter(activeFilter === "high" ? "all" : "high")
-                }
-              >
-                {t("yuqorimaosh")}
-              </h3>
-            </div>
             <button
-              className="currency-open-btn desktop-only-filter"
-              onClick={() => setIsCurrencyModalOpen(true)}
-            >
-              {t("valyuta")}
-            </button>
-
-            <button
-              className="mobile-filter-btn"
+              className="filter-open-btn"
               onClick={() => setIsFilterModalOpen(true)}
             >
               {t("filtrlash")}
@@ -3660,75 +3627,6 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isCurrencyModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsCurrencyModalOpen(false)}>
-          <div className="modal-container currency-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h2>{t("valyuta")}</h2>
-                <p className="modal-description">{t("currency_popup_description")}</p>
-              </div>
-              <button
-                className="close-btn"
-                onClick={() => setIsCurrencyModalOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="modal-body filter-modal-body">
-              <div className="currency-modal-body">
-                <div className="rate-row">
-                  <button
-                    className={`filter-btn ${currencyDisplayMode === "sum" ? "active" : ""}`}
-                    onClick={() => handleCurrencyDisplayModeChange("sum")}
-                  >
-                    {t("currency_mode_sum_short")}
-                  </button>
-                  <button
-                    className={`filter-btn ${currencyDisplayMode === "dollar" ? "active" : ""}`}
-                    onClick={() => handleCurrencyDisplayModeChange("dollar")}
-                  >
-                    {t("currency_mode_dollar_short")}
-                  </button>
-                  <button
-                    className={`filter-btn ${currencyDisplayMode === "combined" ? "active" : ""}`}
-                    onClick={() => handleCurrencyDisplayModeChange("combined")}
-                  >
-                    {t("currency_mode_combined_short")}
-                  </button>
-                </div>
-                {currencyDisplayMode !== "combined" && (
-                  <div className="rate-row">
-                    <label>{t("dollar_rate_short")}</label>
-                    <input
-                      type="number"
-                      className="rate-input"
-                      value={dollarRate}
-                      onChange={(e) => handleDollarRateChange(e.target.value)}
-                      onBlur={handleDollarRateCommit}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="btn cancel"
-                onClick={() => setIsCurrencyModalOpen(false)}
-              >
-                {t("bekor_qilish_btn")}
-              </button>
-              <button
-                className="btn add"
-                onClick={() => setIsCurrencyModalOpen(false)}
-              >
-                {t("saqlash_btn")}
-              </button>
             </div>
           </div>
         </div>
