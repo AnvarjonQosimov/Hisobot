@@ -326,9 +326,13 @@ function LogIn() {
           {loading ? (
             <span style={{ fontSize: '16px', fontWeight: '500' }}>{t("tekshirilmoqda...") || "Tekshirilmoqda..."}</span>
           ) : (
-            <FaGoogle />
+            <>
+              <FaGoogle />
+              <span>{t("login_choose_google_account")}</span>
+            </>
           )}
         </button>
+        <p className="login-account-hint">{t("login_choose_google_account_hint")}</p>
         {error && <p className="error" style={{ textAlign: 'center', marginTop: '20px', color: '#ff4d4d' }}>{error}</p>}
       </div>
     </div>
