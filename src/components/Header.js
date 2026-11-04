@@ -26,7 +26,7 @@ function Header() {
     setBurgerOpen(false);
   };
 
-  if (location.pathname === "/hisobot") {
+  if (location.pathname === "/hisobot" || location.pathname === "/davomat") {
     return null;
   }
 

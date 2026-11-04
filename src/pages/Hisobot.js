@@ -15,6 +15,7 @@ import { AnimatePresence } from "framer-motion";
 import { saveBossCabinet } from "../auth/firestoreOwnership";
 import AssistantManager from "../components/AssistantManager";
 import { getBossSectionSnapshot, saveBossSectionSnapshot } from "../auth/assistantSnapshots";
+import { SiLibreofficecalc } from "react-icons/si";
 import {
   createAssistantRecord,
   deleteAssistantRecord,
@@ -2240,6 +2241,21 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             >
               {t("filtrlash")}
             </button>
+
+            <div className="davomat">
+              <button className="davomat_btn">
+                <Link to="/davomat" >
+                <div className="davomat_ico">
+                  <SiLibreofficecalc />
+                </div>
+                <div className="davomt_text">
+                  {/* <h3 className="davomat_t">
+                  {t("davomat")}
+                </h3> */}
+                </div>
+                </Link>
+              </button>
+            </div>
 
             {undoState && (
               <div className="undo-group">

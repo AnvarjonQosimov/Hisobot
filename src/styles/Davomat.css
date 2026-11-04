@@ -1,0 +1,403 @@
+.Davomat {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+    color: rgb(204, 194, 255);
+    background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 30%),
+        linear-gradient(135deg, #020617 0%, #111827 45%, #0f172a 100%);
+}
+
+.davomat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 100px;
+    padding: 18px 32px;
+    box-sizing: border-box;
+    border-bottom: 2px solid rgb(9, 15, 80);
+    box-shadow: 0 10px 30px rgba(8, 16, 99, 0.2);
+}
+
+.davomat-brand,
+.davomat-header-info {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.davomat-logo {
+    color: #fff;
+    font-size: 24px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.davomat-logo span {
+    color: rgb(146, 151, 223);
+}
+
+.davomat-title h1,
+.davomat-title p {
+    margin: 0;
+}
+
+.davomat-title h1 {
+    color: #fff;
+    font-size: 20px;
+}
+
+.davomat-title p {
+    margin-top: 4px;
+    color: rgb(146, 151, 223);
+    font-size: 13px;
+}
+
+.davomat-worker-count {
+    color: rgb(146, 151, 223);
+    font-size: 14px;
+}
+
+.davomat-undo-group {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid rgba(255, 165, 0, 0.3);
+    border-radius: 10px;
+    background: rgba(255, 165, 0, 0.1);
+}
+
+.davomat-undo-group button {
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    color: rgb(255, 200, 100);
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.davomat-undo-group .davomat-undo-button {
+    border-right: 1px solid rgba(255, 165, 0, 0.2);
+}
+
+.davomat-undo-group .davomat-undo-dismiss {
+    color: rgba(255, 200, 100, 0.6);
+    font-size: 14px;
+}
+
+.davomat-undo-group button:hover:not(:disabled) {
+    background: rgba(255, 165, 0, 0.15);
+}
+
+.davomat-undo-group button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.davomat-back-link {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    border: 1px solid rgba(104, 239, 126, 0.5);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(40, 236, 112, 0.6), rgba(13, 138, 28, 0.8));
+    box-shadow: 0 4px 15px rgba(40, 236, 112, 0.3);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.davomat-content {
+    width: 100%;
+    flex: 1;
+    padding: 20px 32px;
+    box-sizing: border-box;
+}
+
+.davomat-header-add {
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.davomat-worker-list {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.davomat-worker-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
+    padding: 20px 10px;
+    border-bottom: 1px solid rgba(161, 161, 241, 0.15);
+    box-sizing: border-box;
+    transition: background 0.3s ease;
+}
+
+.davomat-worker-card:hover {
+    background: rgba(161, 161, 241, 0.05);
+}
+
+.davomat-worker-info h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.davomat_info_face {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.davomat-worker-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.davomat-access-status {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    border-radius: 50%;
+}
+
+.davomat-access-status.has-access-code {
+    background: linear-gradient(135deg, #7df5b0, #22c55e);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+}
+
+.davomat-access-status.no-access-code {
+    background: linear-gradient(135deg, #ff8585, #ef4444);
+}
+
+.davomat-worker-date {
+    display: block;
+    margin-top: 6px;
+    color: rgb(146, 151, 223);
+    font-size: 0.8rem;
+}
+
+.davomat-local-label {
+    display: block;
+    margin-top: 6px;
+    color: #a7f3d0;
+    font-size: 12px;
+}
+
+.davomat-worker-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.davomat-delete-button {
+    border-color: rgba(248, 113, 113, 0.45);
+    background: rgba(185, 28, 28, 0.45);
+}
+
+.davomat-empty {
+    display: grid;
+    min-height: 200px;
+    place-items: center;
+    color: rgb(146, 151, 223);
+    font-style: italic;
+}
+
+.davomat-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(2, 6, 23, 0.78);
+    backdrop-filter: blur(6px);
+}
+
+.davomat-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: min(100%, 480px);
+    padding: 24px;
+    border: 1px solid rgba(161, 161, 241, 0.25);
+    border-radius: 16px;
+    background: linear-gradient(145deg, #090d32, #111827);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+    color: rgb(204, 194, 255);
+    box-sizing: border-box;
+}
+
+.davomat-modal h2 {
+    margin: 0;
+    color: #fff;
+    font-size: 20px;
+}
+
+.davomat-modal p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.davomat-confirm-modal {
+    width: min(100%, 420px);
+}
+
+.davomat-modal > label:not(.davomat-sync-option) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: rgb(146, 151, 223);
+    font-size: 13px;
+}
+
+.davomat-modal input:not([type="checkbox"]) {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    border-radius: 10px;
+    outline: none;
+    background: rgba(2, 6, 23, 0.65);
+    color: #fff;
+    font: inherit;
+    box-sizing: border-box;
+}
+
+.davomat-modal input:focus {
+    border-color: rgba(129, 140, 248, 0.8);
+}
+
+.davomat-sync-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: #d7ddff;
+    font-size: 13px;
+    line-height: 1.45;
+    cursor: pointer;
+}
+
+.davomat-sync-option input {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    margin: 1px 0 0;
+    accent-color: #22c55e;
+}
+
+.davomat-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.davomat-modal-actions button {
+    min-height: 40px;
+    padding: 0 16px;
+    border: 1px solid rgba(161, 161, 241, 0.28);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e5e7eb;
+    font: inherit;
+    cursor: pointer;
+}
+
+.davomat-modal-actions button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.davomat-modal-actions .davomat-save-button {
+    border-color: rgba(104, 239, 126, 0.5);
+    background: linear-gradient(135deg, rgba(40, 236, 112, 0.6), rgba(13, 138, 28, 0.8));
+    color: #fff;
+}
+
+@media (max-width: 600px) {
+    .davomat-header {
+        min-height: 86px;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+        padding: 16px 18px;
+    }
+
+    .davomat-brand,
+    .davomat-header-info {
+        width: 100%;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .davomat-logo {
+        font-size: 20px;
+    }
+
+    .davomat-title h1 {
+        font-size: 18px;
+    }
+
+    .davomat-content {
+        padding: 12px 18px;
+    }
+
+    .davomat-worker-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .davomat-worker-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .davomat-header-info {
+        flex-wrap: wrap;
+    }
+
+    .davomat-modal {
+        padding: 20px;
+    }
+}
+
+.davomat_info_face{
+    display: flex;
+    align-items: start;
+    justify-content: center;
+    height: 125px;
+}
+
+.face_id_image{
+    width: 90px;
+    height: 125px;
+    border: 1px solid rgb(85, 91, 183);
+    background-color: transparent;
+    border-radius: 9px;
+    margin-right: 19px;
+}
+
+.davomat_worker_name{
+    margin-top: 15px !important;
+}

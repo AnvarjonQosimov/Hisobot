@@ -12,7 +12,7 @@ function PrivateRoute({ children }) {
 
   useEffect(() => {
     const isAdminRoute = location.pathname === "/admin";
-    const isBossRoute = location.pathname === "/hisobot";
+    const isBossRoute = location.pathname === "/hisobot" || location.pathname === "/davomat";
     if (!isAdminRoute && !isBossRoute) return undefined;
     let isCurrent = true;
     setAccountAccess("checking");
@@ -33,7 +33,8 @@ function PrivateRoute({ children }) {
         const isAllowed = isAdminRoute
           ? access.admin
           : role === "assistant"
-            ? access.assistant
+            ? access.assistant &&
+              (location.pathname !== "/davomat" || access.sections?.includes("workers"))
             : access.allowed && !access.admin && !access.assistant;
         if (isCurrent) setAccountAccess(isAllowed ? "allowed" : "denied");
       } catch (error) {
@@ -52,7 +53,7 @@ function PrivateRoute({ children }) {
     return <Navigate to="/login" />;
   }
 
-  if (role === "admin" && location.pathname === "/hisobot") {
+  if (role === "admin" && (location.pathname === "/hisobot" || location.pathname === "/davomat")) {
     return <Navigate to="/admin" replace />;
   }
 
@@ -62,7 +63,10 @@ function PrivateRoute({ children }) {
   }
 
   // If a worker tries to access boss routes (like /hisobot)
-  if (role === "worker" && location.pathname === "/hisobot") {
+  if (
+    role === "worker" &&
+    (location.pathname === "/hisobot" || location.pathname === "/davomat")
+  ) {
     return <Navigate to="/workerdashboard" />;
   }
 
