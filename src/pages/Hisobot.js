@@ -407,7 +407,7 @@ function Hisobot() {
     return null;
   };
 
-  const getWorkerSummary = (workersList) => {
+  const getWorkerSummary = (workersList, includePaymentCounts = true) => {
     const list = Array.isArray(workersList) ? workersList : [];
     const sumForList = (amountKey, currencyKey, currency) =>
       list
@@ -415,16 +415,25 @@ function Hisobot() {
         .reduce((sum, worker) => sum + parseAmount(worker[amountKey]), 0);
     const paidCount = list.filter((worker) => worker.isPaid).length;
 
-    return [
+    const summary = [
       [t("report_export_generated_at"), new Date()],
       [t("report_export_worker_count"), list.length],
-      [t("report_export_paid_count"), paidCount],
-      [t("report_export_unpaid_count"), list.length - paidCount],
+    ];
+
+    if (includePaymentCounts) {
+      summary.push(
+        [t("report_export_paid_count"), paidCount],
+        [t("report_export_unpaid_count"), list.length - paidCount],
+      );
+    }
+
+    summary.push(
       [t("report_export_total_due_sum"), sumForList("amountToReceive", "currencyToReceive", "sum")],
       [t("report_export_total_due_dollar"), sumForList("amountToReceive", "currencyToReceive", "dollar")],
       [t("report_export_received_sum"), sumForList("amountAlreadyReceived", "currencyAlreadyReceived", "sum")],
       [t("report_export_received_dollar"), sumForList("amountAlreadyReceived", "currencyAlreadyReceived", "dollar")],
-    ];
+    );
+    return summary;
   };
 
   const handleCurrencyDisplayModeChange = (mode) => {
@@ -475,7 +484,7 @@ function Hisobot() {
         await downloadReportExcel({
           fileName: `${reportTitle}_hisobot`,
           title: reportTitle,
-          summary: getWorkerSummary(currentWorkers),
+          summary: getWorkerSummary(currentWorkers, activeWorkerObjectId !== null),
         });
         setIsExportModalOpen(false);
         return;
@@ -1100,20 +1109,22 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         ...currentWorkerData,
         id: currentWorker?.id || Date.now(),
         workerName,
-        amountToReceive,
-        currencyToReceive,
-        dateToGive,
-        amountAlreadyReceived,
-        currencyAlreadyReceived,
-        dateAlreadyReceived,
-        currentWork: finalWork,
-        workPercent: finalPercent,
-        prevWork: finalPrevWork,
-        prevWorkPercent: finalPrevPercent,
+        ...(activeWorkerObjectId !== null && {
+          amountToReceive,
+          currencyToReceive,
+          dateToGive,
+          amountAlreadyReceived,
+          currencyAlreadyReceived,
+          dateAlreadyReceived,
+          currentWork: finalWork,
+          workPercent: finalPercent,
+          prevWork: finalPrevWork,
+          prevWorkPercent: finalPrevPercent,
+        }),
         createdAt: currentWorker?.createdAt || new Date().toISOString(),
         isPaid: currentWorker?.isPaid || false,
         history: currentWorker?.history || [],
-        workerCode: "",
+        workerCode: activeWorkerObjectId === null ? workerCode.trim() : "",
       };
       try {
         await updateAssistantRecord(currentWorker.assistantRecordId, "worker", assistantWorker);
@@ -1167,16 +1178,18 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             ? {
               ...w,
               workerName,
-              amountToReceive,
-              currencyToReceive,
-              dateToGive,
-              amountAlreadyReceived,
-              currencyAlreadyReceived,
-              dateAlreadyReceived,
-              currentWork: finalWork,
-              workPercent: finalPercent,
-              prevWork: finalPrevWork,
-              prevWorkPercent: finalPrevPercent,
+              ...(activeWorkerObjectId !== null && {
+                amountToReceive,
+                currencyToReceive,
+                dateToGive,
+                amountAlreadyReceived,
+                currencyAlreadyReceived,
+                dateAlreadyReceived,
+                currentWork: finalWork,
+                workPercent: finalPercent,
+                prevWork: finalPrevWork,
+                prevWorkPercent: finalPrevPercent,
+              }),
               workerCode: workerCode.trim()
             }
             : w,
@@ -1780,8 +1793,6 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         amountAlreadyReceived &&
         dateAlreadyReceived
       );
-  const isAllWorkersAdd = activeWorkerObjectId === null && !editMode;
-
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
   };
@@ -2781,7 +2792,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                   />
                 </div>
 
-                {!isAllWorkersAdd && (
+                {activeWorkerObjectId !== null && (
                   <>
                 <div className="row">
                   <div className="input-group">
