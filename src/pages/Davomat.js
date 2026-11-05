@@ -86,11 +86,15 @@ const getDayOfWeek = (dayKey) => {
 
 const getDateFromDayKey = (dayKey) => new Date(`${dayKey}T00:00:00.000Z`);
 
+const getCheckInTime = (record) => {
+  const timestamp = record.checkedInAt;
+  const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const compareCheckIn = (record, startTime) => {
-  const checkInDate = record.checkedInAt?.toDate
-    ? record.checkedInAt.toDate()
-    : new Date(record.checkedInAt);
-  if (Number.isNaN(checkInDate.getTime()) || !startTime) return "onTime";
+  const checkInDate = getCheckInTime(record);
+  if (!checkInDate || !startTime) return "onTime";
   const [startHour, startMinute] = startTime.split(":").map(Number);
   const scheduledMinutes = startHour * 60 + startMinute;
   const arrivalMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
@@ -212,6 +216,26 @@ function Davomat() {
         { onTime: 0, late: 0, absent: 0 },
       ),
     [workerStats],
+  );
+
+  const checkInsByWorker = useMemo(
+    () => {
+      const recordsByWorker = attendanceRecords.reduce((workerRecords, record) => {
+        const workerId = String(record.workerId);
+        if (!workerRecords[workerId]) workerRecords[workerId] = [];
+        workerRecords[workerId].push(record);
+        return workerRecords;
+      }, {});
+      Object.values(recordsByWorker).forEach((records) => {
+        records.sort((a, b) => {
+          const timeA = getCheckInTime(a)?.getTime() || 0;
+          const timeB = getCheckInTime(b)?.getTime() || 0;
+          return timeB - timeA;
+        });
+      });
+      return recordsByWorker;
+    },
+    [attendanceRecords],
   );
 
   useEffect(() => {
@@ -717,17 +741,13 @@ function Davomat() {
                 <div className="davomat-worker-info">
                   <div className="davomat_info_face">
                     <div className="face_id_image">
-                      {workerStats[String(worker.id)]?.history.find((entry) => entry.record)?.record?.imageData ||
-                      faceImages[String(worker.id)]?.front ? (
+                      {checkInsByWorker[String(worker.id)]?.[0]?.imageData ? (
                         <img
-                          src={
-                            workerStats[String(worker.id)]?.history.find((entry) => entry.record)?.record?.imageData ||
-                            faceImages[String(worker.id)].front
-                          }
-                          alt={`${worker.workerName} yuz rasmi`}
+                          src={checkInsByWorker[String(worker.id)][0].imageData}
+                          alt={`${worker.workerName} oxirgi kelish rasmi`}
                         />
                       ) : (
-                        <span>Face ID</span>
+                        <span>Kelish rasmi yo'q</span>
                       )}
                     </div>
                     <div className="davomat-worker-details">
@@ -946,23 +966,31 @@ function Davomat() {
             <hr />
             <h3>Kelishlar tarixi</h3>
             <div className="davomat-full-history">
-              {(workerStats[String(selectedWorker.id)]?.history || []).map((entry) => (
-                <div className={`davomat-full-history-row status-${entry.status}`} key={entry.dateKey}>
-                  <span>{entry.dateKey}</span>
-                  <span>
-                    {entry.record?.checkedInAt?.toDate
-                      ? entry.record.checkedInAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                      : entry.status === "absent" ? "Kelmagan" : "Vaqtida"}
-                  </span>
-                  {entry.record?.imageData && (
+              {checkInsByWorker[String(selectedWorker.id)]?.length ? (
+                checkInsByWorker[String(selectedWorker.id)].map((record) => {
+                  const checkInTime = getCheckInTime(record);
+                  const status = compareCheckIn(record, attendanceData.startTime);
+                  return (
+                    <div className={`davomat-full-history-row status-${status}`} key={record.dateKey}>
+                      <span>{record.dateKey}</span>
+                      <span>
+                        {checkInTime
+                          ? checkInTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                          : "Vaqt noma'lum"}
+                      </span>
+                      {record.imageData && (
                     <img
                       className="davomat-checkin-thumbnail"
-                      src={entry.record.imageData}
-                      alt={`${selectedWorker.workerName} ${entry.dateKey} davomat rasmi`}
+                          src={record.imageData}
+                          alt={`${selectedWorker.workerName} ${record.dateKey} kelish rasmi`}
                     />
                   )}
-                </div>
-              ))}
+                    </div>
+                  );
+                })
+              ) : (
+                <p>Hozircha kelish rasmi yo'q.</p>
+              )}
             </div>
           </div>
         </div>
