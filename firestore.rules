@@ -261,6 +261,15 @@ service cloud.firestore {
     match /inviteCodes/{code} {
       allow get: if isAdmin()
         || (
+          hasVerifiedEmail()
+          && !exists(/databases/$(database)/documents/inviteCodes/$(code))
+        )
+        || (
+          hasVerifiedEmail()
+          && resource.data.ownerEmail == request.auth.token.email
+          && resource.data.ownerUid == request.auth.uid
+        )
+        || (
           isBossFor(resource.data.bossEmail)
           && resource.data.bossEmail == request.auth.token.email
         )
@@ -268,16 +277,18 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isAdmin()
         || (
-          isBossFor(request.resource.data.bossEmail)
+          hasVerifiedEmail()
           && request.resource.data.bossEmail == request.auth.token.email
           && request.resource.data.ownerEmail == request.auth.token.email
           && request.resource.data.ownerUid == request.auth.uid
         );
       allow update: if isAdmin()
         || (
-          isBossFor(request.resource.data.bossEmail)
-          && resource.data.bossEmail == request.auth.token.email
+          hasVerifiedEmail()
+          && resource.data.ownerEmail == request.auth.token.email
+          && resource.data.ownerUid == request.auth.uid
           && request.resource.data.bossEmail == request.auth.token.email
+          && resource.data.workerId == request.resource.data.workerId
           && request.resource.data.ownerEmail == request.auth.token.email
           && request.resource.data.ownerUid == request.auth.uid
         );
@@ -349,8 +360,100 @@ service cloud.firestore {
         );
     }
 
+    match /attendanceFaces/{faceId} {
+        allow get, list: if isAdmin()
+          || (
+            hasVerifiedEmail()
+            && resource.data.bossEmail == request.auth.token.email
+            && resource.data.ownerEmail == request.auth.token.email
+          );
+        allow create: if isAdmin()
+          || (
+            hasVerifiedEmail()
+            && request.resource.data.bossEmail == request.auth.token.email
+            && request.resource.data.ownerEmail == request.auth.token.email
+            && request.resource.data.ownerUid == request.auth.uid
+            && request.resource.data.pose in ["front", "left", "right"]
+            && request.resource.data.imageData is string
+            && request.resource.data.imageData.size() <= 700000
+          );
+        allow update: if isAdmin()
+          || (
+            hasVerifiedEmail()
+            && resource.data.bossEmail == request.auth.token.email
+            && resource.data.ownerEmail == request.auth.token.email
+            && resource.data.ownerUid == request.auth.uid
+            && request.resource.data.bossEmail == request.auth.token.email
+            && request.resource.data.ownerEmail == request.auth.token.email
+            && request.resource.data.ownerUid == request.auth.uid
+            && request.resource.data.workerId == resource.data.workerId
+            && request.resource.data.pose == resource.data.pose
+            && request.resource.data.pose in ["front", "left", "right"]
+            && request.resource.data.imageData is string
+            && request.resource.data.imageData.size() <= 700000
+          );
+        allow delete: if isAdmin()
+          || (
+            hasVerifiedEmail()
+            && resource.data.bossEmail == request.auth.token.email
+            && resource.data.ownerEmail == request.auth.token.email
+            && resource.data.ownerUid == request.auth.uid
+          );
+    }
+
+    match /attendanceRecords/{attendanceRecordId} {
+        allow get: if isAdmin()
+          || (
+            hasVerifiedEmail()
+            && resource.data.bossEmail == request.auth.token.email
+            && resource.data.ownerEmail == request.auth.token.email
+            && resource.data.ownerUid == request.auth.uid
+          )
+          || (
+            hasVerifiedEmail()
+            && request.auth.token.email == resource.data.workerEmail
+            && exists(/databases/$(database)/documents/workerAccess/$(request.auth.token.email))
+            && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.ownerUid == request.auth.uid
+            && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.bossEmail == resource.data.bossEmail
+            && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.workerId == resource.data.workerId
+          );
+        allow list: if isAdmin()
+          || (
+            hasVerifiedEmail()
+            && resource.data.bossEmail == request.auth.token.email
+            && resource.data.ownerEmail == request.auth.token.email
+          );
+        allow create: if hasVerifiedEmail()
+          && exists(/databases/$(database)/documents/workerAccess/$(request.auth.token.email))
+          && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.ownerUid == request.auth.uid
+          && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.bossEmail == request.resource.data.bossEmail
+          && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.workerId == request.resource.data.workerId
+          && request.resource.data.workerEmail == request.auth.token.email
+          && request.resource.data.ownerEmail == request.resource.data.bossEmail
+          && request.resource.data.year == request.time.year()
+          && request.resource.data.month == request.time.month()
+          && request.resource.data.day == request.time.day()
+          && attendanceRecordId == request.auth.token.email
+            + "__"
+            + string(request.time.year())
+            + "_"
+            + string(request.time.month())
+            + "_"
+            + string(request.time.day())
+          && request.resource.data.checkedInAt == request.time
+          && request.resource.data.imageData is string
+          && request.resource.data.imageData.size() <= 700000;
+        allow update, delete: if isAdmin()
+          || (
+            hasVerifiedEmail()
+            && resource.data.bossEmail == request.auth.token.email
+            && resource.data.ownerEmail == request.auth.token.email
+            && resource.data.ownerUid == request.auth.uid
+          );
+    }
+
     match /{document=**} {
-      allow read, write: if false;
+        allow read, write: if false;
     }
   }
 

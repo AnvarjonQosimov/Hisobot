@@ -1101,6 +1101,33 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     const currentWorker = editMode
       ? currentWorkers.find((worker) => worker.id === editingWorkerId)
       : null;
+    const workerIdForCode = editMode ? editingWorkerId : Date.now();
+    const trimmedWorkerCode = workerCode.trim();
+    if (!isAssistant && activeWorkerObjectId === null && trimmedWorkerCode) {
+      const duplicateWorker = currentWorkers.find(
+        (worker) =>
+          String(worker.id) !== String(workerIdForCode) &&
+          worker.workerCode?.trim() === trimmedWorkerCode,
+      );
+      if (duplicateWorker) {
+        window.alert("Bu kod boshqa ishchiga berilgan. Boshqa kod kiriting.");
+        return;
+      }
+
+      try {
+        const codeRef = doc(db, "inviteCodes", trimmedWorkerCode);
+        await setDoc(codeRef, {
+          bossEmail: username,
+          workerId: workerIdForCode,
+          ownerEmail: username,
+          ownerUid: auth.currentUser.uid,
+        });
+      } catch (error) {
+        console.error("Could not reserve unique worker code:", error);
+        window.alert("Bu kod band yoki uni tekshirib bo'lmadi. Boshqa kod kiriting.");
+        return;
+      }
+    }
     if (editMode && currentWorker?.assistantRecordId) {
       if (isAssistant && currentWorker.createdByEmail !== username) return;
       const currentWorkerData = { ...currentWorker };
@@ -1191,24 +1218,14 @@ if (sdr) setDollarRate(JSON.parse(sdr));
                 prevWork: finalPrevWork,
                 prevWorkPercent: finalPrevPercent,
               }),
-              workerCode: workerCode.trim()
+              workerCode: trimmedWorkerCode
             }
             : w,
         ),
       );
-      if (workerCode.trim() && activeWorkerObjectId === null) {
-        // Non-blocking write
-        setDoc(doc(db, "inviteCodes", workerCode.trim()), {
-          bossEmail: username,
-          workerId: editingWorkerId,
-          ownerEmail: username,
-          ownerUid: auth.currentUser.uid,
-        })
-          .catch(e => console.error("Failed to save invite code:", e));
-      }
     } else {
       saveForUndo();
-      const newWorkerId = Date.now();
+      const newWorkerId = workerIdForCode;
       const newWorker = {
         id: newWorkerId,
         workerName,
@@ -1225,19 +1242,9 @@ if (sdr) setDollarRate(JSON.parse(sdr));
         createdAt: new Date().toISOString(),
         isPaid: false,
         history: [],
-        workerCode: workerCode.trim()
+        workerCode: trimmedWorkerCode
       };
       updateCurrentWorkers([newWorker, ...currentWorkers]);
-      if (workerCode.trim() && activeWorkerObjectId === null) {
-        // Non-blocking write
-        setDoc(doc(db, "inviteCodes", workerCode.trim()), {
-          bossEmail: username,
-          workerId: newWorkerId,
-          ownerEmail: username,
-          ownerUid: auth.currentUser.uid,
-        })
-          .catch(e => console.error("Failed to save invite code:", e));
-      }
     }
     handleAddWorkerModalClose();
   };

@@ -1,16 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { auth, db } from "../Firebase/Firebase";
 import { saveBossCabinet } from "../auth/firestoreOwnership";
+import AttendanceCamera from "../components/AttendanceCamera";
+import {
+  getAttendanceDay,
+  getAttendanceFaceId,
+} from "../utils/attendance";
 import "../styles/Davomat.css";
 
 const EMPTY_ATTENDANCE_DATA = {
   workers: [],
   overrides: {},
   hiddenWorkerIds: [],
+  workDays: [1, 2, 3, 4, 5],
+  trackingStartDay: "",
+  startTime: "",
 };
 
 const readStoredWorkers = (key) => {
@@ -38,6 +54,9 @@ const normalizeAttendanceData = (data) => ({
   hiddenWorkerIds: Array.isArray(data?.hiddenWorkerIds)
     ? [...data.hiddenWorkerIds].map(String)
     : [],
+  workDays: Array.isArray(data?.workDays) ? [...data.workDays] : [1, 2, 3, 4, 5],
+  trackingStartDay: typeof data?.trackingStartDay === "string" ? data.trackingStartDay : "",
+  startTime: typeof data?.startTime === "string" ? data.startTime : "",
 });
 
 const makeWorker = (workerName, workerCode) => ({
@@ -59,12 +78,84 @@ const makeWorker = (workerName, workerCode) => ({
   history: [],
 });
 
+const getDayOfWeek = (dayKey) => {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+};
+
+const getDateFromDayKey = (dayKey) => new Date(`${dayKey}T00:00:00.000Z`);
+
+const compareCheckIn = (record, startTime) => {
+  const checkInDate = record.checkedInAt?.toDate
+    ? record.checkedInAt.toDate()
+    : new Date(record.checkedInAt);
+  if (Number.isNaN(checkInDate.getTime()) || !startTime) return "onTime";
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const scheduledMinutes = startHour * 60 + startMinute;
+  const arrivalMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
+  return arrivalMinutes > scheduledMinutes ? "late" : "onTime";
+};
+
+const getWorkerAttendanceStats = (worker, records, attendanceData, now) => {
+  const schedule = attendanceData.workDays || [];
+  const startDay = attendanceData.trackingStartDay;
+  const startTime = attendanceData.startTime;
+  if (!startDay || !startTime) {
+    return { onTime: 0, late: 0, absent: 0, todayStatus: "", history: [] };
+  }
+
+  const createdAt = worker.createdAt ? new Date(worker.createdAt) : null;
+  const workerStartDay =
+    createdAt && !Number.isNaN(createdAt.getTime()) ? getAttendanceDay(createdAt) : startDay;
+  const firstDay = workerStartDay > startDay ? workerStartDay : startDay;
+  const today = getAttendanceDay(now);
+  const matchingRecords = records
+    .filter((record) => String(record.workerId) === String(worker.id))
+    .reduce((recordMap, record) => {
+      recordMap[record.dateKey] = record;
+      return recordMap;
+    }, {});
+  const stats = { onTime: 0, late: 0, absent: 0, todayStatus: "", history: [] };
+
+  for (
+    let date = getDateFromDayKey(firstDay);
+    getAttendanceDay(date) <= today;
+    date.setUTCDate(date.getUTCDate() + 1)
+  ) {
+    const dateKey = getAttendanceDay(date);
+    if (!schedule.includes(getDayOfWeek(dateKey))) continue;
+    const record = matchingRecords[dateKey];
+    let status = "";
+    if (record) {
+      status = compareCheckIn(record, startTime);
+    } else {
+      const cutoff = new Date(`${dateKey}T${startTime}:00`);
+      if (now >= cutoff) status = "absent";
+    }
+
+    if (!status) continue;
+    stats[status] += 1;
+    if (dateKey === today) stats.todayStatus = status;
+    stats.history.push({ dateKey, status, record });
+  }
+
+  return { ...stats, history: stats.history.reverse() };
+};
+
 function Davomat() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [ownerEmail, setOwnerEmail] = useState("");
   const [workers, setWorkers] = useState([]);
   const [workerObjects, setWorkerObjects] = useState([]);
   const [attendanceData, setAttendanceData] = useState(EMPTY_ATTENDANCE_DATA);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [faceImages, setFaceImages] = useState({});
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [cameraTarget, setCameraTarget] = useState(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [selectedWorkDays, setSelectedWorkDays] = useState([1, 2, 3, 4, 5]);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
@@ -78,6 +169,7 @@ function Davomat() {
   const [undoSnapshot, setUndoSnapshot] = useState(null);
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
   const [showDismissUndoConfirm, setShowDismissUndoConfirm] = useState(false);
+  const [startTime, setStartTime] = useState("");
 
   const attendanceWorkers = useMemo(() => {
     const hiddenIds = new Set(attendanceData.hiddenWorkerIds);
@@ -94,6 +186,33 @@ function Davomat() {
       ...attendanceData.workers.map((worker) => ({ ...worker, source: "attendance" })),
     ];
   }, [workers, attendanceData]);
+
+  const workerStats = useMemo(
+    () =>
+      attendanceWorkers.reduce((stats, worker) => {
+        stats[String(worker.id)] = getWorkerAttendanceStats(
+          worker,
+          attendanceRecords,
+          attendanceData,
+          currentTime,
+        );
+        return stats;
+      }, {}),
+    [attendanceWorkers, attendanceRecords, attendanceData, currentTime],
+  );
+
+  const totalAttendanceStats = useMemo(
+    () =>
+      Object.values(workerStats).reduce(
+        (total, stats) => ({
+          onTime: total.onTime + stats.onTime,
+          late: total.late + stats.late,
+          absent: total.absent + stats.absent,
+        }),
+        { onTime: 0, late: 0, absent: 0 },
+      ),
+    [workerStats],
+  );
 
   useEffect(() => {
     let unsubscribeData = () => {};
@@ -149,17 +268,22 @@ function Davomat() {
       setWorkerObjects(readStoredWorkers(`workerObjects_${bossEmail}`));
       try {
         const storedAttendanceData = localStorage.getItem(attendanceKey);
-        setAttendanceData(
-          storedAttendanceData
-            ? normalizeAttendanceData(JSON.parse(storedAttendanceData))
-            : EMPTY_ATTENDANCE_DATA,
+        const savedAttendanceData = storedAttendanceData
+          ? normalizeAttendanceData(JSON.parse(storedAttendanceData))
+          : EMPTY_ATTENDANCE_DATA;
+        setAttendanceData(savedAttendanceData);
+        setSelectedWorkDays([...savedAttendanceData.workDays]);
+        setStartTime(
+          savedAttendanceData.startTime ||
+            readStoredWorkers(workersKey).find((worker) => worker.startTime)?.startTime ||
+            "",
         );
       } catch (error) {
         console.error("Failed to load saved attendance workers:", error);
         setAttendanceData(EMPTY_ATTENDANCE_DATA);
       }
 
-      unsubscribeData = onSnapshot(
+      const unsubscribeCabinet = onSnapshot(
         doc(db, "cabinets", bossEmail),
         (snapshot) => {
           if (!isCurrent || currentOwnerEmail !== bossEmail) return;
@@ -175,6 +299,11 @@ function Davomat() {
           if (cabinet.attendanceData) {
             const nextAttendanceData = normalizeAttendanceData(cabinet.attendanceData);
             setAttendanceData(nextAttendanceData);
+            setStartTime(
+              nextAttendanceData.startTime ||
+                cabinet.workers?.find((worker) => worker.startTime)?.startTime ||
+                "",
+            );
             localStorage.setItem(attendanceKey, JSON.stringify(nextAttendanceData));
           }
           setIsLoading(false);
@@ -184,6 +313,44 @@ function Davomat() {
           setIsLoading(false);
         },
       );
+      const unsubscribeRecords = onSnapshot(
+        query(
+          collection(db, "attendanceRecords"),
+          where("bossEmail", "==", bossEmail),
+          where("ownerEmail", "==", bossEmail),
+        ),
+        (snapshot) => {
+          setAttendanceRecords(snapshot.docs.map((record) => record.data()));
+        },
+        (error) => {
+          console.error("Failed to load attendance history:", error);
+        },
+      );
+      const unsubscribeFaces = onSnapshot(
+        query(
+          collection(db, "attendanceFaces"),
+          where("bossEmail", "==", bossEmail),
+          where("ownerEmail", "==", bossEmail),
+        ),
+        (snapshot) => {
+          setFaceImages(
+            snapshot.docs.reduce((images, faceDoc) => {
+              const { workerId, pose, imageData } = faceDoc.data();
+              if (!images[String(workerId)]) images[String(workerId)] = {};
+              images[String(workerId)][pose] = imageData;
+              return images;
+            }, {}),
+          );
+        },
+        (error) => {
+          console.error("Failed to load worker face photos:", error);
+        },
+      );
+      unsubscribeData = () => {
+        unsubscribeCabinet();
+        unsubscribeRecords();
+        unsubscribeFaces();
+      };
     });
 
     return () => {
@@ -191,6 +358,11 @@ function Davomat() {
       unsubscribeAuth();
       unsubscribeData();
     };
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => window.clearInterval(intervalId);
   }, []);
 
   const persistChanges = async (nextAttendanceData, nextWorkers, recordUndo = true) => {
@@ -241,6 +413,62 @@ function Davomat() {
     }
   };
 
+  const toggleWorkDay = (day) => {
+    setSelectedWorkDays((currentDays) =>
+      currentDays.includes(day)
+        ? currentDays.filter((currentDay) => currentDay !== day)
+        : [...currentDays, day].sort((a, b) => a - b),
+    );
+  };
+
+  const handleSaveWorkDays = async () => {
+    if (selectedWorkDays.length === 0 || !startTime || isSaving) return;
+    const nextAttendanceData = normalizeAttendanceData(attendanceData);
+    nextAttendanceData.workDays = [...selectedWorkDays];
+    nextAttendanceData.startTime = startTime;
+    if (!nextAttendanceData.trackingStartDay) {
+      nextAttendanceData.trackingStartDay = getAttendanceDay();
+    }
+
+    setIsSaving(true);
+    try {
+      await persistChanges(nextAttendanceData);
+      setIsSettingsOpen(false);
+    } catch (error) {
+      console.error("Failed to save attendance work days:", error);
+      window.alert("Ish kunlarini saqlab bo'lmadi. Qayta urinib ko'ring.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleFaceCapture = async (imageData) => {
+    if (!cameraTarget || !selectedWorker || !isOwner) return;
+    const faceId = getAttendanceFaceId(ownerEmail, cameraTarget.workerId, cameraTarget.pose);
+    setIsSaving(true);
+    try {
+      await setDoc(doc(db, "attendanceFaces", faceId), {
+        bossEmail: ownerEmail,
+        ownerEmail,
+        ownerUid: auth.currentUser.uid,
+        workerId: String(cameraTarget.workerId),
+        pose: cameraTarget.pose,
+        imageData,
+        updatedAt: serverTimestamp(),
+      });
+      setFaceImages((currentImages) => ({
+        ...currentImages,
+        [String(cameraTarget.workerId)]: {
+          ...(currentImages[String(cameraTarget.workerId)] || {}),
+          [cameraTarget.pose]: imageData,
+        },
+      }));
+      setCameraTarget(null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const openAddModal = () => {
     setEditingWorker(null);
     setWorkerName("");
@@ -272,6 +500,35 @@ function Davomat() {
     const updatedWorker = editingWorker
       ? { ...editingWorker, workerName: trimmedName, workerCode: trimmedCode }
       : makeWorker(trimmedName, trimmedCode);
+    const duplicateWorker = attendanceWorkers.find(
+      (worker) =>
+        String(worker.id) !== String(updatedWorker.id) &&
+        worker.workerCode?.trim() === trimmedCode &&
+        trimmedCode,
+    );
+    if (duplicateWorker) {
+      window.alert("Bu kod boshqa ishchiga berilgan. Boshqa kod kiriting.");
+      return;
+    }
+
+    const shouldIssueInviteCode = syncWithAllWorkers || editingWorker?.source === "master";
+    if (trimmedCode && shouldIssueInviteCode) {
+      try {
+        const codeRef = doc(db, "inviteCodes", trimmedCode);
+        await setDoc(codeRef, {
+          bossEmail: ownerEmail,
+          workerId: updatedWorker.id,
+          ownerEmail,
+          ownerUid: auth.currentUser.uid,
+        });
+      } catch (error) {
+        console.error("Could not reserve unique worker code:", error);
+        window.alert(
+          "Bu kod band yoki saqlashga ruxsat yo'q. Boshqa kod kiriting yoki ishchini umumiy ro'yxatga qo'shish belgisini tekshiring.",
+        );
+        return;
+      }
+    }
     const nextAttendanceData = normalizeAttendanceData(attendanceData);
     let nextWorkers = null;
 
@@ -308,19 +565,6 @@ function Davomat() {
     setIsSaving(true);
     try {
       await persistChanges(nextAttendanceData, nextWorkers);
-      if (syncWithAllWorkers && trimmedCode) {
-        try {
-          await setDoc(doc(db, "inviteCodes", trimmedCode), {
-            bossEmail: ownerEmail,
-            workerId: updatedWorker.id,
-            ownerEmail,
-            ownerUid: auth.currentUser.uid,
-          });
-        } catch (error) {
-          console.error("Failed to save invite code:", error);
-          window.alert("Ishchi kodi saqlanmadi. Qayta urinib ko'ring.");
-        }
-      }
       setIsModalOpen(false);
       setEditingWorker(null);
     } catch (error) {
@@ -383,6 +627,11 @@ function Davomat() {
           <span className="davomat-worker-count">
             {attendanceWorkers.length} {t("report_export_worker_count") || "Ishchilar"}
           </span>
+          <div className="davomat-header-stats" aria-label="Davomat statistikasi">
+            <span className="on-time">Vaqtida: {totalAttendanceStats.onTime}</span>
+            <span className="late">Kechikdi: {totalAttendanceStats.late}</span>
+            <span className="absent">Kelmagan: {totalAttendanceStats.absent}</span>
+          </div>
           {undoSnapshot && isOwner && (
             <div className="davomat-undo-group">
               <button
@@ -406,6 +655,31 @@ function Davomat() {
             </div>
           )}
           {isOwner && (
+            <button
+              type="button"
+              className="davomat-settings-button"
+              onClick={() => {
+                setSelectedWorkDays([...(attendanceData.workDays || [1, 2, 3, 4, 5])]);
+                setStartTime(attendanceData.startTime || startTime);
+                setIsSettingsOpen(true);
+              }}
+            >
+              Ish jadvali
+            </button>
+          )}
+          <label className="davomat-language-switcher">
+            <span aria-hidden="true">🌐</span>
+            <select
+              aria-label="Language"
+              value={i18n.language?.slice(0, 2) || "uz"}
+              onChange={(event) => i18n.changeLanguage(event.target.value)}
+            >
+              <option value="uz">UZ</option>
+              <option value="ru">RU</option>
+              <option value="en">EN</option>
+            </select>
+          </label>
+          {isOwner && (
             <button type="button" className="addH3 davomat-header-add" onClick={openAddModal}>
               + {t("qo'shish") || "Ishchi qo'shish"}
             </button>
@@ -426,11 +700,35 @@ function Davomat() {
         ) : (
           <div className="davomat-worker-list">
             {attendanceWorkers.map((worker) => (
-              <article className="davomat-worker-card" key={`${worker.source}-${worker.id}`}>
+              <article
+                className={`davomat-worker-card ${
+                  workerStats[String(worker.id)]?.todayStatus
+                    ? `status-${workerStats[String(worker.id)].todayStatus}`
+                    : ""
+                }`}
+                key={`${worker.source}-${worker.id}`}
+                onClick={() => setSelectedWorker(worker)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") setSelectedWorker(worker);
+                }}
+                role="button"
+                tabIndex={0}
+              >
                 <div className="davomat-worker-info">
-                    <div className="davomat_info_face">
-                        <div className="face_id_image">
-                        
+                  <div className="davomat_info_face">
+                    <div className="face_id_image">
+                      {workerStats[String(worker.id)]?.history.find((entry) => entry.record)?.record?.imageData ||
+                      faceImages[String(worker.id)]?.front ? (
+                        <img
+                          src={
+                            workerStats[String(worker.id)]?.history.find((entry) => entry.record)?.record?.imageData ||
+                            faceImages[String(worker.id)].front
+                          }
+                          alt={`${worker.workerName} yuz rasmi`}
+                        />
+                      ) : (
+                        <span>Face ID</span>
+                      )}
                     </div>
                     <div className="davomat-worker-details">
                       <h2 className="davomat_worker_name">
@@ -453,6 +751,24 @@ function Davomat() {
                     </div>
                   </div>
                 </div>
+                <div className="davomat-card-history">
+                  {(workerStats[String(worker.id)]?.history || []).slice(0, 3).map((entry) => (
+                    <span
+                      className={`davomat-history-pill status-${entry.status}`}
+                      key={entry.dateKey}
+                      title={`${entry.dateKey} ${entry.record?.checkedInAt?.toDate
+                        ? entry.record.checkedInAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : entry.status}`}
+                    >
+                      {entry.record?.checkedInAt?.toDate
+                        ? entry.record.checkedInAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : entry.status === "absent" ? "—" : "✓"}
+                    </span>
+                  ))}
+                  {(workerStats[String(worker.id)]?.history.length || 0) > 3 && (
+                    <span className="davomat-more-history" aria-label="To'liq tarix uchun bosing">...</span>
+                  )}
+                </div>
                 {isOwner && (
                   <div className="worker-actions davomat-worker-actions">
                     <button
@@ -460,7 +776,10 @@ function Davomat() {
                       className="edit-btn"
                       title="Tahrirlash"
                       aria-label="Tahrirlash"
-                      onClick={() => openEditModal(worker)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEditModal(worker);
+                      }}
                     >
                       ✏️
                     </button>
@@ -469,7 +788,10 @@ function Davomat() {
                       className="delete-btn"
                       title="O'chirish"
                       aria-label="O'chirish"
-                      onClick={() => openDeleteConfirm(worker)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openDeleteConfirm(worker);
+                      }}
                     >
                       🗑️
                     </button>
@@ -527,6 +849,132 @@ function Davomat() {
             </div>
           </form>
         </div>
+      )}
+
+      {isSettingsOpen && (
+        <div className="davomat-modal-overlay" onMouseDown={() => setIsSettingsOpen(false)}>
+          <div className="davomat-modal" onMouseDown={(event) => event.stopPropagation()}>
+            <h2>Ish jadvali</h2>
+            <label>
+              Ish boshlanish vaqti
+              <input
+                type="time"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+                required
+              />
+            </label>
+            <p>Kechikish va kelmaganlik statistikasi ish vaqti va kunlari asosida hisoblanadi.</p>
+            <div className="davomat-weekdays">
+              {[
+                [1, "Du"],
+                [2, "Se"],
+                [3, "Ch"],
+                [4, "Pa"],
+                [5, "Ju"],
+                [6, "Sh"],
+                [7, "Ya"],
+              ].map(([day, label]) => (
+                <label key={day}>
+                  <input
+                    type="checkbox"
+                    checked={selectedWorkDays.includes(day)}
+                    onChange={() => toggleWorkDay(day)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <div className="davomat-modal-actions">
+              <button type="button" onClick={() => setIsSettingsOpen(false)} disabled={isSaving}>
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                className="davomat-save-button"
+                onClick={handleSaveWorkDays}
+                disabled={isSaving || selectedWorkDays.length === 0 || !startTime}
+              >
+                {isSaving ? "Saqlanmoqda..." : "Saqlash"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedWorker && (
+        <div className="davomat-modal-overlay" onMouseDown={() => setSelectedWorker(null)}>
+          <div className="davomat-modal davomat-worker-detail" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="davomat-detail-heading">
+              <div>
+                <h2>{selectedWorker.workerName}</h2>
+                <p>Kod: {selectedWorker.workerCode || "—"}</p>
+              </div>
+              <button type="button" onClick={() => setSelectedWorker(null)} aria-label="Yopish">✕</button>
+            </div>
+            <div className="davomat-detail-stats">
+              <span className="on-time">Vaqtida: {workerStats[String(selectedWorker.id)]?.onTime || 0}</span>
+              <span className="late">Kechikdi: {workerStats[String(selectedWorker.id)]?.late || 0}</span>
+              <span className="absent">Kelmagan: {workerStats[String(selectedWorker.id)]?.absent || 0}</span>
+            </div>
+            {isOwner && (
+              <>
+                <p className="davomat-face-notice">Rasmlarni bosingiz qo'lda tekshiradi.</p>
+                <div className="davomat-face-grid">
+                  {[
+                    ["front", "To'g'ridan"],
+                    ["left", "Chapdan"],
+                    ["right", "O'ngdan"],
+                  ].map(([pose, label]) => (
+                    <button
+                      type="button"
+                      className="davomat-face-slot"
+                      key={pose}
+                      onClick={() => setCameraTarget({ workerId: selectedWorker.id, pose })}
+                    >
+                      {faceImages[String(selectedWorker.id)]?.[pose] ? (
+                        <img src={faceImages[String(selectedWorker.id)][pose]} alt={`${label} yuz rasmi`} />
+                      ) : (
+                        <span>+</span>
+                      )}
+                      <small>{label}</small>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <hr />
+            <h3>Kelishlar tarixi</h3>
+            <div className="davomat-full-history">
+              {(workerStats[String(selectedWorker.id)]?.history || []).map((entry) => (
+                <div className={`davomat-full-history-row status-${entry.status}`} key={entry.dateKey}>
+                  <span>{entry.dateKey}</span>
+                  <span>
+                    {entry.record?.checkedInAt?.toDate
+                      ? entry.record.checkedInAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      : entry.status === "absent" ? "Kelmagan" : "Vaqtida"}
+                  </span>
+                  {entry.record?.imageData && (
+                    <img
+                      className="davomat-checkin-thumbnail"
+                      src={entry.record.imageData}
+                      alt={`${selectedWorker.workerName} ${entry.dateKey} davomat rasmi`}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cameraTarget && (
+        <AttendanceCamera
+          title={`Face ID: ${cameraTarget.pose === "front" ? "To'g'ridan" : cameraTarget.pose === "left" ? "Chapdan" : "O'ngdan"}`}
+          onCapture={handleFaceCapture}
+          onClose={() => !isSaving && setCameraTarget(null)}
+          isSaving={isSaving}
+        />
       )}
 
       {deleteWorker && (

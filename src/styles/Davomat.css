@@ -151,6 +151,123 @@
     background: rgba(161, 161, 241, 0.05);
 }
 
+.davomat-worker-card.status-onTime {
+    background: rgba(34, 197, 94, 0.08);
+}
+
+.davomat-worker-card.status-late {
+    background: rgba(234, 179, 8, 0.09);
+}
+
+.davomat-worker-card.status-absent {
+    background: rgba(239, 68, 68, 0.09);
+}
+
+.davomat-worker-card[role="button"] {
+    cursor: pointer;
+}
+
+.davomat-header-stats,
+.davomat-detail-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.davomat-header-stats span,
+.davomat-detail-stats span {
+    padding: 6px 9px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.davomat-header-stats .on-time,
+.davomat-detail-stats .on-time { color: #86efac; }
+.davomat-header-stats .late,
+.davomat-detail-stats .late { color: #fde047; }
+.davomat-header-stats .absent,
+.davomat-detail-stats .absent { color: #fca5a5; }
+
+.davomat-settings-button {
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e5e7eb;
+    cursor: pointer;
+}
+
+.davomat-language-switcher {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 10px;
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e5e7eb;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.davomat-language-switcher select {
+    min-height: 30px;
+    border: 0;
+    border-radius: 6px;
+    outline: none;
+    background: #111827;
+    color: #fff;
+    font: inherit;
+}
+
+.davomat-language-switcher {
+    gap: 5px;
+}
+
+.davomat-language-switcher select {
+    padding: 0 5px;
+    cursor: pointer;
+}
+
+.worker-attendance-checkin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+    border: 1px solid rgba(161, 161, 241, 0.2);
+    border-radius: 12px;
+    background: rgba(99, 102, 241, 0.08);
+    color: #e5e7eb;
+}
+
+.worker-attendance-checkin h3,
+.worker-attendance-checkin p {
+    margin: 0;
+}
+
+.worker-attendance-checkin p {
+    flex: 1 1 100%;
+    color: #c4b5fd;
+    font-size: 13px;
+}
+
+.worker-attendance-checkin .davomat-save-button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid rgba(104, 239, 126, 0.5);
+    border-radius: 9px;
+    background: linear-gradient(135deg, rgba(40, 236, 112, 0.6), rgba(13, 138, 28, 0.8));
+    color: #fff;
+    cursor: pointer;
+}
+
 .davomat-worker-info h2 {
     display: flex;
     align-items: center;
@@ -196,6 +313,34 @@
     color: rgb(146, 151, 223);
     font-size: 0.8rem;
 }
+
+.davomat-start-time {
+    margin-top: 5px;
+    color: #c4b5fd;
+    font-size: 12px;
+}
+
+.davomat-card-history {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.davomat-history-pill {
+    display: grid;
+    min-width: 42px;
+    height: 28px;
+    padding: 0 6px;
+    place-items: center;
+    border-radius: 7px;
+    font-size: 11px;
+}
+
+.davomat-history-pill.status-onTime { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+.davomat-history-pill.status-late { background: rgba(234, 179, 8, 0.22); color: #fde047; }
+.davomat-history-pill.status-absent { background: rgba(239, 68, 68, 0.22); color: #fca5a5; }
+.davomat-more-history { color: #c4b5fd; font-size: 22px; }
 
 .davomat-local-label {
     display: block;
@@ -261,6 +406,116 @@
 
 .davomat-confirm-modal {
     width: min(100%, 420px);
+}
+
+.davomat-camera-video {
+    display: block;
+    width: 100%;
+    max-height: 55vh;
+    border-radius: 12px;
+    background: #020617;
+    object-fit: cover;
+}
+
+.davomat-camera-error {
+    color: #ff9a9a;
+}
+
+.davomat-weekdays {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.davomat-weekdays label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.davomat-worker-detail {
+    max-height: min(85vh, 850px);
+    overflow: auto;
+}
+
+.davomat-detail-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.davomat-detail-heading p {
+    margin-top: 6px;
+    color: #a5b4fc;
+}
+
+.davomat-detail-heading > button {
+    border: 0;
+    background: transparent;
+    color: #e5e7eb;
+    cursor: pointer;
+}
+
+.davomat-face-notice {
+    color: #c4b5fd;
+    font-size: 13px;
+}
+
+.davomat-face-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.davomat-face-slot {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.5);
+    color: #e5e7eb;
+    cursor: pointer;
+}
+
+.davomat-face-slot img {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 7px;
+    object-fit: cover;
+}
+
+.davomat-face-slot > span {
+    display: grid;
+    width: 100%;
+    aspect-ratio: 1;
+    place-items: center;
+    font-size: 28px;
+}
+
+.davomat-face-slot small { font-size: 11px; }
+.davomat-full-history { display: flex; flex-direction: column; gap: 6px; }
+
+.davomat-full-history-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 9px 10px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 13px;
+}
+
+.davomat-full-history-row.status-onTime { border-left: 3px solid #22c55e; }
+.davomat-full-history-row.status-late { border-left: 3px solid #eab308; }
+.davomat-full-history-row.status-absent { border-left: 3px solid #ef4444; }
+
+.davomat-checkin-thumbnail {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
 }
 
 .davomat-modal > label:not(.davomat-sync-option) {
@@ -368,6 +623,8 @@
         flex-direction: column;
     }
 
+    .davomat-card-history { margin-left: 0; }
+
     .davomat-worker-actions {
         width: 100%;
         justify-content: flex-end;
@@ -375,6 +632,7 @@
 
     .davomat-header-info {
         flex-wrap: wrap;
+        justify-content: flex-start;
     }
 
     .davomat-modal {
@@ -390,12 +648,26 @@
 }
 
 .face_id_image{
+    display: grid;
     width: 90px;
     height: 125px;
+    place-items: center;
     border: 1px solid rgb(85, 91, 183);
     background-color: transparent;
     border-radius: 9px;
     margin-right: 19px;
+    overflow: hidden;
+}
+
+.face_id_image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.face_id_image span {
+    color: #a5b4fc;
+    font-size: 11px;
 }
 
 .davomat_worker_name{

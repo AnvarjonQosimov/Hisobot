@@ -4,10 +4,13 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { HiMenu, HiX } from "react-icons/hi";
 import { db, auth } from "../Firebase/Firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import Loading from "../components/Loading";
 import { getWorkerDataId } from "../auth/firestoreOwnership";
+import AttendanceCamera from "../components/AttendanceCamera";
+import { getAttendanceDateParts, getAttendanceDay, getAttendanceRecordId } from "../utils/attendance";
+import "../styles/Davomat.css";
 
 function WorkerDashboard() {
   const navigate = useNavigate();
@@ -31,6 +34,10 @@ const [workerLoadError, setWorkerLoadError] = useState("");
 const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 const [logoutDialog, setLogoutDialog] = useState(false);
 const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+const [attendanceRecord, setAttendanceRecord] = useState(null);
+const [attendanceDayKey, setAttendanceDayKey] = useState(getAttendanceDay());
+const [isAttendanceCameraOpen, setIsAttendanceCameraOpen] = useState(false);
+const [isAttendanceSaving, setIsAttendanceSaving] = useState(false);
 const currencySettingsEmail = auth.currentUser?.email?.toLowerCase() || "";
 const [currencyDisplayMode, setCurrencyDisplayMode] = useState(() => {
   const savedMode = localStorage.getItem(`workerCurrencyDisplayMode_${currencySettingsEmail}`);
@@ -82,6 +89,66 @@ useEffect(() => {
     },
   );
 }, [navigate, t]);
+
+useEffect(() => {
+  const timer = window.setInterval(() => setAttendanceDayKey(getAttendanceDay()), 60000);
+  return () => window.clearInterval(timer);
+}, []);
+
+useEffect(() => {
+  const bossEmail = localStorage.getItem("bossEmail")?.toLowerCase();
+  const workerId = localStorage.getItem("workerId");
+  const workerEmail = auth.currentUser?.email?.toLowerCase();
+  if (!bossEmail || !workerId || !workerEmail) return undefined;
+
+  const recordRef = doc(
+    db,
+    "attendanceRecords",
+    getAttendanceRecordId(workerEmail, new Date(`${attendanceDayKey}T00:00:00.000Z`)),
+  );
+  return onSnapshot(
+    recordRef,
+    (snapshot) => setAttendanceRecord(snapshot.exists() ? snapshot.data() : null),
+    (error) => {
+      console.error("Could not load today's attendance record:", error);
+    },
+  );
+}, [worker, attendanceDayKey]);
+
+const handleAttendanceCapture = async (imageData) => {
+  const bossEmail = localStorage.getItem("bossEmail")?.toLowerCase();
+  const workerId = localStorage.getItem("workerId");
+  const workerEmail = auth.currentUser?.email?.toLowerCase();
+  if (!bossEmail || !workerId || !workerEmail || attendanceRecord) return;
+
+  const date = new Date();
+  const { year, month, day } = getAttendanceDateParts(date);
+  setIsAttendanceSaving(true);
+  try {
+    await setDoc(doc(db, "attendanceRecords", getAttendanceRecordId(workerEmail, date)), {
+      bossEmail,
+      ownerEmail: bossEmail,
+      workerId: String(workerId),
+      workerEmail,
+      year,
+      month,
+      day,
+      dateKey: getAttendanceDay(date),
+      checkedInAt: serverTimestamp(),
+      imageData,
+    });
+    setIsAttendanceCameraOpen(false);
+  } catch (error) {
+    console.error("Could not submit attendance check-in:", error);
+    throw new Error(
+      error.code === "permission-denied"
+        ? "Bugun davomat belgilangan yoki hisobga kirish huquqi yo'q."
+        : "Davomatni saqlab bo'lmadi. Qayta urinib ko'ring.",
+    );
+  } finally {
+    setIsAttendanceSaving(false);
+  }
+};
 
 const handleOpenDetail = () => {
 if (!worker) return;
@@ -296,6 +363,31 @@ setIsDetailModalOpen(true);
           )}
           {worker ? (
             <div className="worker-list" style={{ height: "auto" }}>
+              <section className="worker-attendance-checkin">
+                <h3>Bugungi davomat</h3>
+                {attendanceRecord ? (
+                  <p>
+                    Davomat belgilandi
+                    {attendanceRecord.checkedInAt?.toDate
+                      ? ` — ${attendanceRecord.checkedInAt.toDate().toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
+                      : ""}
+                  </p>
+                ) : (
+                  <>
+                    <p>Kelganingizni kamera orqali belgilang. Rasm rahbar tomonidan tekshiriladi.</p>
+                    <button
+                      type="button"
+                      className="davomat-save-button"
+                      onClick={() => setIsAttendanceCameraOpen(true)}
+                    >
+                      Kelganimni belgilash
+                    </button>
+                  </>
+                )}
+              </section>
               <div
   className={`worker-item ${worker.isPaid ? "paid-row" : ""}`}
   onClick={handleOpenDetail}
@@ -388,6 +480,15 @@ setIsDetailModalOpen(true);
           )}
         </div>
       </div>
+
+      {isAttendanceCameraOpen && (
+        <AttendanceCamera
+          title="Bugungi davomat uchun rasm"
+          onCapture={handleAttendanceCapture}
+          onClose={() => !isAttendanceSaving && setIsAttendanceCameraOpen(false)}
+          isSaving={isAttendanceSaving}
+        />
+      )}
 
       {isDetailModalOpen && worker && (
   <div
