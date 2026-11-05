@@ -2250,8 +2250,12 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             </button>
 
             <div className="davomat">
-              <button className="davomat_btn">
-                <Link to="/davomat" >
+              <button
+                className="davomat_btn davomat-tooltip"
+                data-tooltip={t("attendance_page_title")}
+                aria-label={t("attendance_page_title")}
+              >
+                <Link to="/davomat">
                 <div className="davomat_ico">
                   <SiLibreofficecalc />
                 </div>

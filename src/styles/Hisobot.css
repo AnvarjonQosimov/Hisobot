@@ -2567,3 +2567,39 @@
 .davomat_btn a{
     color: rgb(204, 194, 255);
 }
+
+.davomat-tooltip {
+    position: relative;
+}
+
+.davomat-tooltip::after {
+    position: absolute;
+    z-index: 1000;
+    right: 0;
+    top: calc(100% + 10px);
+    width: max-content;
+    max-width: min(240px, 80vw);
+    padding: 8px 11px;
+    border: 1px solid rgba(161, 161, 241, 0.3);
+    border-radius: 8px;
+    background: #111827;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    color: #fff;
+    content: attr(data-tooltip);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.35;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0s ease, transform 0s ease;
+}
+
+.davomat-tooltip:hover::after,
+.davomat-tooltip:active::after,
+.davomat-tooltip:focus-within::after {
+    opacity: 1;
+    transform: translateY(0);
+    transition-delay: 0.7s;
+    transition-duration: 140ms;
+}
