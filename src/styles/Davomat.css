@@ -331,6 +331,27 @@
     font-size: 12px;
 }
 
+.davomat-checkin-time {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.davomat-checkin-time.status-onTime {
+    background: rgba(34, 197, 94, 0.18);
+    color: #86efac;
+}
+
+.davomat-checkin-time.status-late {
+    background: rgba(234, 179, 8, 0.22);
+    color: #fde047;
+}
+
 .davomat-card-history {
     display: flex;
     flex: 1 1 auto;

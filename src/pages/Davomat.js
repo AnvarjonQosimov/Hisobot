@@ -296,22 +296,6 @@ function Davomat() {
     [attendanceRecords],
   );
 
-  const countedCheckInsByWorker = useMemo(
-    () =>
-      Object.entries(checkInsByWorker).reduce((countedRecords, [workerId, records]) => {
-        const faceRegistrationDay = getFaceRegistrationDay(faceImages[workerId]);
-        countedRecords[workerId] = faceRegistrationDay
-          ? records.filter(
-              (record) =>
-                record.dateKey > faceRegistrationDay &&
-                record.dateKey >= attendanceData.trackingStartDay,
-            )
-          : [];
-        return countedRecords;
-      }, {}),
-    [checkInsByWorker, faceImages, attendanceData.trackingStartDay],
-  );
-
   useEffect(() => {
     let unsubscribeData = () => {};
     let currentOwnerEmail = "";
@@ -777,7 +761,7 @@ function Davomat() {
 
   const selectedWorkerFaces = faceImages[String(selectedWorker?.id)] || {};
   const selectedWorkerFaceRegistrationDay = getFaceRegistrationDay(selectedWorkerFaces);
-  const selectedWorkerCheckIns = countedCheckInsByWorker[String(selectedWorker?.id)] || [];
+  const selectedWorkerCheckIns = checkInsByWorker[String(selectedWorker?.id)] || [];
 
   return (
     <main className="Davomat">
@@ -886,11 +870,24 @@ function Davomat() {
           </div>
         ) : (
           <div className="davomat-worker-list">
-            {attendanceWorkers.map((worker) => (
+            {attendanceWorkers.map((worker) => {
+              const workerId = String(worker.id);
+              const workerCheckIns = checkInsByWorker[workerId] || [];
+              const todayKey = getAttendanceDay(currentTime);
+              const todayCheckIn = workerCheckIns.find((record) => record.dateKey === todayKey);
+              const latestCheckIn = workerCheckIns[0];
+              const todayStatus =
+                workerStats[workerId]?.todayStatus ||
+                (todayCheckIn ? compareCheckIn(todayCheckIn, attendanceData.startTime) : "");
+              const cardStatus =
+                todayStatus ||
+                (latestCheckIn ? compareCheckIn(latestCheckIn, attendanceData.startTime) : "");
+              const previewCheckIn = todayCheckIn || workerCheckIns[0];
+              return (
               <article
                 className={`davomat-worker-card ${
-                  workerStats[String(worker.id)]?.todayStatus
-                    ? `status-${workerStats[String(worker.id)].todayStatus}`
+                  cardStatus
+                    ? `status-${cardStatus}`
                     : ""
                 }`}
                 key={`${worker.source}-${worker.id}`}
@@ -904,7 +901,7 @@ function Davomat() {
                 <div className="davomat-worker-info">
                   <div className="davomat_info_face">
                     <div className="face_id_image">
-                      {countedCheckInsByWorker[String(worker.id)]?.[0]?.imageData ? (
+                      {previewCheckIn?.imageData ? (
                         <button
                           type="button"
                           className="davomat-photo-zoom-trigger"
@@ -912,13 +909,13 @@ function Davomat() {
                           onClick={(event) => {
                             event.stopPropagation();
                             setZoomedPhoto({
-                              src: countedCheckInsByWorker[String(worker.id)][0].imageData,
+                              src: previewCheckIn.imageData,
                               alt: `${worker.workerName} ${t("attendance_checkin_history")}`,
                             });
                           }}
                         >
                           <img
-                            src={countedCheckInsByWorker[String(worker.id)][0].imageData}
+                            src={previewCheckIn.imageData}
                             alt={`${worker.workerName} ${t("attendance_checkin_history")}`}
                           />
                         </button>
@@ -941,6 +938,17 @@ function Davomat() {
                           }`}
                           title={worker.workerCode ? "Has Access Code" : "No Access Code"}
                         />
+                        {latestCheckIn && (
+                          <span
+                            className={`davomat-checkin-time status-${compareCheckIn(latestCheckIn, attendanceData.startTime)}`}
+                            title={latestCheckIn.dateKey}
+                          >
+                            {getCheckInTime(latestCheckIn)?.toLocaleTimeString(
+                              [],
+                              { hour: "2-digit", minute: "2-digit" },
+                            ) || t("attendance_unknown_time")}
+                          </span>
+                        )}
                       </h2>
                       {worker.createdAt && (
                         <span className="davomat-worker-date">
@@ -970,7 +978,7 @@ function Davomat() {
                         ? entry.record.checkedInAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                         : entry.status === "absent" ? "—" : "✓"}
                     </span>
-                  ))}
+                    ))}
                   {(workerStats[String(worker.id)]?.history.length || 0) > 3 && (
                     <span className="davomat-more-history" aria-label={t("attendance_full_history")}>...</span>
                   )}
@@ -1004,7 +1012,8 @@ function Davomat() {
                   </div>
                 )}
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
