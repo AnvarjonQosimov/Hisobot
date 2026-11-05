@@ -46,7 +46,11 @@ function WorkerAuth() {
         }
       }
 
-      if (codeSnap.exists() && codeSnap.data().bossEmail === pendingWorker.data.bossEmail) {
+      if (
+        codeSnap.exists() &&
+        (!pendingWorker.data?.bossEmail ||
+          codeSnap.data().bossEmail === pendingWorker.data.bossEmail)
+      ) {
         const codeData = codeSnap.data();
         const workerEmail = pendingWorker.email.toLowerCase();
         if (!auth.currentUser) {
@@ -64,23 +68,23 @@ function WorkerAuth() {
         localStorage.setItem("userEmail", workerEmail);
         localStorage.setItem("role", "worker");
         localStorage.setItem("bossEmail", codeData.bossEmail);
-        localStorage.setItem("workerId", codeData.workerId);
+        localStorage.setItem("workerId", JSON.stringify(codeData.workerId));
         navigate("/workerdashboard");
       } else {
-        setError(t("Noto'g'ri kod! Parolni tekshiring."));
+        setError(t("worker_auth_wrong_code", { defaultValue: "Parol noto'g'ri. Qaytadan kiriting." }));
       }
     } catch (err) {
       console.error(`Worker sign-in failed during ${authStep}:`, err);
-      if (err.code === 'unavailable') {
+      if (err.code === "unavailable") {
         setError(t("Internet ulanishida xatolik! Tarmoqni tekshiring."));
       } else if (err.code === "permission-denied") {
-        setError(
-          authStep === "invite-code lookup"
-            ? t("Ishchi kodi qoidalar tomonidan rad etildi. Ishchi emaili boss sahifasida ro'yxatdan o'tganini, kod to'g'riligini va yangilangan Firebase Rules e'lon qilinganini tekshiring.")
-            : t("Ishchi ruxsatini saqlash rad etildi. Firebase Rules yangilanganini tekshiring."),
-        );
+        setError(t("worker_auth_failed", {
+          defaultValue: "Kirish amalga oshmadi. Parolni tekshiring yoki rahbar bilan bog'laning.",
+        }));
       } else {
-        setError(t("Ulanishda xatolik yuz berdi."));
+        setError(t("worker_auth_failed", {
+          defaultValue: "Kirish amalga oshmadi. Parolni tekshiring yoki rahbar bilan bog'laning.",
+        }));
       }
     } finally {
       setLoading(false);
@@ -97,20 +101,16 @@ function WorkerAuth() {
 
   return (
     <div className="LogIn">
-      <div className="LoginType" style={{ maxWidth: '440px', padding: '40px' }}>
-        <h1 style={{ fontSize: '28px', marginBottom: '10px' }}>{t("Kodni kiriting") || "Parolni kiriting"}</h1>
-        <p style={{ 
-          color: 'rgba(204, 194, 255, 0.7)', 
-          textAlign: 'center', 
-          marginBottom: '30px',
-          fontSize: '15px',
-          lineHeight: '1.5'
-        }}>
-          {t("worker_auth_desc") || "Siz ishchi sifatida ro'yxatdan o'tgansiz. Davom etish uchun bossingiz bergan maxsus kodni kiriting."}
+      <div className="LoginType worker-auth-card">
+        <h1>{t("Kodni kiriting", { defaultValue: "Kodni kiriting" })}</h1>
+        <p className="worker-auth-description">
+          {t("worker_auth_desc", {
+            defaultValue: "Siz ishchi sifatida ro'yxatdan o'tgansiz. Davom etish uchun bossingiz bergan maxsus kodni kiriting.",
+          })}
         </p>
 
-        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-          <div style={{ marginBottom: '20px' }}>
+        <form onSubmit={handleSubmit}>
+          <div className="worker-auth-input-group">
             <input
               type="text"
               placeholder={t("Parol/Kod")}
@@ -118,39 +118,22 @@ function WorkerAuth() {
               onChange={(e) => setWorkerCode(e.target.value)}
               autoFocus
               className="worker-code-input"
-              style={{
-                textAlign: 'center',
-                fontSize: '20px',
-                letterSpacing: '2px',
-                fontWeight: 'bold',
-                padding: '16px'
-              }}
+              autoComplete="off"
+              aria-invalid={Boolean(error)}
             />
-            {error && <p className="error" style={{ textAlign: 'center', marginTop: '10px' }}>{error}</p>}
+            {error && <p role="alert" className="error worker-auth-error">{error}</p>}
           </div>
 
-          <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
+          <div className="worker-auth-actions">
             <button
               type="button"
               onClick={handleCancel}
-              style={{
-                flex: 1,
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                margin: 0
-              }}
             >
               {t("bekorqilish")}
             </button>
             <button
               type="submit"
               disabled={loading || !workerCode.trim()}
-              style={{
-                flex: 1,
-                background: 'linear-gradient(135deg, rgb(86, 86, 255) 0%, rgb(50, 50, 200) 100%)',
-                boxShadow: '0 10px 20px rgba(86, 86, 255, 0.2)',
-                margin: 0
-              }}
             >
               {loading ? (t("tekshirilmoqda...") || "...") : t("ha")}
             </button>

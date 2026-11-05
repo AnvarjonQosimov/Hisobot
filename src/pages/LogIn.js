@@ -167,13 +167,15 @@ function LogIn() {
       // =========================
       console.log("Access denied:", email);
 
-      localStorage.removeItem("role");
-      localStorage.removeItem("userEmail");
-      localStorage.removeItem("username");
-
-      await auth.signOut();
-
-      setError(t("login_boss_access_denied"));
+      navigate("/worker-auth", {
+        state: {
+          pendingWorker: {
+            email,
+            data: null,
+          },
+        },
+        replace: true,
+      });
 
     } catch (error) {
       console.error("Account access check failed:", error);
@@ -280,13 +282,14 @@ function LogIn() {
     // =========================
     console.log("Access denied:", email);
 
-    localStorage.removeItem("role");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("username");
-
-    setError(t("login_boss_access_denied"));
-
-    await auth.signOut();
+    navigate("/worker-auth", {
+      state: {
+        pendingWorker: {
+          email,
+          data: null,
+        },
+      },
+    });
 
   } catch (err) {
     console.error("Sign-in error details:", err);

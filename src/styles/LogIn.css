@@ -221,3 +221,83 @@
         font-size: 32px;
     }
 }
+
+.worker-auth-card {
+    box-sizing: border-box;
+    width: min(100%, 440px);
+    max-width: 440px !important;
+    padding: clamp(20px, 5vw, 40px);
+}
+
+.worker-auth-card h1 {
+    margin-bottom: 0;
+    font-size: clamp(24px, 5vw, 32px);
+    line-height: 1.2;
+}
+
+.worker-auth-description {
+    margin: 0;
+    color: rgba(204, 194, 255, 0.7);
+    font-size: clamp(14px, 3.5vw, 16px);
+    line-height: 1.5;
+    text-align: center;
+}
+
+.worker-auth-card form {
+    width: 100%;
+}
+
+.worker-auth-input-group {
+    margin-bottom: 20px;
+}
+
+.worker-auth-card .worker-code-input {
+    text-align: center;
+    font-size: clamp(18px, 5vw, 22px);
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.worker-auth-error {
+    margin-top: 10px;
+    line-height: 1.45;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.worker-auth-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(10px, 3vw, 15px);
+    margin-top: 24px;
+}
+
+.LoginType .worker-auth-actions button {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    padding: 12px 8px;
+    overflow-wrap: anywhere;
+    font-size: clamp(14px, 3.5vw, 16px);
+}
+
+.LoginType .worker-auth-actions button[type="submit"] {
+    background: linear-gradient(135deg, rgb(86, 86, 255) 0%, rgb(50, 50, 200) 100%);
+    box-shadow: 0 10px 20px rgba(86, 86, 255, 0.2);
+}
+
+@media (max-width: 360px) {
+    .worker-auth-card {
+        gap: 16px;
+    }
+
+    .worker-auth-actions {
+        gap: 8px;
+    }
+
+    .LoginType .worker-auth-actions button {
+        padding: 10px 5px;
+        font-size: 13px;
+    }
+}

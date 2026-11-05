@@ -12,6 +12,16 @@ import AttendanceCamera from "../components/AttendanceCamera";
 import { getAttendanceDateParts, getAttendanceDay, getAttendanceRecordId } from "../utils/attendance";
 import "../styles/Davomat.css";
 
+const getStoredWorkerId = () => {
+  const storedWorkerId = localStorage.getItem("workerId");
+  if (!storedWorkerId) return "";
+  try {
+    return JSON.parse(storedWorkerId);
+  } catch {
+    return storedWorkerId;
+  }
+};
+
 function WorkerDashboard() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
@@ -52,7 +62,7 @@ const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
 useEffect(() => {
   const role = localStorage.getItem("role");
   const bossEmail = localStorage.getItem("bossEmail");
-  const workerId = localStorage.getItem("workerId");
+  const workerId = getStoredWorkerId();
 
   if (role !== "worker" || !bossEmail || !workerId) {
     navigate("/login");
@@ -97,7 +107,7 @@ useEffect(() => {
 
 useEffect(() => {
   const bossEmail = localStorage.getItem("bossEmail")?.toLowerCase();
-  const workerId = localStorage.getItem("workerId");
+  const workerId = getStoredWorkerId();
   const workerEmail = auth.currentUser?.email?.toLowerCase();
   if (!bossEmail || !workerId || !workerEmail) return undefined;
 
@@ -117,7 +127,7 @@ useEffect(() => {
 
 const handleAttendanceCapture = async (imageData) => {
   const bossEmail = localStorage.getItem("bossEmail")?.toLowerCase();
-  const workerId = localStorage.getItem("workerId");
+  const workerId = getStoredWorkerId();
   const workerEmail = auth.currentUser?.email?.toLowerCase();
   if (!bossEmail || !workerId || !workerEmail || attendanceRecord) return;
 
@@ -128,7 +138,7 @@ const handleAttendanceCapture = async (imageData) => {
     await setDoc(doc(db, "attendanceRecords", getAttendanceRecordId(workerEmail, date)), {
       bossEmail,
       ownerEmail: bossEmail,
-      workerId: String(workerId),
+      workerId,
       workerEmail,
       year,
       month,
@@ -142,7 +152,7 @@ const handleAttendanceCapture = async (imageData) => {
     console.error("Could not submit attendance check-in:", error);
     throw new Error(
       error.code === "permission-denied"
-        ? "Bugun davomat belgilangan yoki hisobga kirish huquqi yo'q."
+        ? "Davomatni belgilashga Firestore ruxsat bermadi. Yangilangan firestore.rules qoidalarini e'lon qiling; bugungi belgi mavjud bo'lsa, qayta belgilab bo'lmaydi."
         : "Davomatni saqlab bo'lmadi. Qayta urinib ko'ring.",
     );
   } finally {
@@ -363,27 +373,46 @@ setIsDetailModalOpen(true);
           )}
           {worker ? (
             <div className="worker-list" style={{ height: "auto" }}>
-              <section className="worker-attendance-checkin">
-                <h3>Bugungi davomat</h3>
+              <section className={`worker-attendance-checkin ${attendanceRecord ? "has-attendance-card" : ""}`}>
                 {attendanceRecord ? (
-                  <p>
-                    Davomat belgilandi
-                    {attendanceRecord.checkedInAt?.toDate
-                      ? ` — ${attendanceRecord.checkedInAt.toDate().toLocaleTimeString([], {
+                  <article className="worker-attendance-card">
+                    <div className="worker-attendance-photo">
+                      {attendanceRecord.imageData ? (
+                        <img
+                          src={attendanceRecord.imageData}
+                          alt={`${worker.workerName} ${t("worker_attendance_photo_alt")}`}
+                        />
+                      ) : (
+                        <span>{t("attendance_no_photo")}</span>
+                      )}
+                    </div>
+                    <div className="worker-attendance-card-info">
+                      <h3>
+                        {worker.workerName}
+                        <span className="worker-attendance-status-dot" />
+                      </h3>
+                      <span>{new Date().toLocaleDateString()}</span>
+                      <p>{t("worker_attendance_marked")}</p>
+                    </div>
+                    {attendanceRecord.checkedInAt?.toDate && (
+                      <time className="worker-attendance-time">
+                        {attendanceRecord.checkedInAt.toDate().toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
-                        })}`
-                      : ""}
-                  </p>
+                        })}
+                      </time>
+                    )}
+                  </article>
                 ) : (
                   <>
-                    <p>Kelganingizni kamera orqali belgilang. Rasm rahbar tomonidan tekshiriladi.</p>
+                    <h3>{t("worker_attendance_today")}</h3>
+                    <p>{t("worker_attendance_prompt")}</p>
                     <button
                       type="button"
                       className="davomat-save-button"
                       onClick={() => setIsAttendanceCameraOpen(true)}
                     >
-                      Kelganimni belgilash
+                      {t("worker_attendance_mark_button")}
                     </button>
                   </>
                 )}

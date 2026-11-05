@@ -12,6 +12,58 @@ import { auth, db } from "../Firebase/Firebase";
 export const getWorkerDataId = (bossEmail, workerId) =>
   encodeURIComponent(`${bossEmail.toLowerCase()}:${String(workerId)}`);
 
+export const saveAttendanceWorkerData = async (bossEmail, worker) => {
+  const user = auth.currentUser;
+  const ownerEmail = user?.email?.toLowerCase();
+  const normalizedBossEmail = bossEmail.toLowerCase();
+  if (!user || ownerEmail !== normalizedBossEmail) {
+    throw new Error("The signed-in account does not own this cabinet.");
+  }
+  if (worker?.id === undefined || worker?.id === null) {
+    throw new Error("An attendance worker is missing its ID.");
+  }
+
+  const workerData = { ...worker };
+  delete workerData.workerCode;
+  workerData.objectWorkHistory = [];
+  await setDoc(doc(db, "workerData", getWorkerDataId(normalizedBossEmail, worker.id)), {
+    bossEmail: normalizedBossEmail,
+    ownerEmail: normalizedBossEmail,
+    ownerUid: user.uid,
+    workerId: worker.id,
+    worker: workerData,
+  });
+};
+
+export const syncAttendanceWorkerAccess = async (bossEmail, workers) => {
+  const workersWithCodes = workers.filter(
+    (worker) => worker?.workerCode?.trim() && worker?.id !== undefined && worker?.id !== null,
+  );
+  const results = await Promise.allSettled(
+    workersWithCodes.map(async (worker) => {
+      const code = worker.workerCode.trim();
+      await setDoc(doc(db, "inviteCodes", code), {
+        bossEmail: bossEmail.toLowerCase(),
+        workerId: worker.id,
+        ownerEmail: bossEmail.toLowerCase(),
+        ownerUid: auth.currentUser.uid,
+      });
+      await saveAttendanceWorkerData(bossEmail, worker);
+    }),
+  );
+  const failures = results
+    .map((result, index) => ({ result, worker: workersWithCodes[index] }))
+    .filter(({ result }) => result.status === "rejected");
+
+  if (failures.length) {
+    throw new Error(
+      failures
+        .map(({ result, worker }) => `${worker.workerName || worker.id}: ${result.reason.message}`)
+        .join("; "),
+    );
+  }
+};
+
 const getProjectHistoryKey = (item) =>
   JSON.stringify([
     item.type,

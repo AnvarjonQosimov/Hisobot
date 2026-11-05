@@ -82,6 +82,92 @@
     color: #bbf7d0;
 }
 
+.WorkerDashboard .worker-attendance-checkin.has-attendance-card {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.WorkerDashboard .worker-attendance-card {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    min-height: 165px;
+    padding: 18px 14px;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 12px;
+    background: rgba(34, 197, 94, 0.08);
+    box-sizing: border-box;
+}
+
+.WorkerDashboard .worker-attendance-photo {
+    display: grid;
+    width: 90px;
+    height: 125px;
+    flex: 0 0 90px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid rgb(85, 91, 183);
+    border-radius: 9px;
+    color: #a5b4fc;
+    font-size: 11px;
+    text-align: center;
+}
+
+.WorkerDashboard .worker-attendance-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.WorkerDashboard .worker-attendance-card-info {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.WorkerDashboard .worker-attendance-card-info h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: #fff;
+}
+
+.WorkerDashboard .worker-attendance-card-info > span {
+    color: rgb(146, 151, 223);
+    font-size: 13px;
+}
+
+.WorkerDashboard .worker-attendance-card-info p {
+    margin: 0;
+    color: #a7f3d0;
+    font-size: 13px;
+}
+
+.WorkerDashboard .worker-attendance-status-dot {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7df5b0, #22c55e);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+}
+
+.WorkerDashboard .worker-attendance-time {
+    margin-left: auto;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
 @media (max-width: 480px) {
     .WorkerDashboard .rightTop {
         padding: 0 12px;
@@ -103,5 +189,23 @@
         flex-direction: column;
         gap: 10px;
         padding: 14px 16px !important;
+    }
+
+    .WorkerDashboard .worker-attendance-card {
+        align-items: flex-start;
+        gap: 12px;
+        min-height: 0;
+        padding: 12px;
+    }
+
+    .WorkerDashboard .worker-attendance-photo {
+        width: 64px;
+        height: 90px;
+        flex-basis: 64px;
+    }
+
+    .WorkerDashboard .worker-attendance-time {
+        margin-left: auto;
+        align-self: flex-start;
     }
 }

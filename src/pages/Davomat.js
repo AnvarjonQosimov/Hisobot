@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   query,
@@ -12,7 +13,11 @@ import {
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { auth, db } from "../Firebase/Firebase";
-import { saveBossCabinet } from "../auth/firestoreOwnership";
+import {
+  saveAttendanceWorkerData,
+  saveBossCabinet,
+  syncAttendanceWorkerAccess,
+} from "../auth/firestoreOwnership";
 import AttendanceCamera from "../components/AttendanceCamera";
 import {
   getAttendanceDay,
@@ -92,6 +97,23 @@ const getCheckInTime = (record) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const getFaceRegistrationDay = (faces) => {
+  const poses = ["front", "left", "right"].map((pose) => faces?.[pose]);
+  if (poses.some((face) => !face?.imageData || !(face.registeredAt instanceof Date))) {
+    return "";
+  }
+  const latestRegistration = poses
+    .map((face) => face.registeredAt)
+    .sort((left, right) => right - left)[0];
+  return getAttendanceDay(latestRegistration);
+};
+
+const getNextAttendanceDay = (dayKey) => {
+  const date = getDateFromDayKey(dayKey);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return getAttendanceDay(date);
+};
+
 const compareCheckIn = (record, startTime) => {
   const checkInDate = getCheckInTime(record);
   if (!checkInDate || !startTime) return "onTime";
@@ -101,18 +123,25 @@ const compareCheckIn = (record, startTime) => {
   return arrivalMinutes > scheduledMinutes ? "late" : "onTime";
 };
 
-const getWorkerAttendanceStats = (worker, records, attendanceData, now) => {
+const getWorkerAttendanceStats = (worker, records, attendanceData, now, faces) => {
   const schedule = attendanceData.workDays || [];
   const startDay = attendanceData.trackingStartDay;
   const startTime = attendanceData.startTime;
-  if (!startDay || !startTime) {
+  const registeredPoses = Object.values(faces || {}).filter((face) => face?.imageData);
+  const faceRegistrationDay = getFaceRegistrationDay(faces);
+  if (!startDay || !startTime || !registeredPoses.length || !faceRegistrationDay) {
     return { onTime: 0, late: 0, absent: 0, todayStatus: "", history: [] };
   }
 
   const createdAt = worker.createdAt ? new Date(worker.createdAt) : null;
   const workerStartDay =
     createdAt && !Number.isNaN(createdAt.getTime()) ? getAttendanceDay(createdAt) : startDay;
-  const firstDay = workerStartDay > startDay ? workerStartDay : startDay;
+  const firstDayOptions = [
+    workerStartDay,
+    startDay,
+    getNextAttendanceDay(faceRegistrationDay),
+  ].sort();
+  const firstDay = firstDayOptions[firstDayOptions.length - 1];
   const today = getAttendanceDay(now);
   const matchingRecords = records
     .filter((record) => String(record.workerId) === String(worker.id))
@@ -156,8 +185,12 @@ function Davomat() {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [faceImages, setFaceImages] = useState({});
   const [selectedWorker, setSelectedWorker] = useState(null);
+  const [zoomedPhoto, setZoomedPhoto] = useState(null);
   const [cameraTarget, setCameraTarget] = useState(null);
+  const [faceToDelete, setFaceToDelete] = useState(null);
+  const [selectedAttendanceStat, setSelectedAttendanceStat] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
   const [selectedWorkDays, setSelectedWorkDays] = useState([1, 2, 3, 4, 5]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
@@ -174,6 +207,7 @@ function Davomat() {
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
   const [showDismissUndoConfirm, setShowDismissUndoConfirm] = useState(false);
   const [startTime, setStartTime] = useState("");
+  const syncedAttendanceWorkerKeys = useRef(new Set());
 
   const attendanceWorkers = useMemo(() => {
     const hiddenIds = new Set(attendanceData.hiddenWorkerIds);
@@ -199,10 +233,11 @@ function Davomat() {
           attendanceRecords,
           attendanceData,
           currentTime,
+          faceImages[String(worker.id)],
         );
         return stats;
       }, {}),
-    [attendanceWorkers, attendanceRecords, attendanceData, currentTime],
+    [attendanceWorkers, attendanceRecords, attendanceData, currentTime, faceImages],
   );
 
   const totalAttendanceStats = useMemo(
@@ -216,6 +251,29 @@ function Davomat() {
         { onTime: 0, late: 0, absent: 0 },
       ),
     [workerStats],
+  );
+
+  const attendanceStatDetails = useMemo(
+    () =>
+      ["onTime", "late", "absent"].reduce((details, status) => {
+        details[status] = attendanceWorkers.reduce(
+          (groups, worker) => {
+            const count = workerStats[String(worker.id)]?.[status] || 0;
+            if (count) {
+              const group = worker.source === "master" ? "shared" : "attendanceOnly";
+              groups[group].total += count;
+              groups[group].workers.push({ worker, count });
+            }
+            return groups;
+          },
+          {
+            shared: { total: 0, workers: [] },
+            attendanceOnly: { total: 0, workers: [] },
+          },
+        );
+        return details;
+      }, {}),
+    [attendanceWorkers, workerStats],
   );
 
   const checkInsByWorker = useMemo(
@@ -236,6 +294,22 @@ function Davomat() {
       return recordsByWorker;
     },
     [attendanceRecords],
+  );
+
+  const countedCheckInsByWorker = useMemo(
+    () =>
+      Object.entries(checkInsByWorker).reduce((countedRecords, [workerId, records]) => {
+        const faceRegistrationDay = getFaceRegistrationDay(faceImages[workerId]);
+        countedRecords[workerId] = faceRegistrationDay
+          ? records.filter(
+              (record) =>
+                record.dateKey > faceRegistrationDay &&
+                record.dateKey >= attendanceData.trackingStartDay,
+            )
+          : [];
+        return countedRecords;
+      }, {}),
+    [checkInsByWorker, faceImages, attendanceData.trackingStartDay],
   );
 
   useEffect(() => {
@@ -329,6 +403,26 @@ function Davomat() {
                 "",
             );
             localStorage.setItem(attendanceKey, JSON.stringify(nextAttendanceData));
+            if (role === "boss" && nextAttendanceData.workers.length) {
+              const workersWithCodes = nextAttendanceData.workers.filter(
+                (worker) => worker.workerCode?.trim(),
+              );
+              const syncKey = JSON.stringify(
+                [bossEmail, ...workersWithCodes.map((worker) => [worker.id, worker.workerCode])],
+              );
+              if (
+                workersWithCodes.length &&
+                !syncedAttendanceWorkerKeys.current.has(syncKey)
+              ) {
+                syncedAttendanceWorkerKeys.current.add(syncKey);
+                syncAttendanceWorkerAccess(bossEmail, workersWithCodes).catch((error) => {
+                  console.error("Could not activate existing attendance worker codes:", error);
+                  window.alert(
+                    "Ba'zi Davomat ishchilarining kirish kodlarini faollashtirib bo'lmadi. Firestore Rules yangilanganini tekshiring.",
+                  );
+                });
+              }
+            }
           }
           setIsLoading(false);
         },
@@ -359,9 +453,12 @@ function Davomat() {
         (snapshot) => {
           setFaceImages(
             snapshot.docs.reduce((images, faceDoc) => {
-              const { workerId, pose, imageData } = faceDoc.data();
+              const { workerId, pose, imageData, registeredAt, updatedAt } = faceDoc.data();
               if (!images[String(workerId)]) images[String(workerId)] = {};
-              images[String(workerId)][pose] = imageData;
+              images[String(workerId)][pose] = {
+                imageData,
+                registeredAt: registeredAt?.toDate?.() || updatedAt?.toDate?.() || new Date(),
+              };
               return images;
             }, {}),
           );
@@ -431,7 +528,7 @@ function Davomat() {
       setShowUndoConfirm(false);
     } catch (error) {
       console.error("Failed to undo attendance change:", error);
-      window.alert("Oxirgi amalni bekor qilib bo'lmadi. Qayta urinib ko'ring.");
+      window.alert(t("attendance_undo_failed"));
     } finally {
       setIsSaving(false);
     }
@@ -460,7 +557,23 @@ function Davomat() {
       setIsSettingsOpen(false);
     } catch (error) {
       console.error("Failed to save attendance work days:", error);
-      window.alert("Ish kunlarini saqlab bo'lmadi. Qayta urinib ko'ring.");
+      window.alert(t("attendance_schedule_save_failed"));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRestartAttendanceTracking = async () => {
+    if (isSaving) return;
+    const nextAttendanceData = normalizeAttendanceData(attendanceData);
+    nextAttendanceData.trackingStartDay = getAttendanceDay();
+    setIsSaving(true);
+    try {
+      await persistChanges(nextAttendanceData);
+      setShowRestartConfirm(false);
+    } catch (error) {
+      console.error("Failed to restart attendance tracking:", error);
+      window.alert(t("attendance_restart_failed"));
     } finally {
       setIsSaving(false);
     }
@@ -478,16 +591,43 @@ function Davomat() {
         workerId: String(cameraTarget.workerId),
         pose: cameraTarget.pose,
         imageData,
+        registeredAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       setFaceImages((currentImages) => ({
         ...currentImages,
         [String(cameraTarget.workerId)]: {
           ...(currentImages[String(cameraTarget.workerId)] || {}),
-          [cameraTarget.pose]: imageData,
+          [cameraTarget.pose]: { imageData, registeredAt: new Date() },
         },
       }));
       setCameraTarget(null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteFace = async (workerId, pose) => {
+    if (!isOwner || isSaving) return;
+    const faceId = getAttendanceFaceId(ownerEmail, workerId, pose);
+    setIsSaving(true);
+    try {
+      await deleteDoc(doc(db, "attendanceFaces", faceId));
+      setFaceImages((currentImages) => {
+        const nextImages = { ...currentImages };
+        const workerFaces = { ...(nextImages[String(workerId)] || {}) };
+        delete workerFaces[pose];
+        if (Object.keys(workerFaces).length) {
+          nextImages[String(workerId)] = workerFaces;
+        } else {
+          delete nextImages[String(workerId)];
+        }
+        return nextImages;
+      });
+      setFaceToDelete(null);
+    } catch (error) {
+      console.error("Could not delete attendance face photo:", error);
+      window.alert(t("attendance_face_delete_failed"));
     } finally {
       setIsSaving(false);
     }
@@ -531,28 +671,11 @@ function Davomat() {
         trimmedCode,
     );
     if (duplicateWorker) {
-      window.alert("Bu kod boshqa ishchiga berilgan. Boshqa kod kiriting.");
+      window.alert(t("attendance_duplicate_code"));
       return;
     }
 
-    const shouldIssueInviteCode = syncWithAllWorkers || editingWorker?.source === "master";
-    if (trimmedCode && shouldIssueInviteCode) {
-      try {
-        const codeRef = doc(db, "inviteCodes", trimmedCode);
-        await setDoc(codeRef, {
-          bossEmail: ownerEmail,
-          workerId: updatedWorker.id,
-          ownerEmail,
-          ownerUid: auth.currentUser.uid,
-        });
-      } catch (error) {
-        console.error("Could not reserve unique worker code:", error);
-        window.alert(
-          "Bu kod band yoki saqlashga ruxsat yo'q. Boshqa kod kiriting yoki ishchini umumiy ro'yxatga qo'shish belgisini tekshiring.",
-        );
-        return;
-      }
-    }
+    const shouldIssueInviteCode = Boolean(trimmedCode);
     const nextAttendanceData = normalizeAttendanceData(attendanceData);
     let nextWorkers = null;
 
@@ -589,11 +712,26 @@ function Davomat() {
     setIsSaving(true);
     try {
       await persistChanges(nextAttendanceData, nextWorkers);
+      if (shouldIssueInviteCode) {
+        await setDoc(doc(db, "inviteCodes", trimmedCode), {
+          bossEmail: ownerEmail,
+          workerId: updatedWorker.id,
+          ownerEmail,
+          ownerUid: auth.currentUser.uid,
+        });
+        if (!syncWithAllWorkers && updatedWorker.source !== "master") {
+          await saveAttendanceWorkerData(ownerEmail, updatedWorker);
+        }
+      }
       setIsModalOpen(false);
       setEditingWorker(null);
     } catch (error) {
       console.error("Failed to save attendance worker:", error);
-      window.alert("Ishchini saqlab bo'lmadi. Qayta urinib ko'ring.");
+      window.alert(
+        shouldIssueInviteCode
+          ? t("attendance_worker_saved_login_failed")
+          : t("attendance_worker_save_failed"),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -631,11 +769,15 @@ function Davomat() {
       setDeleteWorker(null);
     } catch (error) {
       console.error("Failed to delete attendance worker:", error);
-      window.alert("Ishchini o'chirib bo'lmadi. Qayta urinib ko'ring.");
+      window.alert(t("attendance_worker_delete_failed"));
     } finally {
       setIsSaving(false);
     }
   };
+
+  const selectedWorkerFaces = faceImages[String(selectedWorker?.id)] || {};
+  const selectedWorkerFaceRegistrationDay = getFaceRegistrationDay(selectedWorkerFaces);
+  const selectedWorkerCheckIns = countedCheckInsByWorker[String(selectedWorker?.id)] || [];
 
   return (
     <main className="Davomat">
@@ -643,18 +785,39 @@ function Davomat() {
         <div className="davomat-brand">
           <Link to="/hisobot" className="davomat-logo">Office<span>Report</span></Link>
           <div className="davomat-title">
-            <h1>Davomat</h1>
-            <p>{t("barcha_ishchilar", { defaultValue: "Barcha ishchilar" })}</p>
+            <h1>{t("attendance_page_title")}</h1>
+            <p>{t("attendance_all_workers")}</p>
           </div>
         </div>
         <div className="davomat-header-info">
           <span className="davomat-worker-count">
-            {attendanceWorkers.length} {t("report_export_worker_count") || "Ishchilar"}
+            {attendanceWorkers.length} {t("attendance_worker_count")}
           </span>
-          <div className="davomat-header-stats" aria-label="Davomat statistikasi">
-            <span className="on-time">Vaqtida: {totalAttendanceStats.onTime}</span>
-            <span className="late">Kechikdi: {totalAttendanceStats.late}</span>
-            <span className="absent">Kelmagan: {totalAttendanceStats.absent}</span>
+          <div className="davomat-header-stats" aria-label={t("attendance_page_title")}>
+            <button
+              type="button"
+              className="on-time"
+              onClick={() => setSelectedAttendanceStat("onTime")}
+              aria-label={t("attendance_stat_details", { status: t("attendance_on_time") })}
+            >
+              {t("attendance_on_time")}: {totalAttendanceStats.onTime}
+            </button>
+            <button
+              type="button"
+              className="late"
+              onClick={() => setSelectedAttendanceStat("late")}
+              aria-label={t("attendance_stat_details", { status: t("attendance_late") })}
+            >
+              {t("attendance_late")}: {totalAttendanceStats.late}
+            </button>
+            <button
+              type="button"
+              className="absent"
+              onClick={() => setSelectedAttendanceStat("absent")}
+              aria-label={t("attendance_stat_details", { status: t("attendance_absent") })}
+            >
+              {t("attendance_absent")}: {totalAttendanceStats.absent}
+            </button>
           </div>
           {undoSnapshot && isOwner && (
             <div className="davomat-undo-group">
@@ -671,7 +834,7 @@ function Davomat() {
                 type="button"
                 className="davomat-undo-dismiss"
                 onClick={() => setShowDismissUndoConfirm(true)}
-                title="Bekor qilish bildirishnomasini yopish"
+                title={t("attendance_close_undo_notice")}
                 disabled={isSaving}
               >
                 ✕
@@ -688,13 +851,13 @@ function Davomat() {
                 setIsSettingsOpen(true);
               }}
             >
-              Ish jadvali
+              {t("attendance_schedule")}
             </button>
           )}
           <label className="davomat-language-switcher">
-            <span aria-hidden="true">🌐</span>
+            <span aria-label={t("attendance_language")} title={t("attendance_language")} aria-hidden="true">🌐</span>
             <select
-              aria-label="Language"
+              aria-label={t("attendance_language")}
               value={i18n.language?.slice(0, 2) || "uz"}
               onChange={(event) => i18n.changeLanguage(event.target.value)}
             >
@@ -705,18 +868,18 @@ function Davomat() {
           </label>
           {isOwner && (
             <button type="button" className="addH3 davomat-header-add" onClick={openAddModal}>
-              + {t("qo'shish") || "Ishchi qo'shish"}
+              {t("attendance_add_button")}
             </button>
           )}
           <Link to="/hisobot" className="davomat-back-link">
-            Hisobotga qaytish
+            {t("attendance_back_to_report")}
           </Link>
         </div>
       </header>
 
-      <section className="davomat-content" aria-label="Davomat">
+      <section className="davomat-content" aria-label={t("attendance_page_title")}>
         {isLoading ? (
-          <div className="davomat-empty">Yuklanmoqda...</div>
+          <div className="davomat-empty">{t("attendance_loading")}</div>
         ) : attendanceWorkers.length === 0 ? (
           <div className="davomat-empty">
             {t("hisobot_no_workers") || "Ishchilar hozircha yo'q"}
@@ -741,13 +904,32 @@ function Davomat() {
                 <div className="davomat-worker-info">
                   <div className="davomat_info_face">
                     <div className="face_id_image">
-                      {checkInsByWorker[String(worker.id)]?.[0]?.imageData ? (
-                        <img
-                          src={checkInsByWorker[String(worker.id)][0].imageData}
-                          alt={`${worker.workerName} oxirgi kelish rasmi`}
-                        />
+                      {countedCheckInsByWorker[String(worker.id)]?.[0]?.imageData ? (
+                        <button
+                          type="button"
+                          className="davomat-photo-zoom-trigger"
+                          aria-label={t("attendance_zoom_photo")}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setZoomedPhoto({
+                              src: countedCheckInsByWorker[String(worker.id)][0].imageData,
+                              alt: `${worker.workerName} ${t("attendance_checkin_history")}`,
+                            });
+                          }}
+                        >
+                          <img
+                            src={countedCheckInsByWorker[String(worker.id)][0].imageData}
+                            alt={`${worker.workerName} ${t("attendance_checkin_history")}`}
+                          />
+                        </button>
                       ) : (
-                        <span>Kelish rasmi yo'q</span>
+                        <span
+                          className={getFaceRegistrationDay(faceImages[String(worker.id)])
+                            ? ""
+                            : "davomat-face-missing"}
+                        >
+                          {t("attendance_no_photo")}
+                        </span>
                       )}
                     </div>
                     <div className="davomat-worker-details">
@@ -766,7 +948,7 @@ function Davomat() {
                         </span>
                       )}
                       {worker.source === "attendance" && (
-                        <span className="davomat-local-label">Faqat Davomat</span>
+                        <span className="davomat-local-label">{t("attendance_only")}</span>
                       )}
                     </div>
                   </div>
@@ -778,7 +960,11 @@ function Davomat() {
                       key={entry.dateKey}
                       title={`${entry.dateKey} ${entry.record?.checkedInAt?.toDate
                         ? entry.record.checkedInAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                        : entry.status}`}
+                        : t(entry.status === "late"
+                          ? "attendance_late"
+                          : entry.status === "absent"
+                            ? "attendance_absent"
+                            : "attendance_on_time")}`}
                     >
                       {entry.record?.checkedInAt?.toDate
                         ? entry.record.checkedInAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -786,7 +972,7 @@ function Davomat() {
                     </span>
                   ))}
                   {(workerStats[String(worker.id)]?.history.length || 0) > 3 && (
-                    <span className="davomat-more-history" aria-label="To'liq tarix uchun bosing">...</span>
+                    <span className="davomat-more-history" aria-label={t("attendance_full_history")}>...</span>
                   )}
                 </div>
                 {isOwner && (
@@ -794,8 +980,8 @@ function Davomat() {
                     <button
                       type="button"
                       className="edit-btn"
-                      title="Tahrirlash"
-                      aria-label="Tahrirlash"
+                      title={t("attendance_edit")}
+                      aria-label={t("attendance_edit")}
                       onClick={(event) => {
                         event.stopPropagation();
                         openEditModal(worker);
@@ -806,8 +992,8 @@ function Davomat() {
                     <button
                       type="button"
                       className="delete-btn"
-                      title="O'chirish"
-                      aria-label="O'chirish"
+                      title={t("attendance_delete")}
+                      aria-label={t("attendance_delete")}
                       onClick={(event) => {
                         event.stopPropagation();
                         openDeleteConfirm(worker);
@@ -830,9 +1016,9 @@ function Davomat() {
             onSubmit={handleSaveWorker}
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <h2>{editingWorker ? "Ishchini tahrirlash" : "Ishchi qo'shish"}</h2>
+            <h2>{editingWorker ? t("attendance_edit_worker") : t("attendance_add_worker")}</h2>
             <label>
-              Ishchining ismi
+              {t("attendance_worker_name")}
               <input
                 autoFocus
                 value={workerName}
@@ -841,7 +1027,7 @@ function Davomat() {
               />
             </label>
             <label>
-              Ishchi kodi (Parol)
+              {t("worker_code_label")}
               <input
                 value={workerCode}
                 onChange={(event) => setWorkerCode(event.target.value)}
@@ -855,16 +1041,16 @@ function Davomat() {
               />
               <span>
                 {editingWorker?.source === "master"
-                  ? "O'zgarishlarni Barcha ishchilar ro'yxatiga ham qo'llash"
-                  : "Ushbu ishchini Barcha ishchilar ro'yxatiga ham qo'shish"}
+                  ? t("attendance_sync_edit")
+                  : t("attendance_sync_add")}
               </span>
             </label>
             <div className="davomat-modal-actions">
               <button type="button" onClick={closeModal} disabled={isSaving}>
-                Bekor qilish
+                {t("bekorqilish")}
               </button>
               <button type="submit" className="davomat-save-button" disabled={isSaving || !workerName.trim()}>
-                {isSaving ? "Saqlanmoqda..." : "Saqlash"}
+                {isSaving ? t("attendance_saving") : t("attendance_save")}
               </button>
             </div>
           </form>
@@ -874,9 +1060,9 @@ function Davomat() {
       {isSettingsOpen && (
         <div className="davomat-modal-overlay" onMouseDown={() => setIsSettingsOpen(false)}>
           <div className="davomat-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <h2>Ish jadvali</h2>
+            <h2>{t("attendance_schedule")}</h2>
             <label>
-              Ish boshlanish vaqti
+              {t("attendance_schedule_start")}
               <input
                 type="time"
                 value={startTime}
@@ -884,16 +1070,16 @@ function Davomat() {
                 required
               />
             </label>
-            <p>Kechikish va kelmaganlik statistikasi ish vaqti va kunlari asosida hisoblanadi.</p>
+            <p>{t("attendance_schedule_hint")}</p>
             <div className="davomat-weekdays">
               {[
-                [1, "Du"],
-                [2, "Se"],
-                [3, "Ch"],
-                [4, "Pa"],
-                [5, "Ju"],
-                [6, "Sh"],
-                [7, "Ya"],
+                [1, t("attendance_weekday_mon")],
+                [2, t("attendance_weekday_tue")],
+                [3, t("attendance_weekday_wed")],
+                [4, t("attendance_weekday_thu")],
+                [5, t("attendance_weekday_fri")],
+                [6, t("attendance_weekday_sat")],
+                [7, t("attendance_weekday_sun")],
               ].map(([day, label]) => (
                 <label key={day}>
                   <input
@@ -906,8 +1092,13 @@ function Davomat() {
               ))}
             </div>
             <div className="davomat-modal-actions">
-              <button type="button" onClick={() => setIsSettingsOpen(false)} disabled={isSaving}>
-                Bekor qilish
+              <button
+                type="button"
+                className="davomat-restart-button"
+                onClick={() => setShowRestartConfirm(true)}
+                disabled={isSaving}
+              >
+                {isSaving ? t("attendance_saving") : t("attendance_restart_today")}
               </button>
               <button
                 type="button"
@@ -915,7 +1106,7 @@ function Davomat() {
                 onClick={handleSaveWorkDays}
                 disabled={isSaving || selectedWorkDays.length === 0 || !startTime}
               >
-                {isSaving ? "Saqlanmoqda..." : "Saqlash"}
+                {isSaving ? t("attendance_saving") : t("attendance_save")}
               </button>
             </div>
           </div>
@@ -928,46 +1119,66 @@ function Davomat() {
             <div className="davomat-detail-heading">
               <div>
                 <h2>{selectedWorker.workerName}</h2>
-                <p>Kod: {selectedWorker.workerCode || "—"}</p>
+                <p>{t("attendance_worker_code")}: {selectedWorker.workerCode || "—"}</p>
               </div>
-              <button type="button" onClick={() => setSelectedWorker(null)} aria-label="Yopish">✕</button>
+              <button type="button" onClick={() => setSelectedWorker(null)} aria-label={t("attendance_close")}>✕</button>
             </div>
             <div className="davomat-detail-stats">
-              <span className="on-time">Vaqtida: {workerStats[String(selectedWorker.id)]?.onTime || 0}</span>
-              <span className="late">Kechikdi: {workerStats[String(selectedWorker.id)]?.late || 0}</span>
-              <span className="absent">Kelmagan: {workerStats[String(selectedWorker.id)]?.absent || 0}</span>
+              <span className="on-time">{t("attendance_on_time")}: {workerStats[String(selectedWorker.id)]?.onTime || 0}</span>
+              <span className="late">{t("attendance_late")}: {workerStats[String(selectedWorker.id)]?.late || 0}</span>
+              <span className="absent">{t("attendance_absent")}: {workerStats[String(selectedWorker.id)]?.absent || 0}</span>
             </div>
             {isOwner && (
               <>
-                <p className="davomat-face-notice">Rasmlarni bosingiz qo'lda tekshiradi.</p>
+                <p className="davomat-face-notice">{t("attendance_face_review_notice")}</p>
                 <div className="davomat-face-grid">
                   {[
-                    ["front", "To'g'ridan"],
-                    ["left", "Chapdan"],
-                    ["right", "O'ngdan"],
+                    ["front", t("attendance_face_front")],
+                    ["left", t("attendance_face_left")],
+                    ["right", t("attendance_face_right")],
                   ].map(([pose, label]) => (
-                    <button
-                      type="button"
-                      className="davomat-face-slot"
-                      key={pose}
-                      onClick={() => setCameraTarget({ workerId: selectedWorker.id, pose })}
-                    >
-                      {faceImages[String(selectedWorker.id)]?.[pose] ? (
-                        <img src={faceImages[String(selectedWorker.id)][pose]} alt={`${label} yuz rasmi`} />
-                      ) : (
-                        <span>+</span>
+                    <div className="davomat-face-slot" key={pose}>
+                      <button
+                        type="button"
+                        className="davomat-face-capture"
+                        onClick={() => setCameraTarget({ workerId: selectedWorker.id, pose })}
+                      >
+                        {selectedWorkerFaces[pose]?.imageData ? (
+                          <img src={selectedWorkerFaces[pose].imageData} alt={`${label} yuz rasmi`} />
+                        ) : (
+                          <span>+</span>
+                        )}
+                        <small>{label}</small>
+                      </button>
+                      {selectedWorkerFaces[pose]?.imageData && (
+                        <button
+                          type="button"
+                          className="davomat-face-delete-button"
+                          aria-label={t("attendance_face_delete", { pose: label })}
+                          title={t("attendance_face_delete", { pose: label })}
+                          disabled={isSaving}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFaceToDelete({
+                              workerId: selectedWorker.id,
+                              pose,
+                              label,
+                            });
+                          }}
+                        >
+                          ×
+                        </button>
                       )}
-                      <small>{label}</small>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </>
             )}
             <hr />
-            <h3>Kelishlar tarixi</h3>
+            <h3>{t("attendance_checkin_history")}</h3>
             <div className="davomat-full-history">
-              {checkInsByWorker[String(selectedWorker.id)]?.length ? (
-                checkInsByWorker[String(selectedWorker.id)].map((record) => {
+              {selectedWorkerCheckIns.length ? (
+                selectedWorkerCheckIns.map((record) => {
                   const checkInTime = getCheckInTime(record);
                   const status = compareCheckIn(record, attendanceData.startTime);
                   return (
@@ -976,21 +1187,177 @@ function Davomat() {
                       <span>
                         {checkInTime
                           ? checkInTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                          : "Vaqt noma'lum"}
+                          : t("attendance_unknown_time")}
                       </span>
                       {record.imageData && (
-                    <img
-                      className="davomat-checkin-thumbnail"
-                          src={record.imageData}
-                          alt={`${selectedWorker.workerName} ${record.dateKey} kelish rasmi`}
-                    />
-                  )}
+                        <button
+                          type="button"
+                          className="davomat-history-photo-zoom-trigger"
+                          aria-label={t("attendance_zoom_photo")}
+                          onClick={() =>
+                            setZoomedPhoto({
+                              src: record.imageData,
+                              alt: `${selectedWorker.workerName} ${record.dateKey} ${t("attendance_checkin_history")}`,
+                            })
+                          }
+                        >
+                          <img
+                            className="davomat-checkin-thumbnail"
+                            src={record.imageData}
+                            alt={`${selectedWorker.workerName} ${record.dateKey} ${t("attendance_checkin_history")}`}
+                          />
+                        </button>
+                      )}
                     </div>
                   );
-                })
+                  })
+              ) : !selectedWorkerFaceRegistrationDay ? (
+                <p>{t("attendance_face_required")}</p>
               ) : (
-                <p>Hozircha kelish rasmi yo'q.</p>
+                <p>{t("attendance_no_checkin_photo")}</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {faceToDelete && (
+        <div
+          className="davomat-modal-overlay"
+          onMouseDown={() => !isSaving && setFaceToDelete(null)}
+        >
+          <div
+            className="davomat-modal davomat-confirm-modal davomat-face-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2>{t("attendance_face_delete_title")}</h2>
+            <p>{t("attendance_face_delete_confirm", { pose: faceToDelete.label })}</p>
+            <div className="davomat-modal-actions">
+              <button
+                type="button"
+                onClick={() => setFaceToDelete(null)}
+                disabled={isSaving}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button
+                type="button"
+                className="davomat-delete-button"
+                onClick={() => handleDeleteFace(faceToDelete.workerId, faceToDelete.pose)}
+                disabled={isSaving}
+              >
+                {isSaving ? t("attendance_deleting") : t("attendance_delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedAttendanceStat && (
+        <div
+          className="davomat-modal-overlay"
+          onMouseDown={() => setSelectedAttendanceStat("")}
+        >
+          <div
+            className="davomat-modal davomat-stat-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attendance-stat-detail-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="davomat-detail-heading">
+              <h2 id="attendance-stat-detail-title">
+                {t("attendance_stat_details", {
+                  status: t(
+                    selectedAttendanceStat === "onTime"
+                      ? "attendance_on_time"
+                      : selectedAttendanceStat === "late"
+                        ? "attendance_late"
+                        : "attendance_absent",
+                  ),
+                })}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSelectedAttendanceStat("")}
+                aria-label={t("attendance_close")}
+              >
+                ✕
+              </button>
+            </div>
+            {["shared", "attendanceOnly"].map((group) => {
+              const groupDetails = attendanceStatDetails[selectedAttendanceStat][group];
+              return (
+                <section className="davomat-stat-group" key={group}>
+                  <h3>
+                    {t(group === "shared" ? "attendance_group_shared" : "attendance_group_only")}
+                    <span>{groupDetails.total}</span>
+                  </h3>
+                  {groupDetails.workers.length ? (
+                    <ul>
+                      {groupDetails.workers.map(({ worker, count }) => (
+                        <li key={`${worker.source}-${worker.id}`}>
+                          <span>{worker.workerName}</span>
+                          <strong>{count}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>{t("attendance_group_empty")}</p>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {zoomedPhoto && (
+        <div
+          className="davomat-photo-zoom-overlay"
+          onMouseDown={() => setZoomedPhoto(null)}
+          role="presentation"
+        >
+          <img
+            src={zoomedPhoto.src}
+            alt={zoomedPhoto.alt}
+            onMouseDown={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
+
+      {showRestartConfirm && (
+        <div
+          className="davomat-modal-overlay"
+          onMouseDown={() => !isSaving && setShowRestartConfirm(false)}
+        >
+          <div
+            className="davomat-modal davomat-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attendance-restart-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="attendance-restart-title">{t("attendance_restart_title")}</h2>
+            <p>{t("attendance_restart_confirm")}</p>
+            <div className="davomat-modal-actions">
+              <button
+                type="button"
+                onClick={() => setShowRestartConfirm(false)}
+                disabled={isSaving}
+              >
+                {t("bekorqilish")}
+              </button>
+              <button
+                type="button"
+                className="davomat-restart-button"
+                onClick={handleRestartAttendanceTracking}
+                disabled={isSaving}
+              >
+                {isSaving ? t("attendance_saving") : t("ha")}
+              </button>
             </div>
           </div>
         </div>
@@ -998,7 +1365,13 @@ function Davomat() {
 
       {cameraTarget && (
         <AttendanceCamera
-          title={`Face ID: ${cameraTarget.pose === "front" ? "To'g'ridan" : cameraTarget.pose === "left" ? "Chapdan" : "O'ngdan"}`}
+          title={t("attendance_camera_face_title", {
+            pose: cameraTarget.pose === "front"
+              ? t("attendance_face_front")
+              : cameraTarget.pose === "left"
+                ? t("attendance_face_left")
+                : t("attendance_face_right"),
+          })}
           onCapture={handleFaceCapture}
           onClose={() => !isSaving && setCameraTarget(null)}
           isSaving={isSaving}
@@ -1008,9 +1381,9 @@ function Davomat() {
       {deleteWorker && (
         <div className="davomat-modal-overlay" onMouseDown={() => !isSaving && setDeleteWorker(null)}>
           <div className="davomat-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <h2>Ishchini o'chirish</h2>
+            <h2>{t("attendance_delete_worker_title")}</h2>
             <p>
-              {deleteWorker.workerName} ni Davomat ro'yxatidan o'chirmoqchimisiz?
+              {t("attendance_delete_worker_confirm", { name: deleteWorker.workerName })}
             </p>
             {deleteWorker.source === "master" && (
               <label className="davomat-sync-option">
@@ -1019,12 +1392,12 @@ function Davomat() {
                   checked={syncDeleteWithAllWorkers}
                   onChange={(event) => setSyncDeleteWithAllWorkers(event.target.checked)}
                 />
-                <span>Barcha ishchilar ro'yxatidan ham o'chirish</span>
+                <span>{t("attendance_delete_from_all")}</span>
               </label>
             )}
             <div className="davomat-modal-actions">
               <button type="button" onClick={() => setDeleteWorker(null)} disabled={isSaving}>
-                Bekor qilish
+                {t("bekorqilish")}
               </button>
               <button
                 type="button"
@@ -1032,7 +1405,7 @@ function Davomat() {
                 onClick={handleDeleteWorker}
                 disabled={isSaving}
               >
-                {isSaving ? "O'chirilmoqda..." : "O'chirish"}
+                {isSaving ? t("attendance_deleting") : t("attendance_delete")}
               </button>
             </div>
           </div>
@@ -1042,10 +1415,10 @@ function Davomat() {
       {showUndoConfirm && undoSnapshot && (
         <div className="davomat-modal-overlay" onMouseDown={() => setShowUndoConfirm(false)}>
           <div className="davomat-modal davomat-confirm-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <p>Oxirgi amalni bekor qilmoqchimisiz?</p>
+            <p>{t("attendance_undo_confirm")}</p>
             <div className="davomat-modal-actions">
               <button type="button" onClick={() => setShowUndoConfirm(false)} disabled={isSaving}>
-                {t("bekorqilish") || "Yo'q"}
+                {t("bekorqilish")}
               </button>
               <button
                 type="button"
@@ -1053,7 +1426,7 @@ function Davomat() {
                 onClick={handleUndo}
                 disabled={isSaving}
               >
-                {isSaving ? "Bekor qilinmoqda..." : t("ha") || "Ha"}
+                {isSaving ? t("attendance_undoing") : t("ha")}
               </button>
             </div>
           </div>
@@ -1063,10 +1436,10 @@ function Davomat() {
       {showDismissUndoConfirm && undoSnapshot && (
         <div className="davomat-modal-overlay" onMouseDown={() => setShowDismissUndoConfirm(false)}>
           <div className="davomat-modal davomat-confirm-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <p>Bekor qilish imkoniyatini yopmoqchimisiz?</p>
+            <p>{t("attendance_dismiss_undo_confirm")}</p>
             <div className="davomat-modal-actions">
               <button type="button" onClick={() => setShowDismissUndoConfirm(false)}>
-                {t("bekorqilish") || "Yo'q"}
+                {t("bekorqilish")}
               </button>
               <button
                 type="button"
@@ -1076,7 +1449,7 @@ function Davomat() {
                   setShowDismissUndoConfirm(false);
                 }}
               >
-                {t("ha") || "Ha"}
+                {t("ha")}
               </button>
             </div>
           </div>

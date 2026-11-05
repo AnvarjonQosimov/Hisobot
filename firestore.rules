@@ -52,15 +52,12 @@ service cloud.firestore {
     }
 
     function validWorkerAccess(data) {
-      let workerEmailPath = /databases/$(database)/documents/globalWorkerEmails/$(request.auth.token.email);
       let inviteCodePath = /databases/$(database)/documents/inviteCodes/$(data.inviteCode);
       return hasVerifiedEmail()
         && data.ownerEmail == request.auth.token.email
         && data.ownerUid == request.auth.uid
         && data.inviteCode is string
         && data.inviteCode.size() > 0
-        && exists(workerEmailPath)
-        && data.bossEmail == get(workerEmailPath).data.bossEmail
         && exists(inviteCodePath)
         && get(inviteCodePath).data.bossEmail == data.bossEmail
         && get(inviteCodePath).data.workerId == data.workerId;
@@ -260,6 +257,7 @@ service cloud.firestore {
 
     match /inviteCodes/{code} {
       allow get: if isAdmin()
+        || hasVerifiedEmail()
         || (
           hasVerifiedEmail()
           && !exists(/databases/$(database)/documents/inviteCodes/$(code))
@@ -316,8 +314,6 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (
           request.auth.token.email == workerEmail
-          && resource.data.ownerEmail == request.auth.token.email
-          && resource.data.ownerUid == request.auth.uid
           && validWorkerAccess(request.resource.data)
         );
       allow delete: if isAdmin();
@@ -415,7 +411,6 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/workerAccess/$(request.auth.token.email))
             && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.ownerUid == request.auth.uid
             && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.bossEmail == resource.data.bossEmail
-            && get(/databases/$(database)/documents/workerAccess/$(request.auth.token.email)).data.workerId == resource.data.workerId
           );
         allow list: if isAdmin()
           || (

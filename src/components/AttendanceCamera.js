@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
+  const { t } = useTranslation();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [cameraError, setCameraError] = useState("");
@@ -11,7 +13,7 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
     const startCamera = async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error("Bu qurilmada kamera mavjud emas.");
+          throw new Error("camera-not-supported");
         }
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
@@ -28,8 +30,10 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
         if (active) {
           setCameraError(
             error.name === "NotAllowedError"
-              ? "Kameradan foydalanishga ruxsat bering."
-              : error.message || "Kamerani ishga tushirib bo'lmadi.",
+              ? "attendance_camera_permission"
+              : error.message === "camera-not-supported"
+                ? "attendance_camera_not_supported"
+                : "attendance_camera_start_failed",
           );
         }
       }
@@ -46,7 +50,7 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
   const capture = async () => {
     const video = videoRef.current;
     if (!video?.videoWidth || !video.videoHeight) {
-      setCameraError("Kamera tasviri hali tayyor emas.");
+      setCameraError("attendance_camera_not_ready");
       return;
     }
 
@@ -56,7 +60,7 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
     canvas.height = Math.round(video.videoHeight * scale);
     const context = canvas.getContext("2d");
     if (!context) {
-      setCameraError("Kamera tasvirini tayyorlab bo'lmadi.");
+      setCameraError("attendance_camera_image_failed");
       return;
     }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -68,7 +72,7 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
       imageData = canvas.toDataURL("image/jpeg", quality);
     }
     if (imageData.length > 700000) {
-      setCameraError("Rasm hajmini kichraytirib qayta oling.");
+      setCameraError("attendance_camera_resize");
       return;
     }
 
@@ -78,8 +82,8 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
       console.error("Could not save attendance photo:", error);
       setCameraError(
         error.code === "permission-denied"
-          ? "Firestore ruxsat bermadi. Firebase loyihasiga yangilangan firestore.rules qoidalarini joylang."
-          : error.message || "Rasmni saqlab bo'lmadi.",
+          ? "attendance_camera_rules_error"
+          : "attendance_camera_save_failed",
       );
     }
   };
@@ -92,13 +96,13 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
       >
         <h2>{title}</h2>
         {cameraError ? (
-          <p role="alert" className="davomat-camera-error">{cameraError}</p>
+          <p role="alert" className="davomat-camera-error">{t(cameraError)}</p>
         ) : (
           <video ref={videoRef} className="davomat-camera-video" autoPlay playsInline muted />
         )}
         <div className="davomat-modal-actions">
           <button type="button" onClick={onClose} disabled={isSaving}>
-            Bekor qilish
+            {t("bekorqilish")}
           </button>
           <button
             type="button"
@@ -106,7 +110,7 @@ function AttendanceCamera({ title, onCapture, onClose, isSaving = false }) {
             onClick={capture}
             disabled={isSaving || Boolean(cameraError)}
           >
-            {isSaving ? "Saqlanmoqda..." : "Rasmga olish"}
+            {isSaving ? t("attendance_saving") : t("attendance_take_photo")}
           </button>
         </div>
       </div>
