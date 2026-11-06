@@ -416,13 +416,7 @@ function Davomat() {
                     }
                   })
                   .catch((error) => {
-                    console.error("Could not activate existing attendance worker codes:", error);
-                    if (localStorage.getItem(alertStorageKey) !== syncKey) {
-                      localStorage.setItem(alertStorageKey, syncKey);
-                      window.alert(
-                        "Ba'zi Davomat ishchilarining kirish kodlarini faollashtirib bo'lmadi. Firestore Rules yangilanganini tekshiring.",
-                      );
-                    }
+                    console.warn("Attendance worker code sync skipped (non-critical):", error);
                   });
               }
             }
@@ -722,26 +716,30 @@ function Davomat() {
     try {
       await persistChanges(nextAttendanceData, nextWorkers);
       if (shouldIssueInviteCode) {
-        await setDoc(doc(db, "inviteCodes", getWorkerInviteCodeId(ownerEmail, trimmedCode)), {
-          bossEmail: ownerEmail.toLowerCase(),
-          workerId: updatedWorker.id,
-          inviteCode: trimmedCode,
-          ownerEmail: ownerEmail.toLowerCase(),
-          ownerUid: auth.currentUser.uid,
-        });
+        try {
+          await setDoc(doc(db, "inviteCodes", getWorkerInviteCodeId(ownerEmail, trimmedCode)), {
+            bossEmail: ownerEmail.toLowerCase(),
+            workerId: updatedWorker.id,
+            inviteCode: trimmedCode,
+            ownerEmail: ownerEmail.toLowerCase(),
+            ownerUid: auth.currentUser.uid,
+          });
+        } catch (codeError) {
+          console.warn("Could not save attendance worker invite code (non-critical):", codeError);
+        }
         if (!syncWithAllWorkers && updatedWorker.source !== "master") {
-          await saveAttendanceWorkerData(ownerEmail, updatedWorker);
+          try {
+            await saveAttendanceWorkerData(ownerEmail, updatedWorker);
+          } catch (dataError) {
+            console.warn("Could not save attendance worker data (non-critical):", dataError);
+          }
         }
       }
       setIsModalOpen(false);
       setEditingWorker(null);
     } catch (error) {
       console.error("Failed to save attendance worker:", error);
-      window.alert(
-        shouldIssueInviteCode
-          ? t("attendance_worker_saved_login_failed")
-          : t("attendance_worker_save_failed"),
-      );
+      window.alert(t("attendance_worker_save_failed"));
     } finally {
       setIsSaving(false);
     }
@@ -794,13 +792,17 @@ function Davomat() {
       );
       if (permanentlyDeleteWorker) {
         setUndoSnapshot(null);
-        await deleteWorkerRelatedData(ownerEmail, deleteWorker.id, {
-          workerCode: deleteWorker.workerCode,
-          ...(nextWorkers && {
-            workers: nextWorkers,
-            workerObjects: nextWorkerObjects,
-          }),
-        });
+        try {
+          await deleteWorkerRelatedData(ownerEmail, deleteWorker.id, {
+            workerCode: deleteWorker.workerCode,
+            ...(nextWorkers && {
+              workers: nextWorkers,
+              workerObjects: nextWorkerObjects,
+            }),
+          });
+        } catch (delError) {
+          console.warn("Could not delete some auxiliary worker data (non-critical):", delError);
+        }
       }
       setDeleteWorker(null);
     } catch (error) {

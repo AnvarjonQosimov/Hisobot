@@ -1157,6 +1157,16 @@
     background: rgba(239, 68, 68, 0.35);
 }
 
+.btn.reset {
+  background: rgba(239, 68, 68, 0.25);
+  color: rgb(255, 140, 140);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.btn.reset:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.45);
+}
+
 .disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -1214,6 +1224,18 @@
     border-color: rgba(239, 100, 100, 0.4);
     color: #ffb4b4;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.balance-tab.active.tab-reset {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(190, 30, 60, 0.3) 100%);
+  border-color: rgba(239, 100, 100, 0.45);
+  color: #ff9999;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.balance-tab.tab-reset:hover {
+  color: #ff9999;
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .current-balance-info-card {

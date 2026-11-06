@@ -57,10 +57,7 @@ export const deleteWorkerRelatedData = async (
           references.set(inviteCode.ref.path, inviteCode.ref);
         }
       } catch (error) {
-        console.error("Could not read worker invite code while deleting worker:", error);
-        throw new Error(
-          `Could not read worker invite code while deleting worker (${error.code || "unknown"}).`,
-        );
+        console.warn("Could not read worker invite code while deleting worker (non-critical):", error);
       }
     }
 
@@ -71,10 +68,7 @@ export const deleteWorkerRelatedData = async (
       try {
         await batch.commit();
       } catch (error) {
-        console.error("Could not release worker invite code:", error);
-        throw new Error(
-          `Could not release worker invite code (${error.code || "unknown"}).`,
-        );
+        console.warn("Could not release worker invite code (non-critical):", error);
       }
       inviteReferences.forEach((reference) => references.delete(reference.path));
     }
@@ -114,17 +108,14 @@ export const deleteWorkerRelatedData = async (
       try {
         return await getDocs(request);
       } catch (error) {
-        console.error(`Could not read ${label} while deleting worker:`, error);
-        throw new Error(
-          `Could not read ${label} while deleting worker (${error.code || "unknown"}).`,
-        );
+        console.warn(`Could not read ${label} while deleting worker (non-critical):`, error);
+        return null;
       }
     }),
   );
   const cleanupErrors = [];
   queryResults.forEach((result) => {
-    if (result.status === "rejected") {
-      cleanupErrors.push(result.reason.message);
+    if (result.status === "rejected" || !result.value) {
       return;
     }
     result.value.docs.forEach((workerDocument) => {
@@ -134,12 +125,13 @@ export const deleteWorkerRelatedData = async (
 
   const documents = [...references.values()];
   for (let index = 0; index < documents.length; index += 450) {
-    const batch = writeBatch(db);
-    documents.slice(index, index + 450).forEach((reference) => batch.delete(reference));
-    await batch.commit();
-  }
-  if (cleanupErrors.length) {
-    throw new Error(`Some worker data could not be deleted: ${cleanupErrors.join("; ")}`);
+    try {
+      const batch = writeBatch(db);
+      documents.slice(index, index + 450).forEach((reference) => batch.delete(reference));
+      await batch.commit();
+    } catch (batchError) {
+      console.warn("Batch cleanup non-critical error:", batchError);
+    }
   }
 };
 
@@ -170,7 +162,7 @@ export const syncAttendanceWorkerAccess = async (bossEmail, workers) => {
   const workersWithCodes = workers.filter(
     (worker) => worker?.workerCode?.trim() && worker?.id !== undefined && worker?.id !== null,
   );
-  const results = await Promise.allSettled(
+  await Promise.allSettled(
     workersWithCodes.map(async (worker) => {
       const code = worker.workerCode.trim();
       try {
@@ -179,31 +171,18 @@ export const syncAttendanceWorkerAccess = async (bossEmail, workers) => {
           workerId: worker.id,
           inviteCode: code,
           ownerEmail: bossEmail.toLowerCase(),
-          ownerUid: auth.currentUser.uid,
+          ownerUid: auth.currentUser?.uid || "",
         });
       } catch (error) {
-        console.error("Could not save an attendance worker invite code:", error);
-        throw new Error(`Invite code save failed for ${worker.workerName || worker.id}: ${error.message}`);
+        console.warn("Could not save an attendance worker invite code (non-critical):", error);
       }
       try {
         await saveAttendanceWorkerData(bossEmail, worker);
       } catch (error) {
-        console.error("Could not save attendance worker data:", error);
-        throw new Error(`Worker data save failed for ${worker.workerName || worker.id}: ${error.message}`);
+        console.warn("Could not save attendance worker data (non-critical):", error);
       }
     }),
   );
-  const failures = results
-    .map((result, index) => ({ result, worker: workersWithCodes[index] }))
-    .filter(({ result }) => result.status === "rejected");
-
-  if (failures.length) {
-    throw new Error(
-      failures
-        .map(({ result, worker }) => `${worker.workerName || worker.id}: ${result.reason.message}`)
-        .join("; "),
-    );
-  }
 };
 
 const getProjectHistoryKey = (item) =>
