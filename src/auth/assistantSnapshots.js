@@ -5,6 +5,30 @@ import { normalizeEmail } from "./assistantAccess";
 const getSnapshotId = (bossEmail, section, contextId = "root") =>
   encodeURIComponent(`${normalizeEmail(bossEmail)}:${section}:${contextId}`);
 
+export const mergeBossSectionSnapshot = async (
+  bossEmail,
+  section,
+  data,
+  contextId,
+) => {
+  const normalizedBossEmail = normalizeEmail(bossEmail);
+  if (normalizeEmail(auth.currentUser?.email) !== normalizedBossEmail) {
+    throw new Error("Only the cabinet owner can update a section snapshot.");
+  }
+
+  await setDoc(
+    doc(db, "assistantSectionSnapshots", getSnapshotId(normalizedBossEmail, section, contextId)),
+    {
+      bossEmail: normalizedBossEmail,
+      section,
+      contextId: String(contextId || "root"),
+      data,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true },
+  );
+};
+
 export const saveBossSectionSnapshot = async (
   bossEmail,
   section,

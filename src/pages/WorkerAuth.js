@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useTranslation } from "react-i18next";
 import Loading from "../components/Loading";
+import { getWorkerInviteCodeId } from "../auth/firestoreOwnership";
 import "../styles/LogIn.css"; // Reuse login styles
 
 function WorkerAuth() {
@@ -32,35 +33,40 @@ function WorkerAuth() {
     let authStep = "invite-code lookup";
 
     try {
-      const codeRef = doc(db, "inviteCodes", workerCode.trim());
+      const expectedBossEmail = pendingWorker.data?.bossEmail?.trim().toLowerCase();
+      const workerEmail = auth.currentUser?.email?.trim().toLowerCase();
+      if (!expectedBossEmail || !workerEmail || workerEmail !== pendingWorker.email.toLowerCase()) {
+        setError(t("worker_auth_wrong_code", { defaultValue: "Parol noto'g'ri. Qaytadan kiriting." }));
+        return;
+      }
 
+      const scopedCodeId = getWorkerInviteCodeId(expectedBossEmail, workerCode);
       let codeSnap;
       try {
-        codeSnap = await getDoc(codeRef);
+        codeSnap = await getDoc(doc(db, "inviteCodes", scopedCodeId));
+        if (!codeSnap.exists()) {
+          codeSnap = await getDoc(doc(db, "inviteCodes", workerCode.trim()));
+        }
       } catch (err) {
         if (err.code === 'unavailable') {
           await new Promise(res => setTimeout(res, 1000));
-          codeSnap = await getDoc(codeRef);
+          codeSnap = await getDoc(doc(db, "inviteCodes", scopedCodeId));
+          if (!codeSnap.exists()) {
+            codeSnap = await getDoc(doc(db, "inviteCodes", workerCode.trim()));
+          }
         } else {
           throw err;
         }
       }
 
-      if (
-        codeSnap.exists() &&
-        (!pendingWorker.data?.bossEmail ||
-          codeSnap.data().bossEmail === pendingWorker.data.bossEmail)
-      ) {
+      if (codeSnap.exists() && codeSnap.data().bossEmail?.trim().toLowerCase() === expectedBossEmail) {
         const codeData = codeSnap.data();
-        const workerEmail = pendingWorker.email.toLowerCase();
-        if (!auth.currentUser) {
-          throw new Error("The worker account is no longer authenticated.");
-        }
         authStep = "worker access save";
         await setDoc(doc(db, "workerAccess", workerEmail), {
           bossEmail: codeData.bossEmail,
           workerId: codeData.workerId,
           inviteCode: workerCode.trim(),
+          inviteCodeId: codeSnap.id,
           ownerEmail: workerEmail,
           ownerUid: auth.currentUser.uid,
         });

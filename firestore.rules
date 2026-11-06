@@ -52,15 +52,24 @@ service cloud.firestore {
     }
 
     function validWorkerAccess(data) {
-      let inviteCodePath = /databases/$(database)/documents/inviteCodes/$(data.inviteCode);
+      let inviteCodePath = /databases/$(database)/documents/inviteCodes/$(data.inviteCodeId);
+      let workerEmailPath = /databases/$(database)/documents/globalWorkerEmails/$(request.auth.token.email);
       return hasVerifiedEmail()
         && data.ownerEmail == request.auth.token.email
         && data.ownerUid == request.auth.uid
         && data.inviteCode is string
         && data.inviteCode.size() > 0
+        && data.inviteCodeId is string
+        && data.inviteCodeId.size() > 0
+        && exists(workerEmailPath)
+        && get(workerEmailPath).data.bossEmail == data.bossEmail
         && exists(inviteCodePath)
         && get(inviteCodePath).data.bossEmail == data.bossEmail
-        && get(inviteCodePath).data.workerId == data.workerId;
+        && get(inviteCodePath).data.workerId == data.workerId
+        && (
+          !("inviteCode" in get(inviteCodePath).data)
+          || get(inviteCodePath).data.inviteCode == data.inviteCode
+        );
     }
 
     match /users/{userId} {
@@ -272,23 +281,20 @@ service cloud.firestore {
           && resource.data.bossEmail == request.auth.token.email
         )
         || isWorkerFor(resource.data.bossEmail);
-      allow list: if isAdmin();
-      allow create: if isAdmin()
+      allow list: if isAdmin()
         || (
-          hasVerifiedEmail()
-          && request.resource.data.bossEmail == request.auth.token.email
-          && request.resource.data.ownerEmail == request.auth.token.email
-          && request.resource.data.ownerUid == request.auth.uid
+          isBossFor(resource.data.bossEmail)
+          && resource.data.bossEmail == request.auth.token.email
         );
-      allow update: if isAdmin()
+      allow create, update: if isAdmin()
         || (
-          hasVerifiedEmail()
-          && resource.data.ownerEmail == request.auth.token.email
-          && resource.data.ownerUid == request.auth.uid
+          isBossFor(request.resource.data.bossEmail)
           && request.resource.data.bossEmail == request.auth.token.email
-          && resource.data.workerId == request.resource.data.workerId
           && request.resource.data.ownerEmail == request.auth.token.email
           && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.workerId != null
+          && request.resource.data.inviteCode is string
+          && request.resource.data.inviteCode.size() > 0
         );
       allow delete: if isAdmin()
         || (
@@ -305,7 +311,11 @@ service cloud.firestore {
           && resource.data.ownerUid == request.auth.uid
           && resource.data.ownerEmail == request.auth.token.email
         );
-      allow list: if isAdmin();
+      allow list: if isAdmin()
+        || (
+          isBossFor(resource.data.bossEmail)
+          && resource.data.bossEmail == request.auth.token.email
+        );
       allow create: if isAdmin()
         || (
           request.auth.token.email == workerEmail
@@ -316,7 +326,11 @@ service cloud.firestore {
           request.auth.token.email == workerEmail
           && validWorkerAccess(request.resource.data)
         );
-      allow delete: if isAdmin();
+      allow delete: if isAdmin()
+        || (
+          isBossFor(resource.data.bossEmail)
+          && resource.data.bossEmail == request.auth.token.email
+        );
     }
 
     match /workerData/{workerDataId} {

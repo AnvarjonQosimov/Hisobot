@@ -8,6 +8,49 @@
         { "fieldPath": "section", "order": "ASCENDING" },
         { "fieldPath": "contextId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "inviteCodes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bossEmail", "order": "ASCENDING" },
+        { "fieldPath": "workerId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "attendanceFaces",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bossEmail", "order": "ASCENDING" },
+        { "fieldPath": "ownerEmail", "order": "ASCENDING" },
+        { "fieldPath": "workerId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "attendanceRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bossEmail", "order": "ASCENDING" },
+        { "fieldPath": "ownerEmail", "order": "ASCENDING" },
+        { "fieldPath": "workerId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "workerAccess",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bossEmail", "order": "ASCENDING" },
+        { "fieldPath": "workerId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "workerData",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerEmail", "order": "ASCENDING" },
+        { "fieldPath": "ownerUid", "order": "ASCENDING" },
+        { "fieldPath": "workerId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

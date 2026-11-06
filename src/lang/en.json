@@ -495,6 +495,7 @@
   "attendance_worker_saved_login_failed": "Worker saved, but the sign-in code or account data could not be saved. Check Firebase rules and your connection.",
   "attendance_worker_save_failed": "Could not save the worker. Please try again.",
   "attendance_worker_delete_failed": "Could not delete the worker. Please try again.",
+  "worker_delete_permanent_warning": "The worker's reports, check-ins, face photos, and access code will be permanently deleted. The code can then be issued to another worker.",
   "attendance_schedule_save_failed": "Could not save the work days. Please try again.",
   "attendance_restart_confirm": "Attendance statistics will be recalculated starting today. Existing check-in records will not be deleted. Continue?",
   "attendance_restart_failed": "Could not restart attendance tracking from today. Please try again.",
@@ -537,5 +538,13 @@
   "attendance_camera_resize": "Reduce the photo size and try again.",
   "attendance_camera_save_failed": "Could not save the photo.",
   "attendance_camera_rules_error": "Firestore denied access. Publish the updated firestore.rules to your Firebase project.",
-  "attendance_take_photo": "Take photo"
+  "attendance_take_photo": "Take photo",
+  "attendance_face_not_found": "No face detected. Look at the camera and try again.",
+  "attendance_face_detector_loading": "Loading face detection...",
+  "attendance_face_detector_failed": "Could not start face detection. Check your connection and try again.",
+  "attendance_photo_confirm": "Is this photo suitable?",
+  "attendance_photo_preview_alt": "Face photo preview",
+  "attendance_retake_photo": "Retake",
+  "attendance_use_photo": "Use this photo",
+  "attendance_switch_camera": "Switch camera"
 }

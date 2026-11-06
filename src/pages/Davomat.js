@@ -16,6 +16,8 @@ import { auth, db } from "../Firebase/Firebase";
 import {
   saveAttendanceWorkerData,
   saveBossCabinet,
+  deleteWorkerRelatedData,
+  getWorkerInviteCodeId,
   syncAttendanceWorkerAccess,
 } from "../auth/firestoreOwnership";
 import AttendanceCamera from "../components/AttendanceCamera";
@@ -392,19 +394,36 @@ function Davomat() {
                 (worker) => worker.workerCode?.trim(),
               );
               const syncKey = JSON.stringify(
-                [bossEmail, ...workersWithCodes.map((worker) => [worker.id, worker.workerCode])],
+                [
+                  bossEmail,
+                  ...workersWithCodes
+                    .map((worker) => [worker.id, worker.workerCode])
+                    .sort(([leftId], [rightId]) =>
+                      String(leftId).localeCompare(String(rightId)),
+                    ),
+                ],
               );
               if (
                 workersWithCodes.length &&
                 !syncedAttendanceWorkerKeys.current.has(syncKey)
               ) {
                 syncedAttendanceWorkerKeys.current.add(syncKey);
-                syncAttendanceWorkerAccess(bossEmail, workersWithCodes).catch((error) => {
-                  console.error("Could not activate existing attendance worker codes:", error);
-                  window.alert(
-                    "Ba'zi Davomat ishchilarining kirish kodlarini faollashtirib bo'lmadi. Firestore Rules yangilanganini tekshiring.",
-                  );
-                });
+                const alertStorageKey = `attendanceWorkerAccessSyncAlert_${bossEmail}`;
+                syncAttendanceWorkerAccess(bossEmail, workersWithCodes)
+                  .then(() => {
+                    if (localStorage.getItem(alertStorageKey) === syncKey) {
+                      localStorage.removeItem(alertStorageKey);
+                    }
+                  })
+                  .catch((error) => {
+                    console.error("Could not activate existing attendance worker codes:", error);
+                    if (localStorage.getItem(alertStorageKey) !== syncKey) {
+                      localStorage.setItem(alertStorageKey, syncKey);
+                      window.alert(
+                        "Ba'zi Davomat ishchilarining kirish kodlarini faollashtirib bo'lmadi. Firestore Rules yangilanganini tekshiring.",
+                      );
+                    }
+                  });
               }
             }
           }
@@ -470,7 +489,12 @@ function Davomat() {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const persistChanges = async (nextAttendanceData, nextWorkers, recordUndo = true) => {
+  const persistChanges = async (
+    nextAttendanceData,
+    nextWorkers,
+    recordUndo = true,
+    nextWorkerObjects = workerObjects,
+  ) => {
     if (!isOwner || !ownerEmail || auth.currentUser?.email?.toLowerCase() !== ownerEmail) {
       throw new Error("Only the cabinet owner can change attendance workers.");
     }
@@ -486,7 +510,7 @@ function Davomat() {
       attendanceData: nextAttendanceData,
       ...(nextWorkers && {
         workers: nextWorkers,
-        workerObjects,
+        workerObjects: nextWorkerObjects,
       }),
     };
     await saveBossCabinet(ownerEmail, payload);
@@ -496,6 +520,7 @@ function Davomat() {
     if (nextWorkers) {
       setWorkers(nextWorkers);
       localStorage.setItem(`workers_${ownerEmail}`, JSON.stringify(nextWorkers));
+      setWorkerObjects(nextWorkerObjects);
     }
   };
 
@@ -697,10 +722,11 @@ function Davomat() {
     try {
       await persistChanges(nextAttendanceData, nextWorkers);
       if (shouldIssueInviteCode) {
-        await setDoc(doc(db, "inviteCodes", trimmedCode), {
-          bossEmail: ownerEmail,
+        await setDoc(doc(db, "inviteCodes", getWorkerInviteCodeId(ownerEmail, trimmedCode)), {
+          bossEmail: ownerEmail.toLowerCase(),
           workerId: updatedWorker.id,
-          ownerEmail,
+          inviteCode: trimmedCode,
+          ownerEmail: ownerEmail.toLowerCase(),
           ownerUid: auth.currentUser.uid,
         });
         if (!syncWithAllWorkers && updatedWorker.source !== "master") {
@@ -730,6 +756,9 @@ function Davomat() {
     if (!deleteWorker || isSaving) return;
     const nextAttendanceData = normalizeAttendanceData(attendanceData);
     let nextWorkers = null;
+    let nextWorkerObjects = workerObjects;
+    const permanentlyDeleteWorker =
+      deleteWorker.source === "attendance" || syncDeleteWithAllWorkers;
 
     if (deleteWorker.source === "attendance") {
       nextAttendanceData.workers = nextAttendanceData.workers.filter(
@@ -739,6 +768,14 @@ function Davomat() {
       nextWorkers = workers.filter(
         (worker) => String(worker.id) !== String(deleteWorker.id),
       );
+      nextWorkerObjects = workerObjects.map((object) => ({
+        ...object,
+        workers: Array.isArray(object.workers)
+          ? object.workers.filter(
+              (worker) => String(worker.id) !== String(deleteWorker.id),
+            )
+          : object.workers,
+      }));
       delete nextAttendanceData.overrides[String(deleteWorker.id)];
       nextAttendanceData.hiddenWorkerIds = nextAttendanceData.hiddenWorkerIds.filter(
         (id) => id !== String(deleteWorker.id),
@@ -749,11 +786,28 @@ function Davomat() {
 
     setIsSaving(true);
     try {
-      await persistChanges(nextAttendanceData, nextWorkers);
+      await persistChanges(
+        nextAttendanceData,
+        nextWorkers,
+        !permanentlyDeleteWorker,
+        nextWorkerObjects,
+      );
+      if (permanentlyDeleteWorker) {
+        setUndoSnapshot(null);
+        await deleteWorkerRelatedData(ownerEmail, deleteWorker.id, {
+          workerCode: deleteWorker.workerCode,
+          ...(nextWorkers && {
+            workers: nextWorkers,
+            workerObjects: nextWorkerObjects,
+          }),
+        });
+      }
       setDeleteWorker(null);
     } catch (error) {
       console.error("Failed to delete attendance worker:", error);
-      window.alert(t("attendance_worker_delete_failed"));
+      window.alert(
+        error.message || t("attendance_worker_delete_failed"),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -1394,6 +1448,9 @@ function Davomat() {
             <p>
               {t("attendance_delete_worker_confirm", { name: deleteWorker.workerName })}
             </p>
+            {(deleteWorker.source === "attendance" || syncDeleteWithAllWorkers) && (
+              <p>{t("worker_delete_permanent_warning")}</p>
+            )}
             {deleteWorker.source === "master" && (
               <label className="davomat-sync-option">
                 <input

@@ -452,6 +452,21 @@
     object-fit: cover;
 }
 
+.davomat-camera-preview {
+    display: block;
+    width: 100%;
+    max-height: 55vh;
+    border-radius: 12px;
+    background: #020617;
+    object-fit: contain;
+}
+
+.davomat-camera-confirm-prompt,
+.davomat-camera-status {
+    color: #cbd5e1;
+    font-size: 14px;
+}
+
 .davomat-camera-error {
     color: #ff9a9a;
 }

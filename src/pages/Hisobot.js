@@ -12,7 +12,11 @@ import { signOut } from "firebase/auth";
 import FloatingCalculator from "../components/FloatingCalculator";
 import Loading from "../components/Loading";
 import { AnimatePresence } from "framer-motion";
-import { saveBossCabinet } from "../auth/firestoreOwnership";
+import {
+  deleteWorkerRelatedData,
+  getWorkerInviteCodeId,
+  saveBossCabinet,
+} from "../auth/firestoreOwnership";
 import AssistantManager from "../components/AssistantManager";
 import { getBossSectionSnapshot, saveBossSectionSnapshot } from "../auth/assistantSnapshots";
 import { SiLibreofficecalc } from "react-icons/si";
@@ -1115,11 +1119,16 @@ if (sdr) setDollarRate(JSON.parse(sdr));
       }
 
       try {
-        const codeRef = doc(db, "inviteCodes", trimmedWorkerCode);
+        const codeRef = doc(
+          db,
+          "inviteCodes",
+          getWorkerInviteCodeId(username, trimmedWorkerCode),
+        );
         await setDoc(codeRef, {
-          bossEmail: username,
+          bossEmail: username.toLowerCase(),
           workerId: workerIdForCode,
-          ownerEmail: username,
+          inviteCode: trimmedWorkerCode,
+          ownerEmail: username.toLowerCase(),
           ownerUid: auth.currentUser.uid,
         });
       } catch (error) {
@@ -1373,7 +1382,7 @@ if (sdr) setDollarRate(JSON.parse(sdr));
     setDeleteWorkerId(id);
   };
 
-  const confirmDeleteWorker = () => {
+  const confirmDeleteWorker = async () => {
     if (deleteWorkerId) {
       if (isAssistant) {
         const worker = currentWorkers.find((item) => item.id === deleteWorkerId);
@@ -1391,8 +1400,52 @@ if (sdr) setDollarRate(JSON.parse(sdr));
             window.alert(t("assistant_action_failed"));
           });
         } else {
-          saveForUndo(); // Save state before deletion
-          updateCurrentWorkers(currentWorkers.filter((w) => w.id !== deleteWorkerId));
+          const nextWorkers = activeWorkerObjectId === null
+            ? workers.filter((worker) => String(worker.id) !== String(deleteWorkerId))
+            : workers;
+          const nextWorkerObjects = activeWorkerObjectId === null
+            ? workerObjects.map((object) => ({
+                ...object,
+                workers: Array.isArray(object.workers)
+                  ? object.workers.filter(
+                      (worker) => String(worker.id) !== String(deleteWorkerId),
+                    )
+                  : object.workers,
+              }))
+            : workerObjects.map((object) => {
+                if (object.id !== activeWorkerObjectId) return object;
+                const objectWorkers = Array.isArray(object.workers) ? object.workers : [];
+                return {
+                  ...object,
+                  workers: objectWorkers.filter(
+                    (worker) => String(worker.id) !== String(deleteWorkerId),
+                  ),
+                };
+              });
+
+          try {
+            if (activeWorkerObjectId === null) {
+              await saveBossCabinet(username, {
+                workers: nextWorkers,
+                workerObjects: nextWorkerObjects,
+              });
+              setUndoState(null);
+              await deleteWorkerRelatedData(username, deleteWorkerId, {
+                workerCode: worker?.workerCode,
+                workers: nextWorkers,
+                workerObjects: nextWorkerObjects,
+              });
+              setWorkers(nextWorkers);
+              setWorkerObjects(nextWorkerObjects);
+            } else {
+              saveForUndo();
+              setWorkerObjects(nextWorkerObjects);
+            }
+          } catch (error) {
+            console.error("Failed to completely delete worker data:", error);
+            window.alert(t("attendance_worker_delete_failed"));
+            return;
+          }
         }
       }
       setDeleteWorkerId(null);
@@ -3385,7 +3438,11 @@ if (sdr) setDollarRate(JSON.parse(sdr));
               {t("Haqiqatan ham ushbu ishchini o'chirmoqchimisiz?")}
               <br />
               <small style={{ color: "rgba(204,194,255,0.6)" }}>
-                {t("Ushbu amalni bekor qilish imkoniyati bo'ladi.")}
+                {activeWorkerObjectId === null &&
+                !isAssistant &&
+                !currentWorkers.find((worker) => worker.id === deleteWorkerId)?.assistantRecordId
+                  ? t("worker_delete_permanent_warning")
+                  : t("Ushbu amalni bekor qilish imkoniyati bo'ladi.")}
               </small>
             </div>
             <div className="confirm-buttons">

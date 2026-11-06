@@ -495,6 +495,7 @@
   "attendance_worker_saved_login_failed": "Сотрудник сохранён, но не удалось сохранить код входа или данные аккаунта. Проверьте правила Firebase и подключение.",
   "attendance_worker_save_failed": "Не удалось сохранить сотрудника. Попробуйте ещё раз.",
   "attendance_worker_delete_failed": "Не удалось удалить сотрудника. Попробуйте ещё раз.",
+  "worker_delete_permanent_warning": "Отчёты, отметки прихода, фото лица и код доступа сотрудника будут удалены без возможности отмены. Код можно будет выдать другому сотруднику.",
   "attendance_schedule_save_failed": "Не удалось сохранить рабочие дни. Попробуйте ещё раз.",
   "attendance_restart_confirm": "Статистика посещаемости будет рассчитана заново с сегодняшнего дня. Старые записи о приходах не удаляются. Продолжить?",
   "attendance_restart_failed": "Не удалось начать отсчёт посещаемости с сегодняшнего дня. Попробуйте ещё раз.",
@@ -537,5 +538,13 @@
   "attendance_camera_resize": "Уменьшите размер фото и попробуйте снова.",
   "attendance_camera_save_failed": "Не удалось сохранить фото.",
   "attendance_camera_rules_error": "Firestore запретил доступ. Опубликуйте обновлённые правила firestore.rules в проекте Firebase.",
-  "attendance_take_photo": "Сделать фото"
+  "attendance_take_photo": "Сделать фото",
+  "attendance_face_not_found": "Лицо не найдено. Посмотрите в камеру и попробуйте ещё раз.",
+  "attendance_face_detector_loading": "Загрузка распознавания лица...",
+  "attendance_face_detector_failed": "Не удалось запустить распознавание лица. Проверьте подключение и попробуйте ещё раз.",
+  "attendance_photo_confirm": "Это подходящее фото?",
+  "attendance_photo_preview_alt": "Предпросмотр фото лица",
+  "attendance_retake_photo": "Переснять",
+  "attendance_use_photo": "Подтвердить фото",
+  "attendance_switch_camera": "Переключить камеру"
 }
